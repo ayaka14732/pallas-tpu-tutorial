@@ -34,8 +34,26 @@ TensorCore 和 SparseCore 各自拥有**物理上独立的 VMEM**，它们不共
 `VMEM_SHARED` 用于 SparseCore kernel 中 Scalar Subcore 和 Vector Subcore 之间的通信。典型模式：
 
 1. Scalar Subcore 从 HBM 加载数据到 VMEM_SHARED
-2. Vector Subcore 从 VMEM_SHARED 拷贝到自己的 VMEM 进行计算
-3. 计算结果写回 VMEM_SHARED 或直接写回 HBM
+2. 通过信号量通知 Vector Subcore 数据已就绪
+3. Vector Subcore 从 VMEM_SHARED 拷贝到自己的 VMEM 进行计算
+4. 计算结果写回 HBM
+
+### 信号量基础
+
+由于 Scalar Subcore 和 Vector Subcore **并行执行**，它们之间需要信号量来同步：
+
+```python
+# 信号量是一个计数器
+pl.semaphore_signal(sem, device_id=...)  # 将目标设备上的 sem 加 1
+pl.semaphore_wait(sem, value=N)          # 阻塞直到本地 sem >= N，然后减 N
+```
+
+规则：
+- 信号量在 kernel 结束时**必须为 0**，否则程序崩溃（over-signal）或挂起（over-wait）
+- `device_id` 指定信号量所在的目标设备/subcore
+- 对于跨 subcore 通信，需要指定 `device_id={"core": i, "subcore": j}`
+
+### 完整示例：Scalar Subcore 加载 → Vector Subcore 计算
 
 ```python
 import jax
@@ -44,51 +62,144 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 from jax.experimental.pallas import tpu_sc as plsc
 
-# 获取 SparseCore 信息
+# 获取 SparseCore 硬件信息
 sc_info = pltpu.get_tpu_info().sparse_core
+num_cores = sc_info.num_cores
+num_subcores = 1  # 简化：只用 1 个 vector subcore
 
 # 创建 mesh
 vector_mesh = plsc.VectorSubcoreMesh(
     core_axis_name="core",
     subcore_axis_name="subcore",
+    num_cores=num_cores,
+    num_subcores=num_subcores,
 )
-scalar_mesh = plsc.ScalarSubcoreMesh(axis_name="core")
+scalar_mesh = plsc.ScalarSubcoreMesh(
+    axis_name="core",
+    num_cores=num_cores,
+)
 
 x = jnp.arange(128, dtype=jnp.int32)
 
-def vector_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref):
-    # Vector Subcore: 从 VMEM_SHARED 拷贝到本地 VMEM
+def vector_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref, tec_sem, scs_sem):
+    """
+    Vector Subcore 的工作：
+    1. 等待 Scalar Subcore 通知数据已加载到 VMEM_SHARED
+    2. 从 VMEM_SHARED 拷贝到本地 VMEM
+    3. 计算
+    4. 写回 HBM
+    5. 通知 Scalar Subcore 工作完成
+    """
+    # 步骤 1：等待 Scalar Subcore 的信号（数据已就绪）
+    # Scalar Subcore 会 signal 每个 vector subcore 一次
+    pl.semaphore_wait(tec_sem, num_cores)  # 等待所有 scalar core 的信号
+
+    # 步骤 2：从 VMEM_SHARED 拷贝到本地 VMEM
     local_ref = jax.empty_ref(jax.typeof(x), memory_space=pltpu.VMEM)
     pltpu.sync_copy(shared_ref, local_ref)
 
-    # 在本地 VMEM 中计算
+    # 步骤 3：在本地 VMEM 中计算（每个元素乘以 2）
     @pl.loop(0, x.size, step=sc_info.num_lanes)
     def _(i):
         s = pl.ds(i, sc_info.num_lanes)
         local_ref[s] = local_ref[s] * 2
 
-    # 写回 HBM
-    pltpu.sync_copy(local_ref, out_hbm_ref)
+    # 步骤 4：写回 HBM
+    core_idx = jax.lax.axis_index("core")
+    pltpu.sync_copy(local_ref, out_hbm_ref.at[core_idx])
 
-def scalar_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref):
-    # Scalar Subcore: 从 HBM 加载到 VMEM_SHARED
+    # 步骤 5：通知 Scalar Subcore 工作完成
+    for i in range(num_cores):
+        pl.semaphore_signal(scs_sem, device_id={"core": i})
+
+def scalar_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref, tec_sem, scs_sem):
+    """
+    Scalar Subcore 的工作：
+    1. 从 HBM 加载数据到 VMEM_SHARED
+    2. 通知所有 Vector Subcore 数据已就绪
+    3. 等待 Vector Subcore 完成计算
+    """
+    # 步骤 1：从 HBM 加载到 VMEM_SHARED
     pltpu.sync_copy(x_hbm_ref, shared_ref)
 
-# 使用 pl.kernel 同时调度两个 subcore 函数
-result = pl.kernel(
-    body=[vector_subcore_fn, scalar_subcore_fn],
-    mesh=[vector_mesh, scalar_mesh],
-    out_type=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    scratch_types=[pltpu.VMEM_SHARED(x.shape, x.dtype)],  # 共享缓冲区
-)(x)
-# result == x * 2
+    # 步骤 2：通知所有 Vector Subcore（每个 core 的每个 subcore）
+    for i in range(num_cores):
+        for j in range(num_subcores):
+            pl.semaphore_signal(tec_sem, device_id={"core": i, "subcore": j})
+
+    # 步骤 3：等待 Vector Subcore 完成
+    pl.semaphore_wait(scs_sem, num_cores * num_subcores)
+
+# 调用 kernel
+@jax.jit
+def f(x):
+    return pl.kernel(
+        body=[vector_subcore_fn, scalar_subcore_fn],
+        mesh=[vector_mesh, scalar_mesh],
+        out_type=jax.ShapeDtypeStruct((num_cores, 128), x.dtype),
+        scratch_types=[
+            pltpu.VMEM_SHARED(x.shape, x.dtype),          # shared_ref
+            pltpu.SemaphoreType.REGULAR(()) @ vector_mesh, # tec_sem（属于 Vector Subcore）
+            pltpu.SemaphoreType.REGULAR(()) @ scalar_mesh, # scs_sem（属于 Scalar Subcore）
+        ],
+    )(x)
+
+result = f(x)
+# result[core_idx] == x * 2（每个 core 各自计算一份）
 ```
 
-**关键点：**
-- `pltpu.VMEM_SHARED(shape, dtype)` 分配一块 VMEM_SHARED 区域作为 scratch
-- Scalar Subcore 和 Vector Subcore 都能通过 `sync_copy` 访问这块共享内存
-- 这允许 Scalar Subcore 做索引计算/DMA 调度，Vector Subcore 做 SIMD 计算，两者通过 VMEM_SHARED 交换数据
-- 需要信号量来同步两个 subcore 之间的执行顺序（上面的例子省略了同步，实际需要 `pl.semaphore_signal` / `pl.semaphore_wait`）
+### 信号量分配的 `@ mesh` 语法
+
+```python
+pltpu.SemaphoreType.REGULAR(()) @ vector_mesh  # 信号量属于 Vector Subcore
+pltpu.SemaphoreType.REGULAR(()) @ scalar_mesh  # 信号量属于 Scalar Subcore
+```
+
+`@ mesh` 表示信号量**物理分配在哪个 subcore 上**。这决定了：
+- 谁可以 `wait` 这个信号量（只有拥有者可以 wait）
+- 谁可以 `signal` 这个信号量（任何人都可以 signal 任何设备上的信号量）
+
+### 执行时间线
+
+```
+Scalar Subcore:  [HBM→VMEM_SHARED] → signal(tec_sem) → wait(scs_sem) → done
+                       ↓ 信号
+Vector Subcore:  wait(tec_sem) → [VMEM_SHARED→VMEM] → [计算] → [VMEM→HBM] → signal(scs_sem)
+```
+
+两个 subcore 并行执行，通过信号量实现生产者-消费者模式。
+
+### 简化版本：不需要 Scalar/Vector 协作时
+
+如果不需要 Scalar Subcore 做额外工作（如索引计算），Vector Subcore 可以直接从 HBM 加载到 VMEM_SHARED 再到本地 VMEM，不需要信号量：
+
+```python
+def vector_subcore_fn_simple(x_hbm_ref, out_hbm_ref, shared_ref):
+    # Vector Subcore 自己完成所有工作
+    pltpu.sync_copy(x_hbm_ref, shared_ref)       # HBM → VMEM_SHARED
+    local_ref = jax.empty_ref(jax.typeof(x), memory_space=pltpu.VMEM)
+    pltpu.sync_copy(shared_ref, local_ref)        # VMEM_SHARED → VMEM
+
+    @pl.loop(0, x.size, step=sc_info.num_lanes)
+    def _(i):
+        s = pl.ds(i, sc_info.num_lanes)
+        local_ref[s] = local_ref[s] * 2
+
+    pltpu.sync_copy(local_ref, out_hbm_ref)
+
+def scalar_subcore_fn_simple(x_hbm_ref, out_hbm_ref, shared_ref):
+    del x_hbm_ref, out_hbm_ref, shared_ref  # Scalar Subcore 不参与
+    pass
+```
+
+这种模式下不需要信号量，但也没有利用 Scalar Subcore 的并行能力。
+
+**关键点总结：**
+- `pltpu.VMEM_SHARED(shape, dtype)` 分配一块所有 subcore 都能访问的共享内存
+- 信号量通过 `@ mesh` 语法指定属于哪个 subcore 类型
+- `pl.semaphore_signal(sem, device_id={...})` 中的 `device_id` 指定目标
+- `pl.semaphore_wait(sem, value=N)` 阻塞直到信号量 >= N，然后减 N
+- 信号量在 kernel 结束时必须为 0（所有 signal 和 wait 必须配对）
 
 ### DMA 路径总结
 
