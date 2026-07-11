@@ -1,0 +1,22 @@
+/* Custom styles for Pallas TPU Tutorial */
+
+/* Improve code block readability */
+.highlight pre {
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+/* Better table styling */
+table.docutils {
+    font-size: 0.9rem;
+}
+
+/* Emphasize admonitions */
+.admonition.important {
+    border-left-color: #e8710a;
+}
+
+/* Math display improvements */
+.math {
+    overflow-x: auto;
+}
