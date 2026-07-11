@@ -1,112 +1,200 @@
-# 第 3 章：Grid 与 BlockSpec 深入解析
+# 第 3 章：Grid 与 BlockSpec
 
-在上一章的 Hello World 中，我们接触了 `grid` 和 `BlockSpec`。这两个概念是 Pallas 编程模型的核心，它们决定了数据如何从 HBM 被切分成小块加载到 VMEM，以及 Kernel 是如何循环执行的。
+## 循环模型
 
-本章我们将深入解析它们的语义，并学习如何处理更复杂的切分模式。理解这一章是编写任何非平凡 Kernel（如 MatMul 或 Attention）的前提。
+`pallas_call` 的 grid 参数定义了一个多维循环。对于 `grid=(M, N)`，kernel 会被调用 `M × N` 次，按字典序遍历所有 `(i, j)` 组合。每次调用时，`BlockSpec` 决定了哪些数据块被加载到 VMEM。
 
-## 循环的心智模型 (The Mental Model)
-
-在 Pallas 中，你可以把 `pallas_call` 想象成一个巨大的、由硬件协助执行的 `for` 循环。
-
-当你这样调用时：
 ```python
 pl.pallas_call(
     kernel_fn,
-    grid=(X, Y),
-    in_specs=[in_spec],
-    out_specs=out_spec
-)(input_array)
+    grid=(M, N),
+    in_specs=[block_spec_x],
+    out_specs=block_spec_z,
+)(x)
 ```
 
-它的行为在逻辑上等价于以下 Python 代码：
+逻辑上等价于：
 
 ```python
-for i in range(X):
-    for j in range(Y):
-        # 1. 根据 in_spec 计算输入切片位置，并触发 HBM -> VMEM 的 DMA 拷贝
-        in_slice = in_spec.compute_slice(i, j)
-        in_ref = input_array[in_slice]  # 此时 in_ref 指向 VMEM
-        
-        # 2. 根据 out_spec 计算输出切片位置
-        out_slice = out_spec.compute_slice(i, j)
-        out_ref = output_array[out_slice] # 此时 out_ref 指向 VMEM
-        
-        # 3. 执行 Kernel（此时数据在 VMEM 中，由 VPU/MXU 处理）
-        kernel_fn(in_ref, out_ref)
-        
-        # 4. 触发 VMEM -> HBM 的 DMA 拷贝，将 out_ref 的内容写回 output_array
+for i in range(M):
+    for j in range(N):
+        x_block = x[block_spec_x.compute_slice(i, j)]  # DMA: HBM -> VMEM
+        z_block = z[block_spec_z.compute_slice(i, j)]   # VMEM 中的输出区域
+        kernel_fn(x_block_ref, z_block_ref)             # 执行
+        # DMA: VMEM -> HBM（自动）
 ```
 
-**与 GPU 的核心区别：**
-在 CUDA 中，Grid 维度 `(X, Y)` 代表的是并发启动的线程块（Thread Blocks）。它们在不同的流多处理器（SM）上并行执行，执行顺序是**未定义的**。
-但在 TPU Pallas 中，这个网格 `(X, Y)` 保证是**按字典序严格顺序执行**的（即先遍历 `i`，再遍历 `j`）。这种顺序性保证允许我们在不同的 Grid 迭代之间传递状态（通过 Scratch Buffer），这在 GPU 上通常需要昂贵的全局内存原子操作或 Kernel 拆分。
-
-## BlockSpec 的组成
-
-`BlockSpec` 由两部分组成：
-1. `block_shape`：一个元组，定义了加载到 VMEM 中的数据块的形状。
-2. `index_map`：一个函数，它接收网格索引（Grid indices），返回块索引（Block indices）。
-
-### 块索引 (Block Indices) vs 元素切片 (Element Slices)
-
-理解 `index_map` 的关键在于：它返回的是**块索引**，而不是实际的元素偏移量。Pallas 会自动将块索引乘以 `block_shape`，从而得到真实的元素切片。
-
-例如，如果输入数组形状是 `(1024, 1024)`，`block_shape=(128, 128)`：
-如果 `index_map(i, j)` 返回 `(2, 3)`，那么实际提取的切片是：
-- 第 0 维：`2 * 128` 到 `3 * 128`，即 `256:384`
-- 第 1 维：`3 * 128` 到 `4 * 128`，即 `384:512`
-
-### 常见的 Index Map 模式
-
-#### 1. 一一映射 (1:1 Mapping)
-最常见的模式，网格索引直接对应块索引。适用于逐元素（Element-wise）操作。
-```python
-grid = (8, 8)
-block_shape = (128, 128)
-index_map = lambda i, j: (i, j)
-```
-
-#### 2. 广播 (Broadcasting)
-如果某个输入在某个网格维度上不需要切分（即所有迭代都使用同一块数据），可以让 `index_map` 在该维度返回 0。
-```python
-# 假设我们要在矩阵每一行上加一个偏置向量
-grid = (8, 8) # 遍历矩阵的行和列
-# 矩阵的 index_map
-matrix_map = lambda i, j: (i, j)
-# 偏置向量的 index_map：它不随行索引 i 变化，始终使用整块向量
-bias_map = lambda i, j: (0, j) 
-```
-
-#### 3. 降维/挤压 (Squeezing Dimensions)
-有时我们希望加载的数据块维数比原数组少。例如，从 2D 矩阵中提取 1D 的行。
-在 Pallas 中，可以通过在 `block_shape` 中使用 `None` 来实现。
+## BlockSpec 的两个组成部分
 
 ```python
-# input_array shape: (8, 128)
-# 我们想每次提取一行，即 (128,) 的一维数组
-block_shape = (None, 128)
-index_map = lambda i: (i, 0)
+pl.BlockSpec(
+    block_shape=(BM, BN),       # 每次加载的块大小
+    index_map=lambda i, j: (i, j)  # grid 索引 -> 块索引的映射
+)
 ```
-此时传入 Kernel 的 `in_ref` 形状将是 `(128,)`，而不是 `(1, 128)`。这对于避免 TPU 上的"单元素维度"性能惩罚非常重要。
 
-## 越界填充 (Out-of-Bounds Padding)
+`index_map` 返回的是**块索引**（block index），不是元素偏移。实际的元素切片 = 块索引 × block_shape。
 
-如果原数组的大小不能被 `block_shape` 整除怎么办？在 CUDA 中，我们需要在 Kernel 内部写大量的 `if (tid < N)` 边界检查代码。
+例如：数组形状 `(1024, 512)`，`block_shape=(128, 256)`，`index_map` 返回 `(2, 1)` 时，实际切片为 `[256:384, 256:512]`。
 
-Pallas 提供了一个非常优雅的特性：它会**自动处理越界读取**。当切片超出原数组边界时，Pallas 会自动在 VMEM 中填充默认值（通常是 0）。
+## 常见 index_map 模式
 
-例如，数组大小为 100，`block_shape=(128,)`。
-当加载这块数据时，VMEM 中的 `ref` 大小依然是 128，其中前 100 个元素是真实数据，后 28 个元素被填充为 0。
+**逐块遍历**（最常见）：
+```python
+# 矩阵乘法：C[i,j] = A[i,:] @ B[:,j]
+# A 的行随 i 变化，B 的列随 j 变化
+in_specs_A = pl.BlockSpec((BM, BK), lambda i, j: (i, 0))  # A 的列索引固定为 0
+in_specs_B = pl.BlockSpec((BK, BN), lambda i, j: (0, j))  # B 的行索引固定为 0
+out_specs  = pl.BlockSpec((BM, BN), lambda i, j: (i, j))
+```
 
-**注意：** 越界写入（Out-of-bounds writes）目前会导致静默丢弃（Silently dropped），写入超出边界的部分不会影响原数组，但这是一种不推荐的做法，可能在未来版本中报错。
+**广播**（某个维度不随 grid 变化）：
+```python
+# bias 对所有行广播
+bias_spec = pl.BlockSpec((BN,), lambda i, j: (j,))  # 只依赖 j，不依赖 i
+```
 
-## TPU 限制与最佳实践
+**累加模式**（多次写入同一输出块）：
+```python
+# 矩阵乘法的 K 维累加：grid=(M//BM, N//BN, K//BK)
+out_specs = pl.BlockSpec((BM, BN), lambda i, j, k: (i, j))  # 输出不依赖 k
+# 每次 k 迭代都写入同一个输出块，实现累加
+```
 
-在 TPU 上使用 BlockSpec 时，必须牢记我们在第 1 章提到的硬件限制：
+## Squeezed 维度
 
-1. **Rank 限制**：在 TPU 上，块的秩（Rank，即维度数）必须至少为 1。不支持 0D（标量）的 BlockSpec。如果需要标量，应使用 `PrefetchScalarGridSpec`（见第 10 章）。
-2. **Tile 对齐**：`block_shape` 的**最后两个维度**必须能被 8 和 128 整除，或者等于原数组对应维度的完整大小。
-   - 合法：`(256, 128)`, `(8, 256)`
-   - 非法：`(10, 100)`（除非原数组的最后两维就是 10 和 100，此时必须一次性加载整个维度）。
+当 `block_shape` 中某个维度为 `None`（或使用 `pl.Squeezed()`），该维度会从传入 kernel 的 Ref 中被压缩掉。这用于处理"沿某个维度逐片处理"的场景。
 
-掌握了 Grid 和 BlockSpec，你就可以自由地将任何大型张量切片送入 TPU 的超快 VMEM 中。下一章，我们将详细探讨 TPU 的内存空间标注，这是实现复杂 Kernel（如 FlashAttention）不可或缺的工具。
+```python
+# 输入形状 (batch, seq_len, hidden)
+# 想逐 batch 处理，kernel 内部只看到 (seq_len, hidden)
+pl.BlockSpec(
+    block_shape=(None, seq_len, hidden),  # None = 该维度被 squeeze
+    index_map=lambda b: (b, 0, 0)
+)
+# kernel 收到的 ref 形状为 (seq_len, hidden)，而非 (1, seq_len, hidden)
+```
+
+等价写法：`pl.BlockSpec(block_shape=(pl.Squeezed(), seq_len, hidden), ...)`
+
+## 越界处理（OOB Behavior）
+
+当 block 的边界超出数组实际大小时，TPU 的行为是：
+- **读取**：越界部分填充为 0
+- **写入**：越界部分被丢弃
+
+这意味着你不需要手动处理边界条件。即使数组大小不是 block_size 的整数倍，也可以安全地使用 `cdiv(size, block_size)` 作为 grid 大小。
+
+```python
+# 数组大小 1000，block_size 128
+# grid = cdiv(1000, 128) = 8
+# 最后一个块实际只有 1000 - 7*128 = 104 个有效元素
+# 读取时，后 24 个位置自动填 0
+# 写入时，后 24 个位置的写入被忽略
+```
+
+## 其他索引模式
+
+除了标准的 `BlockSpec`，Pallas 还支持以下索引模式：
+
+### pl.Element
+
+逐元素访问。kernel 收到的 Ref 是标量（0D）。通常不用于 TPU（因为标量操作效率极低），但在某些控制流场景中有用。
+
+### pl.BoundedSlice
+
+安全的有界切片，编译器可以利用边界信息进行优化：
+
+```python
+pl.BlockSpec(
+    block_shape=(pl.BoundedSlice(size=128, bound=array_size),),
+    index_map=lambda i: (i,)
+)
+```
+
+### pl.Indirect
+
+间接索引。允许通过另一个数组来决定访问哪些块。这是实现 sparse kernel 的基础：
+
+```python
+# indices 数组包含要访问的块索引
+pl.BlockSpec(
+    block_shape=(128,),
+    index_map=lambda i: (pl.Indirect(indices_ref, i),)
+)
+```
+
+## no_block_spec 与整体传入
+
+`pl.no_block_spec` 表示该输入/输出不参与自动切分，整个数组作为一个 Ref 传入 kernel。
+
+```python
+# x 按块切分，metadata 整体传入
+in_specs = [
+    pl.BlockSpec((128,), lambda i: (i,)),  # x 按块切分
+    pl.no_block_spec,                       # metadata 整体传入
+]
+```
+
+## BlockSpec 的 memory_space 参数
+
+可以指定数据应该驻留在哪个内存空间：
+
+```python
+# 数据驻留在 HBM，kernel 内部手动管理 DMA
+pl.BlockSpec(memory_space=pltpu.HBM)
+
+# 数据预加载到 VMEM（自动 DMA）
+pl.BlockSpec(memory_space=pltpu.VMEM)
+
+# 数据放在 SMEM（用于标量/索引数据）
+pl.BlockSpec(memory_space=pltpu.SMEM)
+```
+
+当使用 `memory_space=pltpu.HBM` 时，kernel 收到的 Ref 指向 HBM。此时你需要自己调用 `pltpu.make_async_copy` 来搬运数据。这是实现手动流水线的基础。
+
+## Scratch Shapes
+
+Scratch buffer 是 kernel 内部使用的临时内存，不对应任何输入或输出：
+
+```python
+scratch_shapes = [
+    pltpu.VMEM((1024, 128), jnp.float32),     # VMEM 中的临时缓冲区
+    pltpu.SMEM((16,), jnp.int32),             # SMEM 中的索引缓冲区
+    pltpu.SemaphoreType.DMA((2,)),            # DMA 信号量
+]
+```
+
+Scratch buffer 作为额外的 Ref 参数传入 kernel（在输入和输出之后）：
+
+```python
+def kernel(x_ref, y_ref, o_ref, scratch_vmem_ref, scratch_smem_ref, sem_ref):
+    # scratch_vmem_ref 是 VMEM 中的临时空间
+    # scratch_smem_ref 是 SMEM 中的临时空间
+    # sem_ref 是 DMA 信号量
+    ...
+```
+
+## 实践：2D 矩阵加法
+
+```python
+def matadd_kernel(x_ref, y_ref, z_ref):
+    z_ref[...] = x_ref[...] + y_ref[...]
+
+def matrix_add(x, y):
+    M, N = x.shape
+    BM, BN = 256, 256
+
+    block_spec = pl.BlockSpec(
+        block_shape=(BM, BN),
+        index_map=lambda i, j: (i, j)
+    )
+
+    return pl.pallas_call(
+        matadd_kernel,
+        out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
+        in_specs=[block_spec, block_spec],
+        out_specs=block_spec,
+        grid=(pl.cdiv(M, BM), pl.cdiv(N, BN)),
+    )(x, y)
+```

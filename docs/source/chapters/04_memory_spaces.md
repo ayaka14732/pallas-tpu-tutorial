@@ -1,98 +1,198 @@
-# 第 4 章：TPU 内存空间与分配
+# 第 4 章：内存空间与 DMA
 
-在前面的章节中，我们一直默认输入数据位于 HBM 中，而 Kernel 内部操作的是 VMEM 中的引用。但在复杂的算子（如 FlashAttention 或 MatMul）中，我们往往需要显式地控制数据存放的内存层级，并在不同的网格迭代之间传递状态。
+## TPU 内存空间总览
 
-本章将介绍如何在 Pallas 中显式指定内存空间，以及如何创建暂存缓冲区（Scratch Buffers）。
+| 空间 | 常量 | 容量 | 特点 |
+| :--- | :--- | :--- | :--- |
+| HBM | `pltpu.HBM` | 16-96GB | 主存。不可直接计算。DMA 访问。 |
+| VMEM | `pltpu.VMEM` | 16MB+ | 向量内存。所有向量/矩阵计算的操作数必须在此。 |
+| SMEM | `pltpu.SMEM` | 数百 KB | 标量内存。支持随机访问。用于索引、控制流数据。 |
+| CMEM | `pltpu.CMEM` | 有限 | 跨核心共享内存。用于多核通信。 |
+| VMEM_SHARED | `pltpu.VMEM_SHARED` | - | 共享 VMEM（多核场景）。 |
+| SEMAPHORE | `pltpu.SEMAPHORE` | - | 信号量空间。 |
+| HOST | `pl.HOST` | - | 主机内存。 |
 
-## TPU 的物理内存空间枚举
+## 自动 DMA vs 手动 DMA
 
-在 `jax.experimental.pallas.tpu` (通常简写为 `pltpu`) 中，定义了 TPU 的物理内存空间：
+Pallas 提供两种内存管理模式：
 
-- `pltpu.VMEM`：向量内存（Vector Memory）。它是 TPU 向量计算单元（VPU 和 MXU）的工作内存。容量通常在 16MB 到 32MB 之间。**所有向量计算的输入和输出都必须在这里。**
-- `pltpu.SMEM`：标量内存（Scalar Memory）。附属于标量核心，容量较小（几百 KB），但支持低延迟的 32-bit 细粒度随机访问。通常用于存放控制流变量和动态索引（详见第 10 章）。
-- `pltpu.HBM`：高带宽主存。容量大（16GB+），但延迟极高。
-- `pltpu.CMEM`：公共内存（Common Memory）。在某些 TPU 代次中可用，作为多核共享的 L3 缓存。
-- `pl.ANY`：让编译器自行决定最佳位置。
+**自动模式**（通过 BlockSpec 的 block_shape 和 index_map）：
+编译器自动生成 HBM ↔ VMEM 的 DMA 代码。适用于访问模式规则的场景。
 
-## 在 BlockSpec 中指定内存空间
+**手动模式**（通过 `memory_space=pltpu.HBM` + `make_async_copy`）：
+kernel 收到 HBM Ref，自己控制何时、搬运多少数据到 VMEM。适用于：
+- 不规则访问模式（如 paged attention 的按页取数据）
+- 需要精细控制流水线时序的场景
+- 数据量动态变化的场景
 
-默认情况下，`pallas_call` 假设所有输入/输出都位于 HBM 中，并在调用 Kernel 前自动生成 DMA 指令将它们搬运到 VMEM。
-
-但有时，你的输入本身就已经在 VMEM 中（例如在嵌套流水线或复杂的分布式 Kernel 中）。你可以通过在 `BlockSpec` 中指定 `memory_space` 来改变默认行为：
+## make_async_copy：手动 DMA
 
 ```python
-import jax.experimental.pallas as pl
-from jax.experimental.pallas import tpu as pltpu
-
-# 告诉编译器：这个输入不需要从 HBM 搬运，它已经在 VMEM 中了
-vmem_block_spec = pl.BlockSpec(
-    block_shape=(128, 128),
-    index_map=lambda i, j: (i, j),
-    memory_space=pltpu.VMEM
+# 创建异步拷贝描述符
+copy = pltpu.make_async_copy(
+    src_ref,    # 源 Ref（HBM 或 VMEM）
+    dst_ref,    # 目标 Ref（VMEM 或 HBM）
+    sem_ref,    # DMA 信号量
 )
+
+# 启动传输（非阻塞）
+copy.start()
+
+# ... 在此期间可以执行其他计算 ...
+
+# 等待传输完成（阻塞）
+copy.wait()
 ```
 
-如果你指定了 `memory_space=pltpu.VMEM`，编译器将**不会**生成 HBM 到 VMEM 的 DMA 拷贝指令，它期望传入 `pallas_call` 的对应参数本身就是一个驻留在 VMEM 中的引用。这在第 5 章的 `emit_pipeline` 中非常关键。
+信号量是 TPU DMA 引擎的同步机制。每次 DMA 完成时，硬件会自动递增信号量。`wait()` 会阻塞直到信号量达到预期值。
 
-## Scratch Buffers (暂存缓冲区)
-
-在编写 Kernel 时，我们经常需要一些临时的内存空间来存储中间结果，例如：
-- 矩阵乘法中的累加器（Accumulator）
-- FlashAttention 中的 running max 和 running sum
-
-这些中间结果不需要写回 HBM，它们只在 Kernel 执行期间存在于 VMEM 中。在 CUDA 中，这对应于在 Kernel 内部声明的 `__shared__` 数组。Pallas 提供了 `scratch_shapes` 参数来分配这些缓冲区。
-
-### 分配 Scratch Buffers
-
-在 `pallas_call` 中，你可以传入一个 `scratch_shapes` 列表：
+一个常见的模式是发起多次 DMA 到同一个信号量，然后一次性 wait。这在 paged attention 中很常见——逐页发起 DMA，最后统一等待：
 
 ```python
-# 分配一个形状为 (128, 128) 的 float32 VMEM 缓冲区
-acc_scratch = pltpu.VMEM((128, 128), jnp.float32)
+# 发起多次 DMA，共用一个信号量
+for page_idx in range(num_pages):
+    pltpu.make_async_copy(
+        cache_ref.at[pl.ds(page_indices[page_idx] * page_size, page_size)],
+        vmem_buf_ref.at[pl.ds(page_idx * page_size, page_size)],
+        sem_ref
+    ).start()
 
-# 分配一个形状为 (8,) 的 int32 SMEM 缓冲区
-idx_scratch = pltpu.SMEM((8,), jnp.int32)
-
-kernel = pl.pallas_call(
-    my_kernel_fn,
-    out_shape=...,
-    in_specs=[...],
-    out_specs=[...],
-    grid=(...),
-    scratch_shapes=[acc_scratch, idx_scratch]
-)
+# 一次性等待所有 DMA 完成
+# 通过对同一个 sem 再做一次 start+wait（src=dst 的空拷贝）来实现 fence
+pltpu.make_async_copy(vmem_buf_ref.at[pl.ds(0, 0)], vmem_buf_ref.at[pl.ds(0, 0)], sem_ref).wait()
 ```
 
-### 在 Kernel 中使用 Scratch Buffers
-
-`scratch_shapes` 中分配的缓冲区，会作为**额外的参数**附加在输入和输出引用之后，传递给你的 Kernel 函数。
+## 信号量类型
 
 ```python
-def my_kernel_fn(in_ref, out_ref, acc_ref, idx_ref):
-    # in_ref, out_ref 对应 in_specs 和 out_specs
-    # acc_ref 对应 acc_scratch (VMEM)
-    # idx_ref 对应 idx_scratch (SMEM)
-    
-    # 初始化累加器
-    acc_ref[...] = 0.0
-    
-    # ... 执行计算，将中间结果累加到 acc_ref ...
-    
-    # 最终结果写回 out_ref
-    out_ref[...] = acc_ref[...]
+# DMA 信号量：用于 HBM ↔ VMEM 的数据传输同步
+pltpu.SemaphoreType.DMA((num_semaphores,))
+
+# 常规信号量：用于核心间同步
+pltpu.SemaphoreType.REGULAR((num_semaphores,))
+
+# 屏障信号量：用于全局屏障
+pltpu.SemaphoreType.BARRIER((num_semaphores,))
 ```
 
-### Scratch Buffer 的生命周期与状态传递
+信号量的底层操作：
+```python
+pl.semaphore_signal(sem_ref)  # 递增信号量
+pl.semaphore_wait(sem_ref)    # 等待信号量递增
+pl.semaphore_read(sem_ref)    # 读取当前值
+```
 
-**极其重要的一点：** Scratch Buffer 的生命周期是**整个 Grid 执行期间**。
+## 双缓冲（Double Buffering）
 
-这意味着，当 Grid 从 `i=0` 推进到 `i=1` 时，Scratch Buffer 中的数据**会被保留，不会被清空**。
+双缓冲是 TPU kernel 中最基本的优化模式。核心思想：使用两块 VMEM 缓冲区交替工作——当计算单元处理缓冲区 A 中的数据时，DMA 引擎同时将下一批数据加载到缓冲区 B。
 
-**这与 GPU 的巨大区别：** 在 CUDA 中，不同的 Thread Block 在不同的流多处理器（SM）上并行执行，它们之间的共享内存（Shared Memory）是完全隔离的。如果你想在 GPU 上跨 Block 累加数据，你必须使用全局内存的原子操作（Atomic Add），这非常慢。
+```python
+def kernel(x_hbm_ref, o_hbm_ref, buf_ref, sem_ref):
+    # buf_ref: shape (2, block_size, dim) — 两个缓冲区
+    # sem_ref: shape (2,) — 两个信号量
 
-但在 TPU 上，由于 Grid 保证是**按字典序顺序执行**的，同一个物理核心会依次处理 Grid 的每一步。因此，Scratch Buffer 就成为了一个天然的、超低延迟的**状态传递容器**。
+    # Prologue：启动第一次 DMA
+    pltpu.make_async_copy(
+        x_hbm_ref.at[pl.ds(0, block_size)],
+        buf_ref.at[0],
+        sem_ref.at[0]
+    ).start()
 
-最经典的例子就是沿着归约维度（Reduction dimension）进行累加：
-如果 Grid 是 `(M, N, K)`，其中 `K` 是归约维度，那么对于相同的 `(M, N)`，随着 `K` 的增加，我们可以不断地向同一个 VMEM `acc_ref` 中累加数据，直到 `K` 遍历完毕，再将 `acc_ref` 写回 HBM。
+    @pl.loop(0, num_blocks)
+    def _(i):
+        cur = i % 2
+        nxt = 1 - cur
 
-这正是下一章"流水线与矩阵乘法"的核心机制。
+        # 等待当前数据就绪
+        pltpu.make_async_copy(
+            x_hbm_ref.at[pl.ds(i * block_size, block_size)],
+            buf_ref.at[cur],
+            sem_ref.at[cur]
+        ).wait()
+
+        # 启动下一次 DMA
+        @pl.when(i + 1 < num_blocks)
+        def _():
+            pltpu.make_async_copy(
+                x_hbm_ref.at[pl.ds((i+1) * block_size, block_size)],
+                buf_ref.at[nxt],
+                sem_ref.at[nxt]
+            ).start()
+
+        # 计算（与下一次 DMA 重叠）
+        result = some_computation(buf_ref.at[cur][...])
+        # 写回结果...
+```
+
+RPA v3 kernel 使用了**三重双缓冲**：bkv（KV cache）、bq（queries）、bo（output）各有两个缓冲区，加上 4 对 DMA 信号量（`SemaphoreType.DMA((4, 2))`），实现了输入加载、计算、输出写回的完全重叠。
+
+## Scratch Shapes
+
+Scratch buffer 是 kernel 内部使用的临时内存，不对应任何输入或输出：
+
+```python
+scratch_shapes = [
+    pltpu.VMEM((1024, 128), jnp.float32),     # VMEM 中的临时缓冲区
+    pltpu.SMEM((16,), jnp.int32),             # SMEM 中的索引缓冲区
+    pltpu.SemaphoreType.DMA((2,)),            # DMA 信号量
+]
+```
+
+Scratch buffer 作为额外的 Ref 参数传入 kernel（在输出之后）：
+
+```python
+def kernel(x_ref, o_ref, scratch_vmem_ref, scratch_smem_ref, sem_ref):
+    ...
+```
+
+Scratch buffer 的生命周期是**整个 Grid 执行期间**。Grid 从 `i=0` 推进到 `i=1` 时，scratch 中的数据会被保留。这是 TPU 顺序执行模型的直接优势——可以跨迭代累加，无需原子操作。
+
+## SMEM 的用途
+
+SMEM 附属于标量核心，支持 O(1) 随机访问。典型用途：
+
+1. **动态索引**：page table、token 长度等需要按序列号查找的数据
+2. **控制流变量**：循环计数器、条件标志、信号量索引追踪
+3. **小型查找表**：如 RPA v3 中的 `kv_lens`、`page_indices`、`cu_q_lens`
+
+通过 `PrefetchScalarGridSpec` 可以将 SMEM 数据作为 scalar prefetch 参数传入（详见第 10 章）。
+
+## with_memory_space_constraint
+
+`pltpu.with_memory_space_constraint` 用于显式指定一个数组应该驻留在哪个内存空间：
+
+```python
+# 确保输入驻留在 HBM（防止编译器将其移到 VMEM）
+q_hbm = pltpu.with_memory_space_constraint(q, pltpu.HBM)
+```
+
+这在 TPU v7+ 上特别重要。RPA v3 kernel 中，`pallas_call` 的调用方会对输入做 `with_memory_space_constraint(q, pltpu.HBM)` 来确保大张量不被意外拷贝到 VMEM。
+
+## run_scoped：动态临时内存
+
+`pl.run_scoped` 允许在 kernel 内部动态分配临时内存：
+
+```python
+def kernel(x_ref, o_ref):
+    def body(tmp_ref):
+        tmp_ref[...] = x_ref[...] * 2
+        o_ref[...] = tmp_ref[...]
+
+    pl.run_scoped(body, pltpu.VMEM((128, 128), jnp.float32))
+```
+
+## sync_copy
+
+`pltpu.sync_copy` 是 `make_async_copy().start()` + `.wait()` 的简写：
+
+```python
+pltpu.sync_copy(src_ref, dst_ref, sem_ref)
+```
+
+## 内存空间选择决策
+
+1. 大张量、流式处理 → `pltpu.HBM`（手动 DMA 或 BlockSpec 自动管理）
+2. 计算操作数 → `pltpu.VMEM`（必须）
+3. 索引、长度、页表等标量数据 → `pltpu.SMEM`
+4. 跨核心共享的小数据 → `pltpu.CMEM`
+5. 同步原语 → `pltpu.SemaphoreType.*`

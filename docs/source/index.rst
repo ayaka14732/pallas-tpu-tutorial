@@ -41,9 +41,16 @@
    chapters/10_scalar_prefetch_and_sparse
 
 .. toctree::
-   :caption: 第四部分：进阶主题
+   :caption: 第四部分：注意力机制
    :maxdepth: 2
 
    chapters/11_flash_attention
    chapters/12_distributed
    chapters/13_ragged_paged_attention
+
+.. toctree::
+   :caption: 第五部分：附录
+   :maxdepth: 2
+
+   chapters/14_api_reference
+   chapters/15_prng

@@ -1,143 +1,237 @@
-# 第 13 章：源码剖析 - Ragged Paged Attention
+# 第 13 章：Ragged Paged Attention (RPA v3)
 
-在前面的章节中，我们学习了 TPU 架构、BlockSpec、流水线、内存空间和标量预取。本章我们将把所有这些知识点融会贯通，剖析 JAX 官方代码库中最复杂、也最具代表性的生产级 Kernel 之一：**Ragged Paged Attention**。
+本章分析 vLLM 项目中的 Ragged Paged Attention v3 kernel（[源码](https://github.com/vllm-project/tpu-inference/blob/main/tpu_inference/kernels/ragged_paged_attention/v3/kernel.py)，[论文](https://arxiv.org/abs/2604.15464)）。这个 kernel 综合运用了前面所有章节的技术：手动 DMA、双缓冲流水线、标量预取、在线 Softmax、Megacore 并行。
 
-这个 Kernel 旨在解决大语言模型（LLM）推理服务器（如 vLLM）中的核心痛点：混合 Prefill（预填充）和 Decode（解码）阶段的高效注意力计算，同时支持不连续的 Paged KV Cache。
+## 问题定义
 
-*注：本章基于 JAX GitHub 仓库中的 `jax.experimental.pallas.ops.tpu.ragged_paged_attention.kernel` 源码进行分析。*
+在 LLM serving 中，一个 batch 内同时存在：
+- **Decode 请求**：q_len=1，KV cache 很长（数千 token）
+- **Prefill 请求**：q_len 很大（数百到数千），KV cache 从 0 开始增长
 
-## 生产级推理的极端挑战
+传统做法是分开处理（decode batch 和 prefill batch 分别调度），但这浪费了 TPU 算力——decode 是 memory-bound，prefill 是 compute-bound，混合处理可以更好地利用硬件。
 
-在真实的推理服务器中，情况远比标准的 FlashAttention 复杂：
-1. **动态索引 (Paged Cache)**：KV Cache 不是连续的张量，而是打散存储在大小固定的物理内存页（Pages）中。我们需要通过 `page_indices` 查找物理地址。
-2. **长度不一 (Ragged)**：批处理（Batching）的请求中，每个 Sequence 的 Query 长度和 KV 长度都不同。
-3. **极高的内存带宽要求**：在 Decode 阶段，Query 长度通常为 1，这是一个极端的 Memory-bound 操作。必须使用双缓冲隐藏 KV Cache 的加载延迟。
-4. **混合负载 (Chunked Prefill)**：同一个 Batch 中，可能有的请求在做 Prefill（长 Query），有的在做 Decode（单 Query），计算负载极度不均衡。
+## 三种调度模式
 
-## 整体架构与 Megacore 负载均衡
+RPA v3 根据 batch 组成选择不同的 kernel 配置：
+
+| 模式 | 条件 | q_len 处理 | 优化目标 |
+| :--- | :--- | :--- | :--- |
+| Decode | 所有请求 q_len=1 | static_q_len=1 | 最大化 HBM 带宽利用 |
+| Prefill | 所有请求 q_len 相同 | chunk_prefill_size | 最大化 MXU 利用 |
+| Mixed | 混合 | 动态 | 平衡两者 |
+
+每种模式有独立的 block size 配置和 `pallas_call` 调用。
+
+## Grid 设计
 
 ```python
-# 核心网格设计
-grid = (num_heads_blks, num_q_blks)
+grid = (1,)  # 只有一个 grid cell
+```
 
+所有循环逻辑在 kernel 内部通过 `pl.loop` 实现。原因：不同序列的工作量不同（ragged），无法用静态 grid 表达。
+
+### 循环结构
+
+```
+pl.loop(start_seq_idx, end_seq_idx)          # 遍历序列
+    pl.loop(0, num_bq)                        # 遍历 Q 块
+        pl.loop(start_bkv_idx, end_bkv_idx)   # 遍历 KV 块
+            pl.loop(0, num_loops)              # 计算子块
+```
+
+## 内存管理
+
+### 三组双缓冲
+
+```python
+# Scratch buffers (VMEM)
+bkv_buf: (2, BKV, head_dim)    # KV cache 双缓冲
+bq_buf:  (2, BQ, head_dim)     # Query 双缓冲
+bo_buf:  (2, BQ, head_dim)     # Output 双缓冲
+```
+
+四组 DMA 信号量：
+```python
+sems: SemaphoreType.DMA((4, 2))
+# sems[0]: bkv 信号量
+# sems[1]: bq 信号量
+# sems[2]: bo 信号量
+# sems[3]: kv_cache_update 信号量
+```
+
+### Paged KV Cache 布局
+
+```
+[total_pages, page_size, num_kv_heads_x2 // kv_packing, kv_packing, head_dim]
+```
+
+K 和 V 交错存储（`num_kv_heads_x2`），并且可能被 pack 到一起（`kv_packing`）以减少 DMA 次数。
+
+## 手动 DMA：_fetch_bkv
+
+```python
+def _fetch_bkv(page_indices_ref, kv_cache_ref, bkv_buf, sem, block_idx):
+    pages_per_block = BKV // page_size
+
+    # 逐 page 发起 DMA（page 物理不连续）
+    for p in range(pages_per_block):
+        page_idx = page_indices_ref[block_idx * pages_per_block + p]
+        pltpu.make_async_copy(
+            kv_cache_ref.at[page_idx, :, head_idx, :, :],
+            bkv_buf.at[p * page_size : (p+1) * page_size, :],
+            sem,
+        ).start()
+```
+
+每个 page 需要单独的 DMA 操作，因为物理页不连续。
+
+## FlashAttention 分步实现
+
+RPA v3 将 FlashAttention 拆分为两步，实现 MXU 和 VPU 的重叠：
+
+### Step 1: QK + Softmax (VPU 密集)
+
+```python
+def step1_qk_softmax(q_buf, k_buf, m_scratch, l_scratch):
+    # QK^T (MXU)
+    qk = jnp.dot(q_buf, k_buf.T, preferred_element_type=jnp.float32) * scale
+
+    # Causal mask (VPU)
+    mask = lax.broadcasted_iota(...) >= lax.broadcasted_iota(...)
+    qk = jnp.where(mask, qk, -jnp.inf)
+
+    # Online softmax (VPU)
+    m_old = m_scratch[...]
+    m_new = jnp.maximum(m_old, jnp.max(qk, axis=-1))
+    correction = jnp.exp(m_old - m_new)
+    p = jnp.exp(qk - m_new[:, None])
+    l_scratch[...] = l_scratch[...] * correction + jnp.sum(p, axis=-1)
+    m_scratch[...] = m_new
+
+    return p, correction
+```
+
+### Step 2: PV 累加 (MXU 密集)
+
+```python
+def step2_pv(p, v_buf, correction, o_scratch):
+    o_scratch[...] = o_scratch[...] * correction[:, None]
+    o_scratch[...] += jnp.dot(
+        p.astype(jnp.bfloat16),
+        v_buf.astype(jnp.bfloat16),
+        preferred_element_type=jnp.float32,
+    )
+```
+
+Step 2 的 MXU 操作可以与下一次 Step 1 的 VPU 操作重叠。
+
+## 主循环流水线
+
+```python
+# Prologue
+fetch_bkv(0, buf=0)
+fetch_bq(0, buf=0)
+
+@pl.loop(0, num_kv_blocks)
+def _(i):
+    buf = i % 2
+
+    # 等待当前 KV 块就绪
+    wait_dma(bkv_sem[buf])
+
+    # 预取下一个 KV 块（与计算重叠）
+    @pl.when(i + 1 < num_kv_blocks)
+    def _():
+        fetch_bkv(i + 1, buf=1-buf)
+
+    # Step 1: QK + softmax
+    p, correction = step1_qk_softmax(q, k_buf[buf])
+
+    # Step 2: PV 累加
+    step2_pv(p, v_buf[buf], correction, o_scratch)
+
+# Epilogue: 归一化并写回
+inv_l = pl.reciprocal(l_scratch[...], approx=True)
+o_ref[...] = (o_scratch[...] * inv_l[:, None]).astype(o_ref.dtype)
+```
+
+## Strided Load/Store
+
+由于 KV cache 的 packed 布局，需要 strided 操作提取 K 和 V：
+
+```python
+def strided_load(src_ref, dst_buf, stride):
+    src_reinterpreted = pltpu.bitcast(src_ref, target_dtype)
+    dst_buf[...] = src_reinterpreted[::stride, :]
+```
+
+## Bank Conflict 避免
+
+当多个 DMA 操作同时访问 VMEM 的同一 bank 时产生冲突：
+
+```python
+# 增加 stride 偏移避免 bank conflict
+bkv_stride = num_kv_heads_x2_per_kv_packing + 1  # +1 避免冲突
+```
+
+## CompilerParams 配置
+
+```python
 compiler_params = pltpu.CompilerParams(
-    dimension_semantics=("arbitrary", "arbitrary")
+    dimension_semantics=(pltpu.GridDimensionSemantics.PARALLEL,),
+    vmem_limit_bytes=...,
+    disable_bounds_checks=True,
+    disable_semaphore_checks=True,
 )
 ```
 
-Kernel 的 Grid 维度是 `(头分组数量, Query块数量)`。
-非常值得注意的是 `dimension_semantics=("arbitrary", "arbitrary")`。
+生产环境关闭检查以提高性能。
 
-**为什么不用 `parallel`？**
-因为这是一个 Ragged 任务。有的 Query 块可能对应一个很长的 KV Cache，需要计算很久；有的 Query 块对应的 KV Cache 很短，瞬间就计算完了。如果强制使用 `parallel` 静态划分任务给 Megacore 的两个核心，必然导致一个核心早早空闲，另一个核心还在苦苦计算。
+## 设计决策分析
 
-标记为 `arbitrary` 允许 TPU 编译器（Mosaic）和硬件调度器在运行时动态地进行**负载均衡**。先空闲下来的核心会自动抓取下一个 Grid 任务。
+### 为什么 grid=(1,)？
 
-## 标量预取 (Scalar Prefetch) 的极致应用
+Ragged batch 中每个序列的工作量不同。静态 grid 需要 padding 到最大长度，浪费算力。`pl.loop` 在 kernel 内部动态循环，精确处理每个序列的实际长度。
 
-由于每个 Sequence 的元数据（长度、页索引等）各不相同，这些数据必须被放入低延迟的 SMEM 中，供 Kernel 内部的控制流（`while_loop`）使用。
+### 为什么三种模式？
 
-```python
-scalar_prefetches = (
-    kv_lens,         # 每个序列的真实的 KV 长度
-    page_indices,    # 物理页映射表 [num_seqs, max_pages]
-    cu_q_lens,       # Query 长度的前缀和 (用于定位 Q 在展平数组中的起始位置)
-    seq_buf_idx_ref, # 跨 Grid 传递状态的计数器
-    num_seqs,        # 总序列数
-)
+不同 q_len 的最优 block size 不同：
+- Decode (q_len=1)：BQ 小，BKV 大（memory-bound，最大化带宽）
+- Prefill (q_len 大)：BQ 和 BKV 都大（compute-bound，最大化 MXU）
 
-grid_spec = pltpu.PrefetchScalarGridSpec(
-    num_scalar_prefetch=5, # 前 5 个参数全部进入 SMEM
-    in_specs=[q_block_spec, pl.BlockSpec(memory_space=pl.ANY)], # 注意 KV Cache 的空间是 ANY/HBM
-    ...
-)
-```
+### 为什么手动 DMA？
 
-**关键点：** KV Cache `kv_pages` 被标记为 `memory_space=pl.ANY`（实际上驻留在 HBM），并且**没有给出具体的 BlockSpec 映射**。
-为什么？因为它的读取完全是动态的。编译器在 Host 端根本不知道该搬运哪些页。搬运工作必须在 Kernel 内部由代码手动指挥。
+Paged KV cache 的物理页不连续，且每个序列的页数不同。BlockSpec 只能表达静态、规则的访问模式。手动 DMA 是唯一选择。
 
-## Scratch Buffers 与手动 DMA 信号量
+### 为什么 K/V packed 存储？
 
-为了在 Kernel 内部手动控制 KV Cache 的加载和流水线，代码分配了多个 VMEM 缓冲区和 DMA 信号量（Semaphores）：
+减少 DMA 次数。一次 DMA 同时获取 K 和 V，在 VMEM 中用 strided_load 分离。DMA 带宽是瓶颈时，减少 DMA 次数比增加 VMEM 计算更划算。
 
-```python
-# 双缓冲的 KV Cache 容器
-double_buf_scratch = pltpu.VMEM(
-    (2, num_kv_pages_per_blk, page_size, num_combined_kv_heads_per_blk, head_dim),
-    kv_pages.dtype,
-)
-scratch_shapes = [
-    double_buf_scratch,             # kv_bufs: 长度为 2 的双缓冲
-    pltpu.SemaphoreType.DMA((2,)),  # 两个 DMA 信号量，用于同步双缓冲
-    lm_scratch,                     # l_ref: FlashAttention 的 running sum
-    lm_scratch,                     # m_ref: FlashAttention 的 running max
-    acc_scratch,                    # acc_ref: 最终输出累加器
-]
-```
+## 关键 API 汇总
 
-## 深入 Kernel：MultiPageAsyncCopyDescriptor
+| API | 用途 |
+| :--- | :--- |
+| `pl.loop` | Pallas 循环 |
+| `pl.when` | 条件执行 |
+| `pl.ds` | 动态切片 |
+| `pl.reciprocal(x, approx=True)` | 快速倒数 |
+| `pltpu.make_async_copy` | 手动 DMA |
+| `pltpu.bitcast` | 类型重解释 |
+| `pltpu.PrefetchScalarGridSpec` | 标量预取 |
+| `pltpu.SemaphoreType.DMA` | DMA 信号量 |
+| `pltpu.VMEM` / `pltpu.HBM` | 内存空间标记 |
+| `pltpu.CompilerParams` | 编译器参数 |
+| `pltpu.GridDimensionSemantics.PARALLEL` | 多核并行 |
+| `lax.broadcasted_iota` | 即时生成 mask |
+| `input_output_aliases` | 原地更新 |
 
-这是整个 Kernel 最硬核、最底层的地方。由于 KV Cache 是一页一页离散存储的，Kernel 内部定义了一个 `MultiPageAsyncCopyDescriptor` 类。它在循环内部，根据 SMEM 中的动态索引，手动发起从 HBM 到 VMEM 的异步拷贝。
+## 性能优化清单
 
-```python
-# 伪代码逻辑展示
-def start_async_copy(seq_id, logical_page_start_idx, vmem_buf, sem):
-    for i in range(num_kv_pages_per_blk):
-        # 1. 从 SMEM 中的 page_indices 读取物理页号
-        physical_page_idx = page_indices_ref[seq_id, logical_page_start_idx + i]
-        
-        # 2. 构造从 HBM 到 VMEM 的异步拷贝指令
-        # 注意：kv_pages_hbm_ref.at[physical_page_idx] 是动态的 HBM 地址
-        async_copy = pltpu.make_async_copy(
-            kv_pages_hbm_ref.at[physical_page_idx],
-            vmem_buf.at[i],
-            sem # 绑定到信号量
-        )
-        async_copies.append(async_copy)
-    
-    # 触发 DMA 引擎开始搬运
-    start_all_copies(async_copies)
-```
-
-## 嵌套的 while_loop 与手动软件流水线
-
-由于每个 Sequence 的长度不同，Kernel 无法使用简单的 `for` 循环，必须使用 `jax.lax.while_loop`。
-
-外层 `while_loop` 遍历当前 Grid 负责的 Query 块，内层 `while_loop` 遍历该 Query 对应的所有 KV 块。
-
-因为我们放弃了 `emit_pipeline`（它不支持动态循环和离散页），我们必须**手动实现双缓冲流水线**：
-
-```python
-# 内层 while_loop 的核心流水线逻辑 (高度简化版)
-def compute_with_kv_blk_in_cur_seq(kv_states):
-    cur_buf_idx = kv_states.buf_idx
-    next_buf_idx = 1 - cur_buf_idx # 切换缓冲区 (0 -> 1 -> 0)
-    
-    # 1. 发起下一个块的异步预取 (到 next_buf_idx)
-    # 这会在后台运行，不阻塞计算
-    @pl.when(has_next_kv_blk)
-    def prefetch_next_kv_blk():
-        start_async_copy(seq_id, next_logical_page, kv_bufs[next_buf_idx], semaphores[next_buf_idx])
-        
-    # 2. 等待当前块的 DMA 完成
-    # 如果 DMA 还没搬完，计算单元会在这里挂起等待
-    semaphores[cur_buf_idx].wait()
-    
-    # 3. 执行核心计算 (FlashAttention)
-    # 使用 VMEM 中的 cur_buf_idx 数据
-    flash_attention(q, kv_bufs[cur_buf_idx], l_ref, m_ref, acc_ref)
-    
-    # 4. 释放当前缓冲区的信号量，表示计算完毕，DMA 引擎可以覆盖它了
-    semaphores[cur_buf_idx].signal()
-    
-    return next_state
-```
-
-## 总结
-
-Ragged Paged Attention Kernel 是 Pallas 表达能力的巅峰展现。它证明了：
-- Pallas 不仅仅能做静态的矩阵切块（像大多数深度学习编译器做的那样）。
-- 通过 SMEM 标量预取、VMEM Scratch 显式分配、以及底层的异步 DMA API（`make_async_copy` 和信号量），开发者可以在 TPU 上实现极其复杂、高度动态的控制流和内存管理。
-- 这种在高级 Python 语法下直接操纵底层硬件的能力，使得 TPU 能够胜任最前沿、最苛刻的大模型推理需求。
-
-如果你能完全理解这个 Kernel 的源码结构和设计动机，你已经具备了顶级的 TPU Kernel 开发能力！祝你在面试中脱颖而出！
+1. **三级流水线**：DMA 预取、QK 计算、PV 累加三者重叠
+2. **双缓冲**：所有数据通路都使用双缓冲
+3. **Packed 布局**：减少 DMA 次数
+4. **Bank conflict 避免**：stride 偏移
+5. **Megacore 并行**：batch × head 维度并行到多核
+6. **动态循环**：精确处理 ragged 工作量，无 padding 浪费
+7. **编译器提示**：关闭不必要的检查，设置 VMEM 限制
+8. **近似倒数**：`pl.reciprocal(x, approx=True)` 避免昂贵的除法
