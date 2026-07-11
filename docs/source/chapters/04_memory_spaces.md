@@ -2,16 +2,107 @@
 
 ## TPU 内存空间总览
 
-| 空间 | 常量 | 容量 | 特点 |
+| 空间 | 常量 | 容量（典型值） | 特点 |
 | :--- | :--- | :--- | :--- |
 | HBM | `pltpu.HBM` / `pl.ANY` | 32-192GB | 主存。不可直接计算。DMA 访问。 |
-| VMEM | `pltpu.VMEM` | 16MB+ | 向量内存。所有向量/矩阵计算的操作数必须在此。 |
-| SMEM | `pltpu.SMEM` | 数百 KB | 标量内存。支持随机访问。用于索引、控制流数据。 |
-| CMEM | `pltpu.CMEM` | 有限 | 跨核心共享内存。用于多核通信。 |
-| VMEM_SHARED | `pltpu.VMEM_SHARED` | - | 共享 VMEM（SparseCore 多 subcore 共享）。 |
-| SEMAPHORE | `pltpu.SEMAPHORE` | - | 信号量空间。 |
+| VMEM (TensorCore) | `pltpu.VMEM` | 16-192MB / 核 | TensorCore 的向量内存。所有 TC 计算操作数必须在此。 |
+| VMEM (SparseCore) | `pltpu.VMEM` | 256-512KB / subcore | SparseCore 每个 Vector Subcore 的本地向量内存。 |
+| VMEM_SHARED | `pltpu.VMEM_SHARED` | 共享池 | SparseCore 所有 Vector Subcore + Scalar Subcore 共享的内存。 |
+| SMEM | `pltpu.SMEM` | 16KB-1MB / 核 | 标量内存。支持随机访问。用于索引、控制流数据。 |
+| SEMAPHORE | `pltpu.SemaphoreType.*` | - | 信号量空间。 |
 
 核心规则：**所有计算必须在 VMEM 中进行**。数据从 HBM 到 VMEM 的搬运由 DMA 引擎负责。
+
+## TensorCore VMEM vs SparseCore VMEM
+
+TensorCore 和 SparseCore 各自拥有**物理上独立的 VMEM**，它们不共享：
+
+| 属性 | TensorCore VMEM | SparseCore VMEM |
+| :--- | :--- | :--- |
+| 所属单元 | TensorCore（MXU + VPU） | 每个 Vector Subcore |
+| 容量 | 16MB (v4) ~ 192MB (8i) | 256KB (v6e) ~ 512KB (v5p/v7) |
+| 数量 | 每个 TensorCore 一块 | 每个 SparseCore 有 16 块（每个 subcore 一块）|
+| 用途 | 密集计算（matmul、向量运算） | 稀疏/随机访问（gather、scatter、sort）|
+| Pallas 常量 | `pltpu.VMEM` | `pltpu.VMEM`（相同常量，上下文决定）|
+
+虽然 Pallas 中都用 `pltpu.VMEM` 表示，但编译器根据 kernel 运行在哪个 mesh（`TensorCoreMesh` vs `VectorSubcoreMesh`）来决定实际映射到哪块物理内存。
+
+**VMEM_SHARED** 是 SparseCore 独有的概念：它是所有 Vector Subcore 和 Scalar Subcore 都能访问的共享内存区域。在其他文档中也被称为 "SPMEM"。它的主要用途是 Scalar Subcore 和 Vector Subcore 之间的数据交换。
+
+## VMEM_SHARED 的用法
+
+`VMEM_SHARED` 用于 SparseCore kernel 中 Scalar Subcore 和 Vector Subcore 之间的通信。典型模式：
+
+1. Scalar Subcore 从 HBM 加载数据到 VMEM_SHARED
+2. Vector Subcore 从 VMEM_SHARED 拷贝到自己的 VMEM 进行计算
+3. 计算结果写回 VMEM_SHARED 或直接写回 HBM
+
+```python
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+from jax.experimental.pallas import tpu as pltpu
+from jax.experimental.pallas import tpu_sc as plsc
+
+# 获取 SparseCore 信息
+sc_info = pltpu.get_tpu_info().sparse_core
+
+# 创建 mesh
+vector_mesh = plsc.VectorSubcoreMesh(
+    core_axis_name="core",
+    subcore_axis_name="subcore",
+)
+scalar_mesh = plsc.ScalarSubcoreMesh(axis_name="core")
+
+x = jnp.arange(128, dtype=jnp.int32)
+
+def vector_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref):
+    # Vector Subcore: 从 VMEM_SHARED 拷贝到本地 VMEM
+    local_ref = jax.empty_ref(jax.typeof(x), memory_space=pltpu.VMEM)
+    pltpu.sync_copy(shared_ref, local_ref)
+
+    # 在本地 VMEM 中计算
+    @pl.loop(0, x.size, step=sc_info.num_lanes)
+    def _(i):
+        s = pl.ds(i, sc_info.num_lanes)
+        local_ref[s] = local_ref[s] * 2
+
+    # 写回 HBM
+    pltpu.sync_copy(local_ref, out_hbm_ref)
+
+def scalar_subcore_fn(x_hbm_ref, out_hbm_ref, shared_ref):
+    # Scalar Subcore: 从 HBM 加载到 VMEM_SHARED
+    pltpu.sync_copy(x_hbm_ref, shared_ref)
+
+# 使用 pl.kernel 同时调度两个 subcore 函数
+result = pl.kernel(
+    body=[vector_subcore_fn, scalar_subcore_fn],
+    mesh=[vector_mesh, scalar_mesh],
+    out_type=jax.ShapeDtypeStruct(x.shape, x.dtype),
+    scratch_types=[pltpu.VMEM_SHARED(x.shape, x.dtype)],  # 共享缓冲区
+)(x)
+# result == x * 2
+```
+
+**关键点：**
+- `pltpu.VMEM_SHARED(shape, dtype)` 分配一块 VMEM_SHARED 区域作为 scratch
+- Scalar Subcore 和 Vector Subcore 都能通过 `sync_copy` 访问这块共享内存
+- 这允许 Scalar Subcore 做索引计算/DMA 调度，Vector Subcore 做 SIMD 计算，两者通过 VMEM_SHARED 交换数据
+- 需要信号量来同步两个 subcore 之间的执行顺序（上面的例子省略了同步，实际需要 `pl.semaphore_signal` / `pl.semaphore_wait`）
+
+### DMA 路径总结
+
+```
+TensorCore 路径:
+  HBM ←DMA→ TC VMEM ←load/store→ VREG (计算)
+
+SparseCore 路径:
+  HBM ←DMA→ VMEM_SHARED ←DMA→ SC VMEM (per-subcore) ←SIMD→ 计算
+  HBM ←DMA→ SC VMEM (直接，跳过 VMEM_SHARED)
+  HBM ←DMA→ SMEM (Scalar Subcore 标量访问)
+```
+
+在 SparseCore 上，`VMEM_SHARED` 充当了 HBM 和各 Vector Subcore 本地 VMEM 之间的中转站。但也可以直接从 HBM DMA 到 per-subcore VMEM（通过 `emit_pipeline` 的 `core_axis_name` 自动分配）。
 
 ## 自动 DMA vs 手动 DMA
 
@@ -591,15 +682,21 @@ pltpu.SemaphoreType.BARRIER(())
 ## 内存空间选择决策树
 
 ```
-需要计算？
-├── 是 → VMEM（必须）
-└── 否 → 需要随机访问标量？
-          ├── 是 → SMEM
-          └── 否 → 数据量大？
-                    ├── 是 → HBM（手动 DMA 管理）
-                    └── 否 → 跨核共享？
-                              ├── 是 → CMEM / VMEM_SHARED
-                              └── 否 → VMEM scratch
+TensorCore kernel:
+  需要计算？
+  ├── 是 → VMEM（必须）
+  └── 否 → 需要标量随机访问？
+            ├── 是 → SMEM
+            └── 否 → 数据量大？
+                      ├── 是 → HBM（手动 DMA 管理）
+                      └── 否 → VMEM scratch
+
+SparseCore kernel:
+  需要跨 subcore 共享？
+  ├── 是 → VMEM_SHARED
+  └── 否 → 需要标量操作？
+            ├── 是 → SMEM (Scalar Subcore)
+            └── 否 → VMEM (per-subcore 本地)
 ```
 
 ## 与 GPU 的对比
