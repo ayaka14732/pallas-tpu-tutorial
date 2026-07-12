@@ -76,18 +76,18 @@ def global_max_kernel(x_ref, o_ref, max_scratch_ref):
     # 第一次迭代时初始化 scratch
     @pl.when(i == 0)
     def _():
-        max_scratch_ref[0, 0] = jnp.float32(-jnp.inf)
+        max_scratch_ref[...] = jnp.full(TILE, jnp.float32(-jnp.inf))
 
     # x_ref: 当前分块，已在 VMEM 中
-    block_max = jnp.max(x_ref[...].astype(jnp.float32))  # 块内归约
+    block_max = jnp.broadcast_to(jnp.max(x_ref[...].astype(jnp.float32), keepdims=True), TILE)  # 块内归约
 
     # 与历史最大值比较
-    max_scratch_ref[0, 0] = jnp.maximum(max_scratch_ref[0, 0], block_max)
+    max_scratch_ref[...] = jnp.maximum(max_scratch_ref[...], block_max)
 
     # 最后一次迭代时写入输出
     @pl.when(i == pl.num_programs(0) - 1)
     def _():
-        o_ref[0, 0] = max_scratch_ref[0, 0].astype(o_ref.dtype)
+        o_ref[...] = max_scratch_ref[...].astype(o_ref.dtype)
 
 def find_global_max(x: jax.Array) -> jax.Array:
     """x: (rows, cols)，返回全局最大值"""
@@ -150,11 +150,11 @@ def find_global_max_pipelined(x: jax.Array) -> jax.Array:
             max_acc=pltpu.VMEM(TILE, jnp.float32),  # (8, 128)，只用 [0,0]
         )
         def _(max_acc):
-            max_acc[0, 0] = jnp.float32(-jnp.inf)
+            max_acc[...] = jnp.full(TILE, jnp.float32(-jnp.inf))
 
             def body(x_ref):
-                block_max = jnp.max(x_ref[...].astype(jnp.float32))
-                max_acc[0, 0] = jnp.maximum(max_acc[0, 0], block_max)
+                block_max = jnp.broadcast_to(jnp.max(x_ref[...].astype(jnp.float32), keepdims=True), TILE)
+                max_acc[...] = jnp.maximum(max_acc[...], block_max)
 
             pltpu.emit_pipeline(
                 body,
@@ -169,7 +169,7 @@ def find_global_max_pipelined(x: jax.Array) -> jax.Array:
                 o_vmem=pltpu.VMEM(TILE, x.dtype),  # (8, 128)
             )
             def _(o_vmem):
-                o_vmem[0, 0] = max_acc[0, 0].astype(x.dtype)
+                o_vmem[...] = max_acc[...].astype(x.dtype)
                 pltpu.sync_copy(o_vmem, o_hbm_ref)
 
     result = pl.pallas_call(
