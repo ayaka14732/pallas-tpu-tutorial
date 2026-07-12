@@ -1,4 +1,43 @@
-# 第 2 章：Pallas Hello World
+# 第 2 章：配置 Pallas TPU 开发环境
+
+## 在 GCP 上开发
+
+通常是租一个 Cloud TPU。
+
+安装最新版的 JAX。
+
+```python
+pip install -U "jax[tpu]"
+```
+
+测试：
+
+```python
+from jax.experimental.pallas import tpu as pltpu
+print(pltpu.get_tpu_info())
+```
+
+## 在 Colab 上使用
+
+虽然 Colab 环境自带 JAX，但由于 Pallas 是一个正在开发中的库，要安装最新版本。
+
+首先在第一个 cell 中
+
+
+```
+!pip install -q -U "jax[tpu]"
+```
+
+完成后在第二个 cell 中
+
+```
+import os
+os.kill(os.getpid(), 9)
+```
+
+意思是……，会自动重启环境，然后就可以进行开发。
+
+Colab 目前只有 TPU v5e，不含 SparseCore，因此无法运行本教程中与 SparseCore 相关的代码。
 
 ## 编程模型概览
 
@@ -157,3 +196,69 @@ def kernel(x_ref, o_ref):
 ```
 
 注意：`debug_print` 会引入同步点，影响性能。仅用于调试，生产代码中应移除。
+
+## 打印 LLO
+
+```python
+# based on https://openxla.org/xla/hlo_dumps#mosaic
+import os
+os.environ["LIBTPU_INIT_ARGS"] = "--xla_mosaic_dump_to=/tmp/mosaic_dumps"
+
+import functools
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+from jax.experimental.pallas import tpu as pltpu
+import time
+import subprocess
+
+print(jax.print_environment_info())
+print(pltpu.get_tpu_info())
+```
+
+```python
+import glob
+import os
+import warnings
+
+magic_str = "tpu_kernel_tutorial_766136783" 
+
+def pallas_call_wrapper(*args, **kwargs):
+    for path in glob.glob("/tmp/mosaic_dump/*.txt"):
+        try:
+            os.remove(path)
+        except OSError:
+            warnings.warn(f'Failed to remove file {path}')
+
+    if 'name' in kwargs:
+        warnings.warn(f'Overriding existing name {kwargs['name']}')
+        del kwargs['name']
+
+    return pl.pallas_call(*args, **kwargs, name=custom_str)
+
+import os
+
+def show_compiled_llo():
+    matched = []
+
+    for root, _, files in os.walk("/tmp/mosaic_dumps"):
+        for filename in files:
+            if not filename.endswith("post-finalize-llo.txt"):
+                continue
+
+            path = os.path.join(root, filename)
+
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    if custom_str in f.read():
+                        matched.append(path)
+            except OSError as e:
+                print(f"Failed to read {path}: {e}")
+
+    if matched:
+        path = max(matched)
+        print(f"------------------- File {path} -------------------")
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            print(f.read().strip())
+```
+

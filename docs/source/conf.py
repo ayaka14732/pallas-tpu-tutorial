@@ -1,7 +1,7 @@
 # Configuration file for the Sphinx documentation builder.
 
 project = 'Pallas TPU Kernel 开发教程'
-copyright = '2025, Pallas TPU Tutorial Contributors'
+copyright = '2026, Pallas TPU Tutorial Contributors'
 author = 'Pallas TPU Tutorial Contributors'
 
 extensions = [
