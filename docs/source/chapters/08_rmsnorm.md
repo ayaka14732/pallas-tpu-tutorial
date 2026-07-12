@@ -20,6 +20,43 @@
 - Grid 的每个迭代处理一个分块
 - Scratch buffer 保存跨迭代的中间结果（利用 TPU 顺序执行模型）
 
+### TPU VMEM 的 Tile 对齐约束
+
+在写归约算子之前，必须理解 TPU 的一个硬件约束：
+
+**VMEM 不支持标量或任意小 shape。** 所有 VMEM 中的数据必须对齐到原生 tile 大小：
+
+| 数据类型 | 原生 tile 大小 (sublanes × lanes) |
+| :--- | :--- |
+| float32 / int32 | (8, 128) |
+| bfloat16 / float16 | (16, 128) |
+| int8 | (32, 128) |
+
+如果你尝试分配 `pltpu.VMEM((1,), jnp.float32)` 或将标量存入 VMEM，会得到：
+```
+ValueError: Cannot store scalars to VMEM
+```
+
+**解决方案：** 用最小合法 tile 大小来存储归约结果，只使用其中一个元素：
+
+```python
+# 错误：标量或 (1,) 无法存入 VMEM
+pltpu.VMEM((1,), jnp.float32)  # ValueError!
+
+# 正确：使用最小 tile 大小
+pltpu.VMEM((8, 128), jnp.float32)  # 合法，只用 [0, 0] 存储结果
+```
+
+这看起来浪费空间（只用 1 个元素却分配 1024 个），但 VMEM 容量很大（16MB+），这点开销忽略不计。
+
+另外，如果归约结果需要写回 HBM，输出形状也需要对齐。或者可以用 SMEM 存储标量结果（SMEM 支持任意大小）：
+
+```python
+# 替代方案：用 SMEM 存储标量归约结果
+pltpu.SMEM((1,), jnp.float32)  # 合法，SMEM 支持任意大小
+# 但注意：SMEM 不能做向量计算，只能存储标量值
+```
+
 ### 版本 1：最简单的全局 Max
 
 ```python
@@ -29,85 +66,78 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 import functools
 
-def global_max_kernel(x_ref, _o_ref, max_scratch_ref):
+# 最小 tile 大小（用于存储标量归约结果）
+TILE = (8, 128)
+
+def global_max_kernel(x_ref, o_ref, max_scratch_ref):
     """每次处理一个分块，维护全局 max"""
-    # x_ref: 当前分块，已在 VMEM 中
-    block_max = jnp.max(x_ref[...])  # 块内归约
-
-    # 与历史最大值比较
-    current_max = max_scratch_ref[0]
-    max_scratch_ref[0] = jnp.maximum(current_max, block_max)
-
-def global_max_epilogue(o_ref, max_scratch_ref):
-    """最后一次迭代后，将结果写入输出"""
-    o_ref[0] = max_scratch_ref[0]
-
-def find_global_max(x: jax.Array) -> jax.Array:
-    """x: (rows, cols)，返回全局最大值（标量）"""
-    rows, cols = x.shape
-    BLOCK_ROWS = 8
-    num_blocks = rows // BLOCK_ROWS
-
-    return pl.pallas_call(
-        global_max_kernel,
-        out_shape=jax.ShapeDtypeStruct((1,), x.dtype),
-        in_specs=[
-            pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0)),
-        ],
-        out_specs=pl.BlockSpec((1,), lambda i: (0,)),  # 输出不随 grid 变化
-        scratch_shapes=[
-            pltpu.VMEM((1,), jnp.float32),  # max_scratch_ref
-        ],
-        grid=(num_blocks,),
-    )(x)
-
-# 测试
-x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
-result = find_global_max(x)
-expected = jnp.max(x)
-# result[0] 应该等于 expected
-```
-
-**关键点：**
-- `max_scratch_ref` 是 Scratch Buffer，跨 Grid 迭代保持状态
-- 每次迭代只读取一个分块，做块内 max，然后与历史最大值比较
-- 输出的 `BlockSpec` 使用 `lambda i: (0,)` 表示所有迭代写入同一位置
-
-### Scratch Buffer 初始化问题
-
-上面的代码有一个微妙的 bug：`max_scratch_ref` 的初始值是什么？
-
-- Scratch buffer 分配后内容是**未定义的**（不保证为 0）
-- 对于 max 归约，初始值应该是 `-inf`
-- 对于 sum 归约，初始值应该是 `0`
-
-修正版：
-
-```python
-def global_max_kernel(x_ref, _o_ref, max_scratch_ref):
     i = pl.program_id(0)
 
     # 第一次迭代时初始化 scratch
     @pl.when(i == 0)
     def _():
-        max_scratch_ref[0] = jnp.float32(-jnp.inf)
+        max_scratch_ref[0, 0] = jnp.float32(-jnp.inf)
 
-    block_max = jnp.max(x_ref[...].astype(jnp.float32))
-    max_scratch_ref[0] = jnp.maximum(max_scratch_ref[0], block_max)
+    # x_ref: 当前分块，已在 VMEM 中
+    block_max = jnp.max(x_ref[...].astype(jnp.float32))  # 块内归约
+
+    # 与历史最大值比较
+    max_scratch_ref[0, 0] = jnp.maximum(max_scratch_ref[0, 0], block_max)
 
     # 最后一次迭代时写入输出
     @pl.when(i == pl.num_programs(0) - 1)
     def _():
-        _o_ref[0] = max_scratch_ref[0].astype(_o_ref.dtype)
+        o_ref[0, 0] = max_scratch_ref[0, 0].astype(o_ref.dtype)
+
+def find_global_max(x: jax.Array) -> jax.Array:
+    """x: (rows, cols)，返回全局最大值"""
+    rows, cols = x.shape
+    BLOCK_ROWS = 8
+    num_blocks = rows // BLOCK_ROWS
+
+    result = pl.pallas_call(
+        global_max_kernel,
+        out_shape=jax.ShapeDtypeStruct(TILE, x.dtype),  # 最小 tile 大小
+        in_specs=[
+            pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0)),
+        ],
+        out_specs=pl.BlockSpec(TILE, lambda i: (0, 0)),  # 输出不随 grid 变化
+        scratch_shapes=[
+            pltpu.VMEM(TILE, jnp.float32),  # max_scratch_ref: (8, 128)
+        ],
+        grid=(num_blocks,),
+    )(x)
+    return result[0, 0]  # 取出标量结果
+
+# 测试
+x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
+result = find_global_max(x)
+expected = jnp.max(x)
+# result 应该等于 expected
 ```
 
-`pl.when(condition)` 是条件执行原语，类似于 `if` 但可以在 Pallas trace 中使用。
+**关键点：**
+- `max_scratch_ref` 是 `(8, 128)` 的 Scratch Buffer，但只使用 `[0, 0]` 存储归约结果
+- `out_shape` 也必须是 tile 对齐的，最后用 `result[0, 0]` 取出标量
+- `pl.when(i == 0)` 初始化，`pl.when(i == num_programs - 1)` 写入输出
+- 每次迭代只读取一个分块，做块内 max，然后与历史最大值比较
+
+### Scratch Buffer 初始化
+
+- Scratch buffer 分配后内容是**未定义的**（不保证为 0）
+- 对于 max 归约，初始值应该是 `-inf`
+- 对于 sum 归约，初始值应该是 `0`
+- 对于 min 归约，初始值应该是 `+inf`
+
+`pl.when(condition)` 是条件执行原语，类似于 `if` 但可以在 Pallas trace 中使用。不能用 Python 的 `if`，因为 trace 时 `i` 不是具体值。
 
 ### 版本 2：流水线化的全局 Max
 
 当矩阵很大时，用 `emit_pipeline` 让 DMA 和计算重叠：
 
 ```python
+TILE = (8, 128)
+
 def find_global_max_pipelined(x: jax.Array) -> jax.Array:
     rows, cols = x.shape
     BLOCK_ROWS = 8
@@ -117,14 +147,14 @@ def find_global_max_pipelined(x: jax.Array) -> jax.Array:
         # Scratch buffer 用于跨迭代维护 max
         @functools.partial(
             pl.run_scoped,
-            max_acc=pltpu.VMEM((1,), jnp.float32),
+            max_acc=pltpu.VMEM(TILE, jnp.float32),  # (8, 128)，只用 [0,0]
         )
         def _(max_acc):
-            max_acc[0] = jnp.float32(-jnp.inf)
+            max_acc[0, 0] = jnp.float32(-jnp.inf)
 
             def body(x_ref):
                 block_max = jnp.max(x_ref[...].astype(jnp.float32))
-                max_acc[0] = jnp.maximum(max_acc[0], block_max)
+                max_acc[0, 0] = jnp.maximum(max_acc[0, 0], block_max)
 
             pltpu.emit_pipeline(
                 body,
@@ -136,18 +166,19 @@ def find_global_max_pipelined(x: jax.Array) -> jax.Array:
             # 流水线结束后，写入最终结果
             @functools.partial(
                 pl.run_scoped,
-                o_vmem=pltpu.VMEM((1,), x.dtype),
+                o_vmem=pltpu.VMEM(TILE, x.dtype),  # (8, 128)
             )
             def _(o_vmem):
-                o_vmem[0] = max_acc[0].astype(x.dtype)
+                o_vmem[0, 0] = max_acc[0, 0].astype(x.dtype)
                 pltpu.sync_copy(o_vmem, o_hbm_ref)
 
-    return pl.pallas_call(
+    result = pl.pallas_call(
         kernel,
-        out_shape=jax.ShapeDtypeStruct((1,), x.dtype),
+        out_shape=jax.ShapeDtypeStruct(TILE, x.dtype),  # tile 对齐
         in_specs=[pl.BlockSpec(memory_space=pltpu.HBM)],
         out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
     )(x)
+    return result[0, 0]  # 取出标量
 
 # 测试
 x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
@@ -162,28 +193,32 @@ result = find_global_max_pipelined(x)
 def row_max_kernel(x_ref, o_ref):
     """每次处理若干行，求每行的 max"""
     # x_ref: (BLOCK_ROWS, cols)
-    # o_ref: (BLOCK_ROWS,)
-    row_maxes = jnp.max(x_ref[...], axis=-1)  # 沿最后一维归约
-    o_ref[...] = row_maxes
+    # o_ref: (BLOCK_ROWS, 128) —— tile 对齐，只用第一列
+    row_maxes = jnp.max(x_ref[...].astype(jnp.float32), axis=-1)  # (BLOCK_ROWS,)
+    # 广播写入第一列
+    o_ref[:, 0] = row_maxes.astype(o_ref.dtype)
 
 def find_row_max(x: jax.Array) -> jax.Array:
     """x: (rows, cols)，返回 (rows,) 每行的最大值"""
     rows, cols = x.shape
-    BLOCK_ROWS = 8
+    BLOCK_ROWS = 8  # 必须 >= 8（sublane 对齐）
 
-    return pl.pallas_call(
+    result = pl.pallas_call(
         row_max_kernel,
-        out_shape=jax.ShapeDtypeStruct((rows,), x.dtype),
+        out_shape=jax.ShapeDtypeStruct((rows, 128), x.dtype),  # tile 对齐
         in_specs=[pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0))],
-        out_specs=pl.BlockSpec((BLOCK_ROWS,), lambda i: (i,)),
+        out_specs=pl.BlockSpec((BLOCK_ROWS, 128), lambda i: (i, 0)),
         grid=(rows // BLOCK_ROWS,),
     )(x)
+    return result[:, 0]  # 取出第一列作为结果
 
 # 测试
 x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
 result = find_row_max(x)  # shape: (2048,)
 expected = jnp.max(x, axis=-1)
 ```
+
+**注意：** 输出形状使用 `(rows, 128)` 而不是 `(rows,)`，因为 VMEM 需要 2D tile 对齐。最后用 `result[:, 0]` 提取结果。这是 TPU kernel 开发中很常见的模式：为了满足硬件对齐要求，输出的形状通常比实际需要的大，在 kernel 外部做裁剪。
 
 这个模式直接对应 RMSNorm 中的 `mean(x^2)` 归约——都是沿最后一维归约，每行产生一个标量结果。
 
