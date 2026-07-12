@@ -1,4 +1,218 @@
-# 第 8 章：RMSNorm
+# 第 8 章：归约算子与 RMSNorm
+
+本章从最简单的归约算子（大矩阵找 max）开始，建立对 TPU 上归约操作的直觉，然后过渡到实际的 RMSNorm 算子。
+
+## 归约算子入门：大矩阵找 Max
+
+归约（reduction）是将一个数组沿某个维度压缩成一个标量或更小的数组。常见的归约操作包括 sum、max、min、mean。
+
+假设我们有一个很大的矩阵（如 2048×8192，超过 VMEM 容量），需要找全局最大值。核心问题：数据无法一次性放入 VMEM，必须分块处理。
+
+### 思路
+
+```
+全局 max = max(块 0 的 max, 块 1 的 max, 块 2 的 max, ...)
+```
+
+这是归约算子的核心性质：**可分解性**。只要归约操作满足结合律（如 max、sum、min），就可以先对每个分块归约，再对中间结果归约。
+
+在 TPU 上，这自然地映射到 Grid + Scratch Buffer 模式：
+- Grid 的每个迭代处理一个分块
+- Scratch buffer 保存跨迭代的中间结果（利用 TPU 顺序执行模型）
+
+### 版本 1：最简单的全局 Max
+
+```python
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+from jax.experimental.pallas import tpu as pltpu
+import functools
+
+def global_max_kernel(x_ref, _o_ref, max_scratch_ref):
+    """每次处理一个分块，维护全局 max"""
+    # x_ref: 当前分块，已在 VMEM 中
+    block_max = jnp.max(x_ref[...])  # 块内归约
+
+    # 与历史最大值比较
+    current_max = max_scratch_ref[0]
+    max_scratch_ref[0] = jnp.maximum(current_max, block_max)
+
+def global_max_epilogue(o_ref, max_scratch_ref):
+    """最后一次迭代后，将结果写入输出"""
+    o_ref[0] = max_scratch_ref[0]
+
+def find_global_max(x: jax.Array) -> jax.Array:
+    """x: (rows, cols)，返回全局最大值（标量）"""
+    rows, cols = x.shape
+    BLOCK_ROWS = 8
+    num_blocks = rows // BLOCK_ROWS
+
+    return pl.pallas_call(
+        global_max_kernel,
+        out_shape=jax.ShapeDtypeStruct((1,), x.dtype),
+        in_specs=[
+            pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0)),
+        ],
+        out_specs=pl.BlockSpec((1,), lambda i: (0,)),  # 输出不随 grid 变化
+        scratch_shapes=[
+            pltpu.VMEM((1,), jnp.float32),  # max_scratch_ref
+        ],
+        grid=(num_blocks,),
+    )(x)
+
+# 测试
+x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
+result = find_global_max(x)
+expected = jnp.max(x)
+# result[0] 应该等于 expected
+```
+
+**关键点：**
+- `max_scratch_ref` 是 Scratch Buffer，跨 Grid 迭代保持状态
+- 每次迭代只读取一个分块，做块内 max，然后与历史最大值比较
+- 输出的 `BlockSpec` 使用 `lambda i: (0,)` 表示所有迭代写入同一位置
+
+### Scratch Buffer 初始化问题
+
+上面的代码有一个微妙的 bug：`max_scratch_ref` 的初始值是什么？
+
+- Scratch buffer 分配后内容是**未定义的**（不保证为 0）
+- 对于 max 归约，初始值应该是 `-inf`
+- 对于 sum 归约，初始值应该是 `0`
+
+修正版：
+
+```python
+def global_max_kernel(x_ref, _o_ref, max_scratch_ref):
+    i = pl.program_id(0)
+
+    # 第一次迭代时初始化 scratch
+    @pl.when(i == 0)
+    def _():
+        max_scratch_ref[0] = jnp.float32(-jnp.inf)
+
+    block_max = jnp.max(x_ref[...].astype(jnp.float32))
+    max_scratch_ref[0] = jnp.maximum(max_scratch_ref[0], block_max)
+
+    # 最后一次迭代时写入输出
+    @pl.when(i == pl.num_programs(0) - 1)
+    def _():
+        _o_ref[0] = max_scratch_ref[0].astype(_o_ref.dtype)
+```
+
+`pl.when(condition)` 是条件执行原语，类似于 `if` 但可以在 Pallas trace 中使用。
+
+### 版本 2：流水线化的全局 Max
+
+当矩阵很大时，用 `emit_pipeline` 让 DMA 和计算重叠：
+
+```python
+def find_global_max_pipelined(x: jax.Array) -> jax.Array:
+    rows, cols = x.shape
+    BLOCK_ROWS = 8
+    num_blocks = rows // BLOCK_ROWS
+
+    def kernel(x_hbm_ref, o_hbm_ref):
+        # Scratch buffer 用于跨迭代维护 max
+        @functools.partial(
+            pl.run_scoped,
+            max_acc=pltpu.VMEM((1,), jnp.float32),
+        )
+        def _(max_acc):
+            max_acc[0] = jnp.float32(-jnp.inf)
+
+            def body(x_ref):
+                block_max = jnp.max(x_ref[...].astype(jnp.float32))
+                max_acc[0] = jnp.maximum(max_acc[0], block_max)
+
+            pltpu.emit_pipeline(
+                body,
+                grid=(num_blocks,),
+                in_specs=[pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0))],
+                out_specs=[],  # 没有每迭代输出
+            )(x_hbm_ref)
+
+            # 流水线结束后，写入最终结果
+            @functools.partial(
+                pl.run_scoped,
+                o_vmem=pltpu.VMEM((1,), x.dtype),
+            )
+            def _(o_vmem):
+                o_vmem[0] = max_acc[0].astype(x.dtype)
+                pltpu.sync_copy(o_vmem, o_hbm_ref)
+
+    return pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct((1,), x.dtype),
+        in_specs=[pl.BlockSpec(memory_space=pltpu.HBM)],
+        out_specs=pl.BlockSpec(memory_space=pltpu.HBM),
+    )(x)
+
+# 测试
+x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
+result = find_global_max_pipelined(x)
+```
+
+### 版本 3：沿某一维归约（每行的 Max）
+
+实际场景中更常见的是沿某一维归约而不是全局归约。例如对 `(batch, seq_len)` 的矩阵，求每行的最大值：
+
+```python
+def row_max_kernel(x_ref, o_ref):
+    """每次处理若干行，求每行的 max"""
+    # x_ref: (BLOCK_ROWS, cols)
+    # o_ref: (BLOCK_ROWS,)
+    row_maxes = jnp.max(x_ref[...], axis=-1)  # 沿最后一维归约
+    o_ref[...] = row_maxes
+
+def find_row_max(x: jax.Array) -> jax.Array:
+    """x: (rows, cols)，返回 (rows,) 每行的最大值"""
+    rows, cols = x.shape
+    BLOCK_ROWS = 8
+
+    return pl.pallas_call(
+        row_max_kernel,
+        out_shape=jax.ShapeDtypeStruct((rows,), x.dtype),
+        in_specs=[pl.BlockSpec((BLOCK_ROWS, cols), lambda i: (i, 0))],
+        out_specs=pl.BlockSpec((BLOCK_ROWS,), lambda i: (i,)),
+        grid=(rows // BLOCK_ROWS,),
+    )(x)
+
+# 测试
+x = jax.random.normal(jax.random.key(0), (2048, 8192), dtype=jnp.bfloat16)
+result = find_row_max(x)  # shape: (2048,)
+expected = jnp.max(x, axis=-1)
+```
+
+这个模式直接对应 RMSNorm 中的 `mean(x^2)` 归约——都是沿最后一维归约，每行产生一个标量结果。
+
+### 归约的 GPU vs TPU 对比
+
+| 维度 | GPU (CUDA) | TPU (Pallas) |
+| :--- | :--- | :--- |
+| 全局归约 | 多级归约：warp shuffle → block reduce → grid reduce | Grid 顺序迭代 + scratch buffer |
+| 每行归约 | 一个 block 处理一行，warp shuffle 归约 | `jnp.max(x, axis=-1)` 硬件自动处理 |
+| 原子操作 | 需要 `atomicMax` 做跨 block 归约 | 不需要（顺序执行，无竞争）|
+| 同步 | `__syncthreads()` + 多次 kernel launch | 无需同步（单线程顺序执行）|
+
+TPU 的顺序执行模型让归约实现变得极其简单：不需要原子操作、不需要线程同步、不需要多级归约。只需要一个 scratch buffer 和顺序迭代。
+
+### 归约的性能特征
+
+归约算子几乎总是 **memory-bound** 的：
+- 读取整个矩阵：N 个元素
+- 计算：N 次比较/加法
+- 算术强度 ≈ 1 FLOP/element，远低于 TPU 的平衡点
+
+因此优化重点是：
+1. 最大化 DMA 带宽利用率（流水线化）
+2. 减少 HBM 访问次数（算子融合）
+3. 不是减少计算量（计算已经被 DMA 完全隐藏）
+
+理解了这个背景，我们现在来看 RMSNorm——它本质上就是一个“每行归约 + 每行元素级运算”的组合。
+
+---
 
 ## 什么是 RMSNorm
 
