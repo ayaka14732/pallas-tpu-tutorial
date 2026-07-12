@@ -20,3 +20,7 @@ table.docutils {
 .math {
     overflow-x: auto;
 }
+
+.caption-text {
+    text-transform: none;
+}

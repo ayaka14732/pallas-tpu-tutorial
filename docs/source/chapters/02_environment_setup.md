@@ -1,6 +1,20 @@
-# 第 2 章：Pallas TPU 开发环境配置
+# 第 2 章：Pallas TPU 开发基础
 
-## 在 GCP 上开发
+## 开发环境配置
+
+### 在本地开发
+
+本教程讨论的是 TPU kernel 开发，但日常学习和调试不必每一步都依赖真实 TPU。TPU 资源通常有限，也不适合长期保持空闲实例等待试验；在熟悉 Pallas API、验证切块逻辑和检查简单 kernel 行为时，可以先在本机使用解释模式运行。等程序逻辑稳定后，再放到 TPU 上编译，并验证真实硬件上的执行结果与性能。
+
+在本机只需安装 CPU 版本的 JAX：
+
+```bash
+pip install -U jax
+```
+
+解释模式的具体用法会在本章后文介绍。
+
+### 在 GCP 上开发
 
 在 GCP 上开发 Pallas TPU 程序时，最常见的方式是创建一台 Cloud TPU VM，并在这台机器上安装面向 TPU 的最新版 JAX：
 
@@ -16,7 +30,7 @@ from jax.experimental.pallas import tpu as pltpu
 print(pltpu.get_tpu_info())
 ```
 
-## 在 Colab 上使用
+### 在 Colab 上使用
 
 Colab 的运行时通常已经预装 JAX，但预装版本通常非常过时，不包含 Pallas TPU 后端所需的最新改动。因此，在 Colab 中建议先升级 `jax[tpu]`，再重启运行时，让后续代码使用新安装的版本。
 
@@ -37,19 +51,17 @@ os.kill(os.getpid(), 9)
 
 需要注意的是，Colab 目前只有 TPU v5e，不含 SparseCore，因此无法运行本教程中与 SparseCore 相关的代码。
 
+```{note}
+Pallas 仍处于实验阶段，API 可能会发生变化。但如果编译器接受了你的 kernel，
+它就 **必须** 返回正确的结果。
+```
+
 ## 编程模型概览
 
 Pallas kernel 由两部分组成：
 
 1. **Kernel 函数**：在 TPU 向量核心上执行，操作的是 `Ref`（内存引用），而非普通 JAX 数组。Kernel 函数没有返回值，结果通过写入输出 `Ref` 来传递。
 2. **`pallas_call` 调度**：在 host 端定义 grid、BlockSpec、scratch shapes 等，告诉编译器如何切分数据并调度 kernel。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-from jax.experimental.pallas import tpu as pltpu
-```
 
 ## Ref 语义
 
@@ -94,10 +106,14 @@ result = pl.pallas_call(
 )(inputs...)
 ```
 
-## 向量加法：完整示例
+## 最简单的 Pallas TPU kernel 示例：向量加法
 
 ```python
-def add_kernel(x_ref, y_ref, z_ref):
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+
+def add_kernel(x_ref: jax.Ref, y_ref: jax.Ref, z_ref: jax.Ref) -> None:
     z_ref[...] = x_ref[...] + y_ref[...]
 
 def vector_add(x: jax.Array, y: jax.Array) -> jax.Array:
@@ -113,8 +129,31 @@ def vector_add(x: jax.Array, y: jax.Array) -> jax.Array:
         ],
         out_specs=pl.BlockSpec(block_shape=(block_size,), index_map=lambda i: (i,)),
         grid=(num_blocks,),
+        # interpret=True,  # 在 CPU 上模拟执行
     )(x, y)
+
+x = jnp.full((1024,), 1.0, dtype=jnp.float32)
+y = jnp.full((1024,), 2.0, dtype=jnp.float32)
+result = vector_add(x, y)
+expected = x + y
+assert jnp.allclose(result, expected)
 ```
+
+其中，代码中的 `interpret=True` 表示在 CPU 上模拟 kernel 执行。如果你在本地开发，没有真实的 TPU 环境，可以使用这种方法执行代码。解释模式有两种开启方法：
+
+```python
+# 方法 1：全局开启
+pltpu.set_tpu_interpret_mode(True)
+
+# 方法 2：通过 compiler_params
+result = pl.pallas_call(
+    kernel_fn,
+    ...,
+    interpret=True,  # 在 CPU 上模拟执行
+)(inputs)
+```
+
+解释模式下，所有 DMA 操作会被模拟为普通的内存拷贝，信号量操作会被模拟为计数器。这对于验证 kernel 逻辑的正确性非常有用，但不能反映真实的性能特征。
 
 ## 执行流程
 
@@ -148,24 +187,6 @@ in_specs = [pl.BlockSpec(memory_space=pltpu.VMEM)]
 ```
 
 这种模式在 Ragged Paged Attention 等复杂 kernel 中非常常见——grid 设为 `(1,)`，所有循环逻辑由 kernel 内部的 `pl.loop` 控制。
-
-## Interpret 模式
-
-Pallas 提供 interpret 模式，允许在 CPU 上模拟 kernel 执行，用于调试：
-
-```python
-# 方法 1：全局开启
-pltpu.set_tpu_interpret_mode(True)
-
-# 方法 2：通过 compiler_params
-result = pl.pallas_call(
-    kernel_fn,
-    ...,
-    interpret=True,  # 在 CPU 上模拟执行
-)(inputs)
-```
-
-Interpret 模式下，所有 DMA 操作会被模拟为普通的内存拷贝，信号量操作会被模拟为计数器。这对于验证 kernel 逻辑的正确性非常有用，但不能反映真实的性能特征。
 
 ## pl.program_id 和 pl.num_programs
 
@@ -201,17 +222,6 @@ def kernel(x_ref, o_ref):
 # based on https://openxla.org/xla/hlo_dumps#mosaic
 import os
 os.environ["LIBTPU_INIT_ARGS"] = "--xla_mosaic_dump_to=/tmp/mosaic_dumps"
-
-import functools
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-from jax.experimental.pallas import tpu as pltpu
-import time
-import subprocess
-
-print(jax.print_environment_info())
-print(pltpu.get_tpu_info())
 ```
 
 ```python
@@ -226,15 +236,13 @@ def pallas_call_wrapper(*args, **kwargs):
         try:
             os.remove(path)
         except OSError:
-            warnings.warn(f'Failed to remove file {path}')
+            warnings.warn(f"Failed to remove file {path}")
 
-    if 'name' in kwargs:
-        warnings.warn(f'Overriding existing name {kwargs['name']}')
-        del kwargs['name']
+    if "name" in kwargs:
+        warnings.warn(f"Overriding existing name {kwargs["name"]}")
+        del kwargs["name"]
 
     return pl.pallas_call(*args, **kwargs, name=custom_str)
-
-import os
 
 def show_compiled_llo():
     matched = []
@@ -259,4 +267,3 @@ def show_compiled_llo():
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             print(f.read().strip())
 ```
-

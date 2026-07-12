@@ -1,39 +1,35 @@
 Pallas TPU Kernel 开发教程
 ==========================
 
-本教程面向有 JAX 使用经验、但没有底层 kernel 开发经验的开发者。
-你将从最基础的概念出发，逐步掌握在 TPU 上使用 Pallas 编写高性能自定义算子的能力。
+.. toctree::
+   :maxdepth: 2
 
-.. note::
-   Pallas 仍处于实验阶段，API 可能会发生变化。但如果编译器接受了你的 kernel，
-   它就 **必须** 返回正确的结果。
-
-前置要求
---------
-
-- 熟悉 JAX 基本用法（``jax.jit``、``jax.vmap``、``jax.numpy``）
-- 了解 Python / NumPy 编程
-- 不需要 CUDA 或 C++ 经验
+   chapters/00_preface
 
 .. toctree::
-   :caption: 第一部分：基础概念
+   :caption: 第一部分：简介
    :maxdepth: 2
 
    chapters/01_tpu_architecture
    chapters/02_environment_setup
-   chapters/03_grid_and_blockspec
-   chapters/04_memory_spaces
 
 .. toctree::
-   :caption: 第二部分：流水线与性能优化
+   :caption: 第二部分：Pallas TPU 基础用法
    :maxdepth: 2
 
+   chapters/03_grid_and_blockspec
+   chapters/04_memory_spaces
    chapters/05_pipelining
+
+.. toctree::
+   :caption: 第三部分：流水线与性能优化
+   :maxdepth: 2
+
    chapters/06_matmul
    chapters/07_profiling
 
 .. toctree::
-   :caption: 第三部分：经典算子实现
+   :caption: 第四部分：基本算子实现
    :maxdepth: 2
 
    chapters/08_rmsnorm
@@ -41,7 +37,7 @@ Pallas TPU Kernel 开发教程
    chapters/10_scalar_prefetch_and_sparse
 
 .. toctree::
-   :caption: 第四部分：注意力机制
+   :caption: 第五部分：注意力机制实现
    :maxdepth: 2
 
    chapters/11_flash_attention
@@ -49,7 +45,7 @@ Pallas TPU Kernel 开发教程
    chapters/13_ragged_paged_attention
 
 .. toctree::
-   :caption: 第五部分：附录
+   :caption: 第六部分：附录
    :maxdepth: 2
 
    chapters/14_api_reference
