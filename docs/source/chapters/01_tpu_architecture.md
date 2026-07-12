@@ -85,13 +85,55 @@ from jax.experimental.pallas import tpu_sc as plsc
 
 ### TPU 代次规格
 
-| 属性 | TPU v4 | TPU v5p | TPU v6e (Trillium) | TPU 7x (Ironwood) |
-| :--- | :--- | :--- | :--- | :--- |
-| SparseCores / Chip | 4 | 4 | 2 | 2 (4 physical) |
-| Vector Subcores / SparseCore | 16 | 16 | 16 | 16 |
-| SC SIMD Width | 8 | 8 | 8(F32)/16(BF16) | 16(F32)/32(BF16) |
-| TensorCores / Chip | 2 | 2 | 1 | - |
-| HBM 容量 | 32 GB | 96 GB | 32 GB | 192 GB |
+以下规格来自 JAX 源码中的 `jax/_src/pallas/mosaic/tpu_info.py`。需要特别注意：`TpuInfo` 中的 VMEM、SMEM、算力和带宽字段是**按 TensorCore 记录**的；下表中 HBM、带宽和峰值算力为了便于和公开芯片规格对齐，按物理 TensorCore 数量换算为**每芯片总量**。GB/TB 使用十进制单位，MiB/KiB 使用二进制单位。
+
+**芯片与内存**
+
+| TPU | 物理 TensorCore 数 / 芯片 | Lite 芯片 | 支持 Megacore | HBM / 芯片 | HBM 带宽 / 芯片 | VMEM / TensorCore | SMEM / TensorCore |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| v2 | 2 | 否 | 否 | 16 GB | 0.716 TB/s | 16 MiB | 16 KiB |
+| v3 | 2 | 否 | 否 | 34.4 GB | 0.825 TB/s | 16 MiB | 16 KiB |
+| v4i | 1 | 是 | 否 | 8.59 GB | 0.614 TB/s | 16 MiB | 1 MiB |
+| v4 | 2 | 否 | 是 | 34.4 GB | 1.23 TB/s | 16 MiB | 1 MiB |
+| v5e | 1 | 是 | 否 | 17.2 GB | 0.820 TB/s | 128 MiB | 1 MiB |
+| v5p | 2 | 否 | 是 | 103 GB | 2.46 TB/s | 64 MiB | 1 MiB |
+| v6e | 1 | 是 | 否 | 34.4 GB | 1.64 TB/s | 128 MiB | 1 MiB |
+| 7x | 2 | 否 | 否 | 206 GB | 7.40 TB/s | 64 MiB | 1 MiB |
+| 8i | 2 | 否 | 否 | 309 GB | 8.60 TB/s | 192 MiB | 1 MiB |
+
+TPU v4 和 v4i 还具有 CMEM 这一内存空间，但在其他代次（包括更新代次）的 TPU 中没有，因此本教程不涉及 CMEM。
+
+从第 7 代开始，TPU 的芯片代号改用不带 `v` 前缀的格式。例如，第 4 代写作 `TPU v4`，而第 7 代写作 `tpu7x`。
+
+**TensorCore 计算参数**
+
+| TPU | sublane 数 | lane 数 | MXU 列宽 | MXU 数 / TensorCore | 累加器数 / MXU | BF16 峰值 / 芯片 | INT8 峰值 / 芯片 | FP8 峰值 / 芯片 | INT4 峰值 / 芯片 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| v2 | 8 | 128 | 128 | 1 | 0 | 46 TFLOPS | - | - | - |
+| v3 | 8 | 128 | 128 | 2 | 0 | 140 TFLOPS | - | - | - |
+| v4i | 8 | 128 | 128 | 4 | 0 | 137 TFLOPS | - | - | - |
+| v4 | 8 | 128 | 128 | 4 | 0 | 275 TFLOPS | - | - | - |
+| v5e | 8 | 128 | 128 | 4 | 0 | 197 TFLOPS | 394 TFLOPS | - | 788 TFLOPS |
+| v5p | 8 | 128 | 128 | 4 | 0 | 459 TFLOPS | 918 TFLOPS | - | 1.84 PFLOPS |
+| v6e | 8 | 128 | 256 | 2 | 0 | 920 TFLOPS | 1.84 PFLOPS | 920 TFLOPS | 3.68 PFLOPS |
+| 7x | 8 | 128 | 256 | 2 | 128 | 2.31 PFLOPS | - | 4.60 PFLOPS | - |
+| 8i | 8 | 128 | 256 | 2 | 256 | 1.101 PFLOPS | - | 8.808 PFLOPS | - |
+
+**SparseCore 参数**
+
+| TPU | SparseCore 数 / 芯片 | Vector Subcore 数 / SparseCore | SparseCore lane 数 | SparseCore VMEM / Vector Subcore | SparseCore DMA 粒度 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| v2 | - | - | - | - | - |
+| v3 | - | - | - | - | - |
+| v4i | - | - | - | - | - |
+| v4 | - | - | - | - | - |
+| v5e | - | - | - | - | - |
+| v5p | 4 | 16 | 8 | 512 KiB | 32 B |
+| v6e | 2 | 16 | 8 | 256 KiB | 32 B |
+| 7x | 2 | 16 | 16 | 512 KiB | 32 B |
+| 8i | 1 | 4 | 16 | 512 KiB | 64 B |
+
+`tpu_info.py` 还提供了 `get_sublane_tiling(dtype)` 和 `infer_tiling(...)`。对本教程最重要的结论是：TensorCore 的默认 compact tiling 仍围绕 `(8, 128)` 展开；从 generation 6 开始 MXU column size 变为 256；从 generation 7 开始，低 bitwidth dtype 的 sublane tiling 会默认使用更大的 second-minor tiling。
 
 可以通过 `pltpu.get_tpu_info()` 在运行时查询硬件信息。
 

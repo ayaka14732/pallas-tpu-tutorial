@@ -1,43 +1,41 @@
-# 第 2 章：配置 Pallas TPU 开发环境
+# 第 2 章：Pallas TPU 开发环境配置
 
 ## 在 GCP 上开发
 
-通常是租一个 Cloud TPU。
+在 GCP 上开发 Pallas TPU 程序时，最常见的方式是创建一台 Cloud TPU VM，并在这台机器上安装面向 TPU 的最新版 JAX：
 
-安装最新版的 JAX。
-
-```python
+```bash
 pip install -U "jax[tpu]"
 ```
 
-测试：
+安装完成后，可以用下面的代码确认当前进程能够访问 TPU，并查看 TPU 的相关信息：
 
 ```python
 from jax.experimental.pallas import tpu as pltpu
+
 print(pltpu.get_tpu_info())
 ```
 
 ## 在 Colab 上使用
 
-虽然 Colab 环境自带 JAX，但由于 Pallas 是一个正在开发中的库，要安装最新版本。
+Colab 的运行时通常已经预装 JAX，但预装版本通常非常过时，不包含 Pallas TPU 后端所需的最新改动。因此，在 Colab 中建议先升级 `jax[tpu]`，再重启运行时，让后续代码使用新安装的版本。
 
-首先在第一个 cell 中
+在第一个 cell 中运行：
 
-
-```
+```bash
 !pip install -q -U "jax[tpu]"
 ```
 
-完成后在第二个 cell 中
+安装完成后，在第二个 cell 中运行：
 
-```
+```python
 import os
 os.kill(os.getpid(), 9)
 ```
 
-意思是……，会自动重启环境，然后就可以进行开发。
+这行代码会主动结束当前 Python 进程。Colab 会自动重新启动运行时；重启后再继续执行后面的教程代码即可。
 
-Colab 目前只有 TPU v5e，不含 SparseCore，因此无法运行本教程中与 SparseCore 相关的代码。
+需要注意的是，Colab 目前只有 TPU v5e，不含 SparseCore，因此无法运行本教程中与 SparseCore 相关的代码。
 
 ## 编程模型概览
 
