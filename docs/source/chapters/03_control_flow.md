@@ -198,7 +198,7 @@ def kernel(x_ref, y_ref, o_ref, acc_ref, *, k: int):
         ...
 ```
 
-# Ref 与 JAX 可变数组
+## Ref 与 JAX 可变数组
 
 `Ref` 支持的操作：
 
