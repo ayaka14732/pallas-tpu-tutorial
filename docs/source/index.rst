@@ -14,7 +14,7 @@ Pallas TPU Kernel 开发教程
    chapters/02_environment_setup
 
 .. toctree::
-   :caption: 第二部分：Pallas TPU 基础用法
+   :caption: 第二部分：Pallas TPU 编程基础
    :maxdepth: 2
 
    chapters/03_grid_and_blockspec

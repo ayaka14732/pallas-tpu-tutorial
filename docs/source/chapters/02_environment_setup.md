@@ -51,16 +51,11 @@ os.kill(os.getpid(), 9)
 
 需要注意的是，Colab 目前只有 TPU v5e，不含 SparseCore，因此无法运行本教程中与 SparseCore 相关的代码。
 
-```{note}
-Pallas 仍处于实验阶段，API 可能会发生变化。但如果编译器接受了你的 kernel，
-它就 **必须** 返回正确的结果。
-```
-
 ## 编程模型概览
 
 Pallas kernel 由两部分组成：
 
-1. **Kernel 函数**：在 TPU 向量核心上执行，操作的是 `Ref`（内存引用），而非普通 JAX 数组。Kernel 函数没有返回值，结果通过写入输出 `Ref` 来传递。
+1. **Kernel 函数**：在 TPU 上执行，操作的是 `Ref`（内存引用），而非普通 JAX 数组。Kernel 函数没有返回值，结果通过写入输出 `Ref` 来传递。
 2. **`pallas_call` 调度**：在 host 端定义 grid、BlockSpec、scratch shapes 等，告诉编译器如何切分数据并调度 kernel。
 
 ## Ref 语义
@@ -242,7 +237,7 @@ def pallas_call_wrapper(*args, **kwargs):
         warnings.warn(f"Overriding existing name {kwargs["name"]}")
         del kwargs["name"]
 
-    return pl.pallas_call(*args, **kwargs, name=custom_str)
+    return pl.pallas_call(*args, **kwargs, name=magic_str)
 
 def show_compiled_llo():
     matched = []
@@ -256,10 +251,10 @@ def show_compiled_llo():
 
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    if custom_str in f.read():
+                    if magic_str in f.read():
                         matched.append(path)
             except OSError as e:
-                print(f"Failed to read {path}: {e}")
+                pass
 
     if matched:
         path = max(matched)
