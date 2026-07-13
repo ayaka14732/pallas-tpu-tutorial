@@ -7,25 +7,26 @@ Pallas TPU Kernel 开发教程
    chapters/00_preface
 
 .. toctree::
-   :caption: 第一部分：简介
+   :caption: 第一部分：Pallas 编程基础
    :maxdepth: 2
 
-   chapters/01_tpu_architecture
-   chapters/02_environment_setup
+   chapters/01_basics
+   chapters/02_grid_and_blockspec
+   chapters/03_control_flow
 
 .. toctree::
-   :caption: 第二部分：Pallas TPU 编程基础
+   :caption: 第二部分：Pallas TPU 编程
    :maxdepth: 2
 
-   chapters/03_grid_and_blockspec
-   chapters/04_memory_spaces
-   chapters/05_pipelining
+   chapters/04_tpu_architecture
+   chapters/05_memory_spaces
+   chapters/06_pipelining
 
 .. toctree::
    :caption: 第三部分：流水线与性能优化
    :maxdepth: 2
 
-   chapters/06_matmul
+   chapters/07_matmul
    chapters/07_profiling
 
 .. toctree::
