@@ -18,17 +18,16 @@ pip install -U jax
 
 在 GCP 上开发 Pallas TPU 程序时，首先需要创建一台 Cloud TPU VM。
 
-使用 uv 可以简便地下载最新版本的 Python。
+使用 uv 可以无需管理员权限，简便地下载最新版本的 Python 3.14。
 
 ```bash
-sudo apt install python3-pip
-python3 -m pip install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 在工作目录使用 uv 创建 venv，安装 Python 3.14 和 JAX：
 
 ```bash
-python3 -m uv venv --python 3.14 --seed venv
+$HOME/.local/bin/uv venv --python 3.14 --seed venv
 source venv/bin/activate
 pip install -U "jax[tpu]"
 ```
@@ -40,6 +39,10 @@ from jax.experimental.pallas import tpu as pltpu
 
 print(pltpu.get_tpu_info())
 ```
+
+:::{note}
+uv 本身是 Python 的包管理器，但本教程仍然使用传统的 pip 包管理器，uv 仅用于安装最新版本的 Python。
+:::
 
 ### 在 Colab 上使用
 

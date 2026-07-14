@@ -1,4 +1,4 @@
-# 第 2 章：Grid 与 BlockSpec
+# 第 2 章：Grid、BlockSpec 与 Dimension Semantics
 
 本章讨论 Pallas TPU kernel 最核心的两个声明：
 
@@ -32,59 +32,6 @@ for i in range(M):
 ```
 
 默认 `grid=()` 表示只执行一次。
-
-## BlockSpec 的结构
-
-`BlockSpec` 回答的问题是：当前 program 应该拿到原数组的哪一块？
-
-```python
-pl.BlockSpec(
-    block_shape=(BM, BN),
-    index_map=lambda i, j: (i, j),
-    memory_space=pltpu.VMEM,
-)
-```
-
-它最重要的组成部分有四个：
-
-| 参数 | 含义 |
-| :--- | :--- |
-| `block_shape` | kernel 每次看到的块形状 |
-| `index_map` | grid 坐标 -> 原数组块坐标 |
-| `memory_space` | Ref 驻留的内存空间 |
-| `pipeline_mode` | 自动流水线缓冲策略，常见于 `pl.Buffered(...)` |
-
-`in_specs` 和 `out_specs` 分别描述输入和输出。它们需要和输入/输出的 pytree 结构对应。
-
-```python
-in_specs = [
-    pl.BlockSpec((BM, BK), lambda i, j, k: (i, k)),  # A
-    pl.BlockSpec((BK, BN), lambda i, j, k: (k, j)),  # B
-]
-out_specs = pl.BlockSpec((BM, BN), lambda i, j, k: (i, j))
-```
-
-### block index，不是元素偏移
-
-默认 `BlockSpec` 使用 blocked indexing。`index_map` 返回的是块索引，不是元素起始下标。
-
-```python
-spec = pl.BlockSpec(
-    block_shape=(128, 256),
-    index_map=lambda i, j: (i, j),
-)
-```
-
-如果原数组形状是 `(1024, 512)`，某次 program 的 grid 坐标是 `(2, 1)`，那么：
-
-```python
-block_index = (2, 1)
-element_slice = (slice(2 * 128, 3 * 128),
-                 slice(1 * 256, 2 * 256))
-# 即 [256:384, 256:512]
-```
-
-这条规则很重要。写 `lambda i: (i * 128,)` 通常是错的，因为那会跳到第 `i * 128` 个块，而不是第 `i * 128` 个元素。
 
 ### 默认值
 
@@ -286,84 +233,6 @@ pl.BlockSpec(
 
 Squeezed 维度很适合 batch/head 这种“用于选择，不用于计算”的轴。它也能避免在最后两个维度里出现低效的 singleton tile。
 
-## 其他索引模式
-
-### pl.Element
-
-`pl.Element(size)` 表示 `index_map` 返回元素起始下标，而不是块编号。
-
-```python
-spec = pl.BlockSpec(
-    block_shape=(pl.Element(BM), pl.Element(BN)),
-    index_map=lambda i, j: (i * BM, j * BN),
-)
-```
-
-这和默认 blocked 模式得到的切片可能一样，但语义不同：
-
-```python
-# blocked：返回块编号
-pl.BlockSpec((BM, BN), lambda i, j: (i, j))
-
-# element：返回元素编号
-pl.BlockSpec((pl.Element(BM), pl.Element(BN)), lambda i, j: (i * BM, j * BN))
-```
-
-`pl.Element` 主要用于需要元素级起点、padding 或特殊布局的场景。普通规则分块优先用默认 blocked 模式。
-
-### pl.BoundedSlice
-
-`pl.BoundedSlice(max_size)` 表示该维度的实际 slice 大小可以动态变化，但不会超过 `max_size`。这常用于 ragged 或动态长度块。
-
-对应的 `index_map` 必须返回 `pl.ds(start, size)`，这里的 `start` 和 `size` 是元素单位，不是块单位。
-
-```python
-spec = pl.BlockSpec(
-    block_shape=(pl.BoundedSlice(32), 128),
-    index_map=lambda i, starts_ref, ends_ref: (
-        pl.ds(starts_ref[i], ends_ref[i] - starts_ref[i]),
-        0,
-    ),
-)
-```
-
-这个模式经常和 `PrefetchScalarGridSpec` 或 `emit_pipeline` 一起使用：metadata 放在 SMEM，`index_map` 根据 metadata 产生动态但有界的切片。
-
-### pl.Indirect
-
-`pl.Indirect(size)` 表示该维度由一组索引间接访问。输入上对应 gather，输出上对应 scatter。它主要出现在 SparseCore 或稀疏访问 kernel 中。
-
-```python
-# indices_ref[i] 给出这一轮要 gather 的若干行
-x_spec = pl.BlockSpec(
-    block_shape=(pl.Indirect(NUM_LANES), NUM_LANES),
-    index_map=lambda i, indices_ref: (indices_ref.at[i], 0),
-)
-```
-
-如果只是根据一个标量页号选择一个连续块，通常用 `PrefetchScalarGridSpec` 的动态 `index_map` 就够了；如果一次要按向量索引 gather/scatter，才考虑 `pl.Indirect`。
-
-## no_block_spec 与整体传入
-
-`pl.no_block_spec` 表示该输入/输出不参与自动分块。它会按整体 Ref 传入 kernel。
-
-```python
-in_specs = [
-    pl.BlockSpec((128,), lambda i: (i,)),  # x 按块切分
-    pl.no_block_spec,                      # metadata 整体传入
-]
-```
-
-不过在 TPU 上，更常见的“整体传入”写法是显式指定内存空间：
-
-```python
-pl.BlockSpec(memory_space=pltpu.HBM)   # 整体 HBM Ref，手动 DMA
-pl.BlockSpec(memory_space=pltpu.VMEM)  # 整体 VMEM Ref，小张量才适合
-pl.BlockSpec(memory_space=pltpu.SMEM)  # 整体 SMEM Ref，适合标量/索引
-```
-
-当你写 `pl.BlockSpec(memory_space=pltpu.HBM)` 且不指定 `block_shape/index_map` 时，kernel 收到的是整个数组的 HBM Ref。它不会被自动搬进 VMEM，需要用 `pltpu.sync_copy` 或 `pltpu.make_async_copy` 手动搬运，详见第 4 章。
-
 ## GridSpec
 
 `pallas_call` 有两种传 grid 和 specs 的方式：
@@ -433,47 +302,29 @@ def kernel(page_table_ref, x_ref, o_ref):
 
 如果动态索引发生在 kernel 内部循环里，而不是每个 grid program 的入口处，通常需要改用手动 DMA。
 
-## BlockSpec 的 memory_space
+## `dimension_semantics` 的使用
 
-`memory_space` 控制 kernel 收到的 Ref 指向哪里。
+如果 TPU 设备以 Megacore 形式暴露多个 TensorCore，可以通过 `pltpu.CompilerParams(dimension_semantics=...)` 告诉编译器哪些 grid 维度可并行分配到多个 core。
 
 ```python
 from jax.experimental.pallas import tpu as pltpu
 
-pl.BlockSpec((BM, BN), lambda i, j: (i, j), memory_space=pltpu.VMEM)
-pl.BlockSpec(memory_space=pltpu.HBM)
-pl.BlockSpec(memory_space=pltpu.SMEM)
-```
-
-常见选择：
-
-| memory_space | kernel 收到什么 | 典型用途 |
-| :--- | :--- | :--- |
-| 默认 / `pltpu.VMEM` | 已在 VMEM 的块 Ref | 自动 DMA、普通计算 |
-| `pltpu.HBM` | HBM 中的整体或切片 Ref | 手动 DMA、复杂流水线 |
-| `pltpu.SMEM` | 标量内存 Ref | metadata、索引、控制流 |
-
-自动模式下，编译器根据 `BlockSpec` 在每个 program 前后生成 DMA：
-
-```text
-HBM input block -> VMEM input Ref -> kernel compute -> VMEM output Ref -> HBM output block
-```
-
-手动模式下，`BlockSpec(memory_space=pltpu.HBM)` 只把 HBM Ref 交给你：
-
-```python
-def kernel(x_hbm_ref, o_hbm_ref, buf_ref, sem_ref):
-    copy = pltpu.make_async_copy(
-        x_hbm_ref.at[:, pl.ds(0, 128)],
-        buf_ref,
-        sem_ref,
+compiler_params = pltpu.CompilerParams(
+    dimension_semantics=(
+        pltpu.PARALLEL,   # i 维：不同输出行块独立
+        pltpu.PARALLEL,   # j 维：不同输出列块独立
+        pltpu.ARBITRARY,  # k 维：同一输出块的归约后缀
     )
-    copy.start()
-    copy.wait()
-    ...
+)
 ```
 
-这正是第 4、5 章手动 DMA 和流水线的基础。
+经验规则：
+
+- `PARALLEL`：不同 program 之间没有数据依赖，可以跨 core 并行。
+- `ARBITRARY`：不要把该维度并行化；常用于归约、累加、跨迭代状态。
+- 常见布局是若干个 `PARALLEL` 前缀维度，加若干个 `ARBITRARY` 后缀维度。
+
+如果某个维度会导致多个 program 写同一个输出块，它通常不应该标成 `PARALLEL`。
 
 ## pipeline_mode
 
@@ -650,32 +501,6 @@ def matmul(a, b):
 
 如果把 grid 写成 `(K_blocks, M_blocks, N_blocks)`，同一个输出块的写入就不再按字典序连续，这会破坏 TPU 上安全累加的结构。
 
-## 示例 5：Squeezed batch 维度
-
-```python
-def scale_batch_kernel(x_ref, o_ref):
-    # x_ref.shape == (SEQ, D)
-    o_ref[...] = x_ref[...] * 0.5
-
-def scale_by_batch(x):
-    batch, seq, d = x.shape
-
-    spec = pl.BlockSpec(
-        block_shape=(None, seq, d),
-        index_map=lambda b: (b, 0, 0),
-    )
-
-    return pl.pallas_call(
-        scale_batch_kernel,
-        out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-        in_specs=[spec],
-        out_specs=spec,
-        grid=(batch,),
-    )(x)
-```
-
-这里 grid 只沿 batch 推进。kernel 内部完全不用关心 batch 维度，只处理一个 `[seq, d]` 的矩阵。
-
 ## 示例 6：动态页号访问
 
 假设有一个 KV cache，形状是 `[num_pages, page_size, head_dim]`，每个 program 根据 page table 读取一个物理页：
@@ -830,46 +655,6 @@ assert jnp.all(y == jnp.array([4, 3, 2, 1, 0], dtype=jnp.int32))
 print(y)
 ```
 
-### pltpu.CompilerParams.dimension_semantics：标注 grid 维度
-
-`dimension_semantics` 告诉 TPU backend 哪些 grid 维度可以并行。下面的例子语义上是普通 2D 加法；在 Megacore TPU 上，两个 grid 维度都可并行。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-from jax.experimental.pallas import tpu as pltpu
-
-
-BM, BN = 2, 4
-
-
-def kernel(x_ref, y_ref, o_ref):
-    o_ref[...] = x_ref[...] + y_ref[...]
-
-
-x = jnp.arange(24, dtype=jnp.float32).reshape(6, 4)
-y = jnp.ones_like(x)
-spec = pl.BlockSpec((BM, BN), lambda i, j: (i, j))
-
-out = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    in_specs=[spec, spec],
-    out_specs=spec,
-    grid=(pl.cdiv(x.shape[0], BM), pl.cdiv(x.shape[1], BN)),
-    compiler_params=pltpu.CompilerParams(
-        dimension_semantics=(pltpu.PARALLEL, pltpu.PARALLEL),
-    ),
-    interpret=True,
-)(x, y)
-
-assert jnp.all(out == x + y)
-print(out)
-```
-
-如果某个维度会重复写同一个输出块，例如 matmul 的 K 维归约，就应标为 `pltpu.ARBITRARY`。
-
 ### pl.BlockSpec：显式分块
 
 `BlockSpec((4,), lambda i: (i,))` 表示第 `i` 个 program 处理第 `i` 个长度为 4 的块。
@@ -936,41 +721,6 @@ print(y)
 ```
 
 在 TPU 上，大数组不要随便整块搬进 VMEM；这个例子只是说明默认语义。
-
-### pl.GridSpec：把 grid/spec/scratch 打包
-
-`GridSpec` 和 `grid + in_specs + out_specs` 是同一件事的显式对象形式。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...] * x_ref[...]
-
-
-x = jnp.arange(8, dtype=jnp.float32)
-spec = pl.BlockSpec((4,), lambda i: (i,))
-grid_spec = pl.GridSpec(
-    grid=(2,),
-    in_specs=[spec],
-    out_specs=spec,
-)
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    grid_spec=grid_spec,
-    interpret=True,
-)(x)
-
-assert jnp.all(y == x * x)
-print(y)
-```
-
-使用 `grid_spec=` 时，不要再同时传 `grid=`、`in_specs=`、`out_specs=` 或 `scratch_shapes=`。
 
 ### pl.no_block_spec：某个输入整体传入
 
@@ -1130,6 +880,16 @@ print(grid)
 
 `pl.cdiv` 最常见的用途就是计算覆盖完整张量的 grid。
 
+当数据需要 reshape 成固定大小的 page/block，或 buffer 大小必须满足硬件对齐时，可以用 `pl.align_to(n, alignment)` 计算 padding 后的长度。例如 ragged KV cache 要按 `page_size` 分页，可以先将 token 数补齐，再安全地 reshape；补出的 token 由真实的 `kv_len` 在计算时排除。
+
+```python
+padded_len = pl.align_to(kv_len, page_size)
+kv = jnp.pad(kv, ((0, padded_len - kv_len), (0, 0), (0, 0)))
+kv_pages = kv.reshape(-1, page_size, num_kv_heads * 2, head_dim)
+```
+
+这里 `kv_pages.shape[0] == pl.cdiv(kv_len, page_size)`：`cdiv` 用于取得 page/block 数量，`align_to` 用于取得实际需要分配或补齐的长度。
+
 ### pytree out_shape / out_specs：多个输出
 
 输出可以是 pytree。kernel 参数顺序是：所有输入 Ref，然后按 pytree flatten 后的所有输出 Ref，再然后是 scratch Ref。
@@ -1217,34 +977,6 @@ print(y)
 ```
 
 `num_scalar_prefetch=1` 表示 `block_ids` 不出现在 `in_specs` 中，但会作为 SMEM Ref 传给 kernel 和所有 `index_map`。
-
-### input_output_aliases：输出复用输入 buffer
-
-`input_output_aliases={input_index: output_index}` 用于声明某个输入和输出 alias。它主要是性能/内存优化，不改变数学语义。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...] + 1
-
-
-x = jnp.arange(8, dtype=jnp.float32)
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    input_output_aliases={0: 0},
-    interpret=True,
-)(x)
-
-assert jnp.all(y == x + 1)
-print(y)
-```
-
-不要把 alias 当作 Python 原地修改；JAX 调用语义仍然是函数式的。
 
 ### pl.Buffered / pipeline_mode：声明自动缓冲策略
 
@@ -1407,18 +1139,6 @@ print(out)
 
 这个例子需要带 SparseCore 的 TPU。普通 TensorCore kernel 里如果只是“根据一个页号选连续页”，通常用 `PrefetchScalarGridSpec` 或手动 DMA，而不是 `pl.Indirect`。
 
-## 设计检查清单
-
-写 `grid` 和 `BlockSpec` 时，可以按下面顺序检查：
-
-1. 输出块由哪些 grid 维度决定？
-2. 哪些维度只是归约或累加？把它们放在 grid 后缀。
-3. 每个输入块是否真的需要依赖所有 grid 维度？能忽略的维度就忽略，让编译器复用数据。
-4. block_shape 是否 tile 友好，尤其是最后两个维度？
-5. 最后一个块越界时，kernel 是否会把 padding 参与计算？如果会，必须 mask。
-6. metadata 是规则静态索引、SMEM scalar prefetch，还是需要手动 DMA？
-7. 哪些 grid 维度可并行？只把真正独立的维度标为 `PARALLEL`。
-
 ## 常见错误
 
 **把 block index 当元素 offset：**
@@ -1486,30 +1206,6 @@ out_specs = pl.BlockSpec((BM, BN), lambda i, j, k: (i, j))
 ```
 
 对于固定的 `(i, j)`，所有 `k` 会连续执行，因此同一个 `C[i, j]` 块可以作为累加器使用。
-
-### `dimension_semantics` 的使用
-
-如果 TPU 设备以 Megacore 形式暴露多个 TensorCore，可以通过 `pltpu.CompilerParams(dimension_semantics=...)` 告诉编译器哪些 grid 维度可并行分配到多个 core。
-
-```python
-from jax.experimental.pallas import tpu as pltpu
-
-compiler_params = pltpu.CompilerParams(
-    dimension_semantics=(
-        pltpu.PARALLEL,   # i 维：不同输出行块独立
-        pltpu.PARALLEL,   # j 维：不同输出列块独立
-        pltpu.ARBITRARY,  # k 维：同一输出块的归约后缀
-    )
-)
-```
-
-经验规则：
-
-- `PARALLEL`：不同 program 之间没有数据依赖，可以跨 core 并行。
-- `ARBITRARY`：不要把该维度并行化；常用于归约、累加、跨迭代状态。
-- 常见布局是若干个 `PARALLEL` 前缀维度，加若干个 `ARBITRARY` 后缀维度。
-
-如果某个维度会导致多个 program 写同一个输出块，它通常不应该标成 `PARALLEL`。
 
 ## 与第 4 章的连接
 

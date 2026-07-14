@@ -59,7 +59,7 @@ topology = topologies.get_topology_desc("v5e-4", platform="tpu")
 
 target = jax.sharding.SingleDeviceSharding(topology.devices[0])
 
-def add_kernel(x_ref: jax.Ref, o_ref: jax.Ref) -> None:
+def kernel(x_ref: jax.Ref, o_ref: jax.Ref) -> None:
     col = pl.program_id(0)
     row = pl.program_id(1)
 
@@ -67,10 +67,10 @@ def add_kernel(x_ref: jax.Ref, o_ref: jax.Ref) -> None:
 
     o_ref[...] = x_ref[...] * 2.0
 
-def vector_add(x: jax.Array) -> jax.Array:
+def fn(x: jax.Array) -> jax.Array:
     N, M = x.shape
     return pallas_call_wrapper(
-        add_kernel,
+        kernel,
         out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
         in_specs=[pl.BlockSpec(block_shape=(8, 128), index_map=lambda i, j: (i, j))],
         out_specs=pl.BlockSpec(block_shape=(8, 128), index_map=lambda i, j: (i, j)),
@@ -79,5 +79,5 @@ def vector_add(x: jax.Array) -> jax.Array:
     )(x)
 
 x_spec = jax.ShapeDtypeStruct((24, 384), jnp.float32, sharding=target)
-jax.jit(vector_add, in_shardings=target, out_shardings=target).lower(x_spec).compile()
+jax.jit(fn, in_shardings=target, out_shardings=target).lower(x_spec).compile()
 print_compiled_llo()
