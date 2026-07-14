@@ -306,25 +306,63 @@ def kernel(page_table_ref, x_ref, o_ref):
 
 如果 TPU 设备以 Megacore 形式暴露多个 TensorCore，可以通过 `pltpu.CompilerParams(dimension_semantics=...)` 告诉编译器哪些 grid 维度可并行分配到多个 core。
 
-```python
-from jax.experimental.pallas import tpu as pltpu
+可以取以下两个值：
 
-compiler_params = pltpu.CompilerParams(
-    dimension_semantics=(
-        pltpu.PARALLEL,   # i 维：不同输出行块独立
-        pltpu.PARALLEL,   # j 维：不同输出列块独立
-        pltpu.ARBITRARY,  # k 维：同一输出块的归约后缀
-    )
-)
-```
-
-经验规则：
-
-- `PARALLEL`：不同 program 之间没有数据依赖，可以跨 core 并行。
-- `ARBITRARY`：不要把该维度并行化；常用于归约、累加、跨迭代状态。
+- `pltpu.PARALLEL`：不同 program 之间没有数据依赖，可以跨 core 并行。
+- `pltpu.ARBITRARY`：不要把该维度并行化；常用于归约、累加、跨迭代状态。
 - 常见布局是若干个 `PARALLEL` 前缀维度，加若干个 `ARBITRARY` 后缀维度。
 
 如果某个维度会导致多个 program 写同一个输出块，它通常不应该标成 `PARALLEL`。
+
+例子如下：
+
+```python
+import jax
+from jax.experimental.pallas import tpu as pltpu
+
+if jax.devices()[0].platform != 'tpu' or not pltpu.get_tpu_info().is_megacore:
+    print("Note: This device does not operate in Megacore mode.")
+
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+
+N = 32
+
+def kernel(x_ref: jax.Ref, o_ref: jax.Ref) -> None:
+    i = pl.program_id(0)
+
+    @pl.when(i == 0)
+    def _():
+        o_ref[...] = jnp.zeros_like(o_ref)
+
+    o_ref[...] += jnp.full_like(o_ref, 1.0) + x_ref[...]
+
+def fn(x: jax.Array) -> jax.Array:
+    return pl.pallas_call(
+        kernel,
+        out_shape=jax.ShapeDtypeStruct((8, 128), x.dtype),
+        in_specs=[pl.BlockSpec(block_shape=(8, 128), index_map=lambda i: (i, 0))],
+        out_specs=pl.BlockSpec(block_shape=(8, 128), index_map=lambda i: (0, 0)),
+        grid=(N,),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=(pltpu.PARALLEL,),  # <-- 错误！应该使用 `pltpu.ARBITRARY`
+        ),
+        # interpret=True,
+    )(x)
+
+x = jnp.zeros((N * 8, 128), dtype=jnp.float32)
+result = fn(x)
+print(result)
+```
+
+在 TPU v4 上：
+
+输出矩阵全为 16，因为两个 core 并行了，写回的时候发生覆盖。
+
+而如果使用 `pltpu.ARBITRARY`，或者解释模式，或者在没有 Megacore 的 TPU 上，输出矩阵全为 32。
+
+只有 v4 和 v5p 有 Megacore；v5e, v6e, 7x, 8i 及更以后的都没有。
 
 ## pipeline_mode
 

@@ -89,7 +89,7 @@ from jax.experimental.pallas import tpu_sc as plsc
 
 **芯片与内存**
 
-| TPU | 物理 TensorCore 数 / 芯片 | Lite 芯片 | 支持 Megacore | HBM / 芯片 | HBM 带宽 / 芯片 | VMEM / TensorCore | SMEM / TensorCore |
+| TPU | 物理 TensorCore 数 / 芯片 | Lite 芯片 | 有 Megacore | HBM / 芯片 | HBM 带宽 / 芯片 | VMEM / TensorCore | SMEM / TensorCore |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | v2 | 2 | 否 | 否 | 16 GB | 0.716 TB/s | 16 MiB | 16 KiB |
 | v3 | 2 | 否 | 否 | 34.4 GB | 0.825 TB/s | 16 MiB | 16 KiB |
