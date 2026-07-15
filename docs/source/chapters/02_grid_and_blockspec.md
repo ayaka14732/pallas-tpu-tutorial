@@ -1,9 +1,10 @@
 # 第 2 章：Grid、BlockSpec 与 Dimension Semantics
 
-本章讨论 Pallas TPU kernel 最核心的两个声明：
+本章讨论 Pallas TPU kernel 中的 Grid、BlockSpec 与 Dimension Semantics：
 
 - `grid`：kernel body 会被执行多少次，每次执行的坐标是什么。
 - `BlockSpec`：每次执行时，每个输入/输出 Ref 对应原数组的哪一块，以及这块数据应放在哪个内存空间。
+- Dimension Semantics：仅用于 TPU v4 和 v5p，标注某个维度是否可以并行。
 
 ## 循环模型
 
@@ -51,9 +52,9 @@ pl.BlockSpec(
 
 ## block shape 的选择
 
-TPU 的 VMEM/VREG 按 tile 工作，block shape 不是任意形状都高效，也不是任意形状都被后端支持。
+TPU TensorCore 的 VMEM/VREG 按 tile 工作，block shape 不是任意形状都高效，也不是任意形状都被后端支持。
 
-官方规则可以浓缩为：
+官方规则可以归纳为：
 
 - TPU 上 block rank 至少为 1。
 - rank >= 2 时，最后两个维度通常应当分别是 `8` 和 `128` 的倍数，或者等于原数组对应维度。
@@ -266,41 +267,68 @@ pl.pallas_call(
 
 当只需要普通分块时，用简写即可。当需要 scalar prefetch、复杂 scratch 配置，或想把 grid/specs 作为一个对象传递时，用 `GridSpec` 更清楚。
 
-### PrefetchScalarGridSpec
+### pltpu.PrefetchScalarGridSpec：index_map 根据 SMEM 数据动态选择输入块
 
-`pltpu.PrefetchScalarGridSpec` 是 TPU 特有扩展，用于让 `index_map` 依赖运行时 metadata。
-
-```python
-grid_spec = pltpu.PrefetchScalarGridSpec(
-    num_scalar_prefetch=1,
-    grid=(num_blocks,),
-    in_specs=[
-        pl.BlockSpec(
-            (None, BLOCK, D),
-            lambda i, page_table_ref: (page_table_ref[i], 0, 0),
-        ),
-    ],
-    out_specs=pl.BlockSpec((None, BLOCK, D), lambda i, page_table_ref: (i, 0, 0)),
-)
-```
-
-关键语义：
-
-- `num_scalar_prefetch=1` 表示 `pallas_call` 的第一个参数会被预取到 SMEM。
-- scalar prefetch 参数不需要在 `in_specs` 中写对应 spec。
-- 后续普通输入/输出的 `index_map` 会额外收到这些 SMEM Ref。
-- 适合 page table、ragged length、block-sparse 索引等动态访问。
-
-Kernel 签名中 scalar prefetch 参数仍然排在最前面：
+`PrefetchScalarGridSpec` 让 `index_map` 除了 grid 坐标外，还能读取 scalar prefetch 参数。下面的例子根据 `block_ids` 动态选择输入块。
 
 ```python
-def kernel(page_table_ref, x_ref, o_ref):
-    # page_table_ref: SMEM
-    # x_ref: 根据 page_table_ref[i] 自动搬到 VMEM 的数据块
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+from jax.experimental.pallas import tpu as pltpu
+
+is_tpu_available = jax.devices()[0].platform == "tpu"
+
+NUM_BLOCKS = 6
+BLOCK_ROWS = 8
+BLOCK_COLS = 128
+
+def kernel(block_ids_ref: jax.Ref, x_ref: jax.Ref, o_ref: jax.Ref) -> None:
+    block_ids_ref[1] = 3
+    block_ids_ref[2] = 3
+    block_ids_ref[3] = 3
+    block_ids_ref[4] = 3
+    block_ids_ref[5] = 3
     o_ref[...] = x_ref[...]
+
+def fn(block_ids: jax.Array, x: jax.Array) -> jax.Array:
+    grid_spec = pltpu.PrefetchScalarGridSpec(
+        num_scalar_prefetch=1,
+        grid=(NUM_BLOCKS,),
+        in_specs=[
+            pl.BlockSpec(
+                block_shape=(None, BLOCK_ROWS, BLOCK_COLS),
+                index_map=lambda i, block_ids_ref: (block_ids_ref[i], 0, 0),
+                pipeline_mode=pl.Buffered(1),  # use single buffering
+            )
+        ],
+        out_specs=pl.BlockSpec(
+            block_shape=(None, BLOCK_ROWS, BLOCK_COLS),
+            index_map=lambda i, block_ids_ref: (i, 0, 0),
+        ),
+    )
+
+    return pl.pallas_call(
+        kernel,
+        grid_spec=grid_spec,
+        out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
+        interpret=False if is_tpu_available else pltpu.InterpretParams(),
+        name="prefetch_fn",
+    )(block_ids, x)
+
+x = jnp.broadcast_to(jnp.arange(NUM_BLOCKS, dtype=jnp.int32).reshape(-1, 1, 1), (NUM_BLOCKS, BLOCK_ROWS, BLOCK_COLS))
+# x[:, 0, 0] = [0, 1, 2, 3, 4, 5]
+
+block_ids = jnp.array([2, 0, 0, 0, 0, 0], dtype=jnp.int32)
+output = fn(block_ids, x)
+print(output[:, 0, 0])  # expected [2 3 3 3 3 3] when `pipeline_mode=pl.Buffered(1)`
 ```
 
-如果动态索引发生在 kernel 内部循环里，而不是每个 grid program 的入口处，通常需要改用手动 DMA。
+`num_scalar_prefetch=1` 表示 `block_ids` 不出现在 `in_specs` 中，但会作为 SMEM Ref 传给 kernel 和所有 `index_map`。
+
+:::{warning}
+在解释模式下，程序会给出错误的结果，详见 [jax-ml/jax#39179](https://github.com/jax-ml/jax/issues/39179)。
+:::
 
 ## `dimension_semantics` 的使用
 
@@ -363,53 +391,6 @@ print(result)
 而如果使用 `pltpu.ARBITRARY`，或者解释模式，或者在没有 Megacore 的 TPU 上，输出矩阵全为 32。
 
 只有 v4 和 v5p 有 Megacore；v5e, v6e, 7x, 8i 及更以后的都没有。
-
-## pipeline_mode
-
-`BlockSpec` 还可以指定 `pipeline_mode`，控制自动流水线中该 operand 使用多少缓冲。
-
-```python
-spec = pl.BlockSpec(
-    (BM, BN),
-    lambda i, j: (i, j),
-    pipeline_mode=pl.Buffered(2),
-)
-```
-
-常见用途：
-
-- `pl.Buffered(1)`：强制单缓冲，减少 VMEM 占用。
-- `pl.Buffered(2)`：双缓冲，尝试重叠 DMA 和计算。
-- `pl.Buffered(buffer_count=2, use_lookahead=True)`：允许 lookahead prefetch。
-
-通常不需要一开始就手动设置它。只有遇到 VMEM OOM、自动缓冲不符合预期，或在写高性能流水线时才调整。
-
-## Scratch Shapes
-
-Scratch buffer 是 kernel 内部临时内存，不对应任何输入或输出。
-
-```python
-scratch_shapes = [
-    pltpu.VMEM((8, 128), jnp.float32),
-    pltpu.SMEM((16,), jnp.int32),
-    pltpu.SemaphoreType.DMA((2,)),
-]
-```
-
-Scratch Ref 会作为额外参数传入 kernel，顺序在输入和输出 Ref 之后：
-
-```python
-def kernel(x_ref, y_ref, o_ref, tmp_ref, idx_ref, dma_sem_ref):
-    ...
-```
-
-它和 `BlockSpec` 的关系是：
-
-- `BlockSpec` 管理来自输入/输出数组的窗口。
-- `scratch_shapes` 分配 kernel 自己使用的临时空间。
-- Scratch 生命周期覆盖整个 `pallas_call` grid 执行，因此可以保存跨 program 的状态。
-
-如果临时空间只在某个局部作用域使用，可以考虑第 4 章的 `pl.run_scoped`。
 
 ## 示例 1：1D 向量加法
 
@@ -539,194 +520,9 @@ def matmul(a, b):
 
 如果把 grid 写成 `(K_blocks, M_blocks, N_blocks)`，同一个输出块的写入就不再按字典序连续，这会破坏 TPU 上安全累加的结构。
 
-## 示例 6：动态页号访问
-
-假设有一个 KV cache，形状是 `[num_pages, page_size, head_dim]`，每个 program 根据 page table 读取一个物理页：
-
-```python
-PAGE, D = 128, 128
-
-def copy_page_kernel(page_table_ref, page_ref, o_ref):
-    o_ref[...] = page_ref[...]
-
-def gather_pages(kv_cache, page_table):
-    num_pages = page_table.shape[0]
-
-    grid_spec = pltpu.PrefetchScalarGridSpec(
-        num_scalar_prefetch=1,
-        grid=(num_pages,),
-        in_specs=[
-            pl.BlockSpec(
-                (None, PAGE, D),
-                lambda i, page_table_ref: (page_table_ref[i], 0, 0),
-            ),
-        ],
-        out_specs=pl.BlockSpec(
-            (None, PAGE, D),
-            lambda i, page_table_ref: (i, 0, 0),
-        ),
-    )
-
-    return pl.pallas_call(
-        copy_page_kernel,
-        out_shape=jax.ShapeDtypeStruct((num_pages, PAGE, D), kv_cache.dtype),
-        grid_spec=grid_spec,
-    )(page_table, kv_cache)
-```
-
-这是 paged attention 的基础模式：page table 放在 SMEM，`index_map` 用它决定 HBM 中真正要搬运的页。
-
 ## API 示例
 
 本节把本章涉及的 Pallas API 按“能复制运行”的方式重新过一遍。除特别标注 TPU/SparseCore 的例子外，代码都使用 `interpret=True`，因此在安装了 `jax` + `jaxlib` 的 CPU 环境也能运行。`interpret=True` 只用于调试语义，不代表 TPU 性能。
-
-### pl.pallas_call：最小完整调用
-
-`pl.pallas_call` 是入口。kernel 不返回值，而是写入输出 Ref。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...] * 2
-
-
-x = jnp.arange(8, dtype=jnp.float32)
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    interpret=True,
-)(x)
-
-assert jnp.all(y == x * 2)
-print(y)
-```
-
-这里没有显式写 `grid/in_specs/out_specs`，默认就是单次调用、整块输入、整块输出。
-
-### grid=int：一维 grid
-
-`grid=4` 会被规范化为 `grid=(4,)`。每个 program 通过 `program_id(0)` 写一个位置。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(o_ref):
-    i = pl.program_id(0)
-    o_ref[i] = i
-
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct((4,), jnp.int32),
-    grid=4,
-    interpret=True,
-)()
-
-assert jnp.all(y == jnp.array([0, 1, 2, 3], dtype=jnp.int32))
-print(y)
-```
-
-### grid=tuple：二维 grid 与 program_id
-
-多维 grid 对应嵌套循环。下面的输出把 `(i, j)` 编码成 `10*i + j`。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(o_ref):
-    i = pl.program_id(0)
-    j = pl.program_id(1)
-    o_ref[i, j] = 10 * i + j
-
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct((3, 4), jnp.int32),
-    grid=(3, 4),
-    interpret=True,
-)()
-
-expected = jnp.array(
-    [[0, 1, 2, 3],
-     [10, 11, 12, 13],
-     [20, 21, 22, 23]],
-    dtype=jnp.int32,
-)
-assert jnp.all(y == expected)
-print(y)
-```
-
-### pl.num_programs：读取 grid 大小
-
-`pl.num_programs(axis)` 返回某个 grid 轴的长度。它常用于最后一轮处理、边界判断或把工作均分到多个 program。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(o_ref):
-    i = pl.program_id(0)
-    n = pl.num_programs(0)
-    o_ref[i] = n - 1 - i
-
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct((5,), jnp.int32),
-    grid=(5,),
-    interpret=True,
-)()
-
-assert jnp.all(y == jnp.array([4, 3, 2, 1, 0], dtype=jnp.int32))
-print(y)
-```
-
-### pl.BlockSpec：显式分块
-
-`BlockSpec((4,), lambda i: (i,))` 表示第 `i` 个 program 处理第 `i` 个长度为 4 的块。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-BLOCK = 4
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...] + 1
-
-
-x = jnp.arange(10, dtype=jnp.float32)
-spec = pl.BlockSpec((BLOCK,), lambda i: (i,))
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    in_specs=[spec],
-    out_specs=spec,
-    grid=(pl.cdiv(x.shape[0], BLOCK),),
-    interpret=True,
-)(x)
-
-assert jnp.all(y == x + 1)
-print(y)
-```
-
-最后一个块的 Ref 仍然是长度 4，但越界写回会被丢弃。
 
 ### block_shape=None：整个数组作为一个块
 
@@ -827,43 +623,6 @@ print(y)
 
 等价写法是 `pl.BlockSpec((pl.Squeezed(), 4), lambda b: (b, 0))`。
 
-### pl.Element：index_map 返回元素下标
-
-默认 blocked 模式中 `index_map` 返回块编号。`pl.Element(size)` 改成返回元素起点。这个 API 主要面向 TPU 后端；下面是完整写法。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...]
-
-
-x = jnp.arange(10, dtype=jnp.float32)
-in_spec = pl.BlockSpec(
-    (pl.Element(4),),
-    lambda i: (2 * i,),  # 元素起点：0, 2, 4
-)
-out_spec = pl.BlockSpec((None, 4), lambda i: (i, 0))
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct((3, 4), x.dtype),
-    in_specs=[in_spec],
-    out_specs=out_spec,
-    grid=(3,),
-    interpret=True,
-)(x)
-
-expected = jnp.stack([x[0:4], x[2:6], x[4:8]])
-assert jnp.all(y == expected)
-print(y)
-```
-
-如果你只是规则地按块遍历，优先使用默认 blocked 模式。
-
 ### pl.ds / pl.dslice：Ref 上的动态切片
 
 `pl.ds(start, size)` 和 `pl.dslice(start, size)` 是同一个动态切片构造器，常用于 Ref indexing。
@@ -897,160 +656,11 @@ print(y)
 
 `pl.ds` 的 `start` 可以是运行时值；普通 Python `slice` 的边界必须更静态。
 
-### pl.cdiv / align_to / next_power_of_2：形状工具
-
-这几个工具是写 grid 和 tile 时的常用工具。
-
-```python
-from jax.experimental import pallas as pl
-
-
-assert pl.cdiv(10, 4) == 3
-assert pl.align_to(10, 4) == 12
-assert pl.next_power_of_2(17) == 32
-
-M, N = 1000, 513
-BM, BN = 128, 128
-grid = (pl.cdiv(M, BM), pl.cdiv(N, BN))
-assert grid == (8, 5)
-print(grid)
-```
-
-`pl.cdiv` 最常见的用途就是计算覆盖完整张量的 grid。
-
-当数据需要 reshape 成固定大小的 page/block，或 buffer 大小必须满足硬件对齐时，可以用 `pl.align_to(n, alignment)` 计算 padding 后的长度。例如 ragged KV cache 要按 `page_size` 分页，可以先将 token 数补齐，再安全地 reshape；补出的 token 由真实的 `kv_len` 在计算时排除。
-
-```python
-padded_len = pl.align_to(kv_len, page_size)
-kv = jnp.pad(kv, ((0, padded_len - kv_len), (0, 0), (0, 0)))
-kv_pages = kv.reshape(-1, page_size, num_kv_heads * 2, head_dim)
-```
-
-这里 `kv_pages.shape[0] == pl.cdiv(kv_len, page_size)`：`cdiv` 用于取得 page/block 数量，`align_to` 用于取得实际需要分配或补齐的长度。
-
 ### pytree out_shape / out_specs：多个输出
 
 输出可以是 pytree。kernel 参数顺序是：所有输入 Ref，然后按 pytree flatten 后的所有输出 Ref，再然后是 scratch Ref。
 
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, y_ref, sum_ref, diff_ref):
-    sum_ref[...] = x_ref[...] + y_ref[...]
-    diff_ref[...] = x_ref[...] - y_ref[...]
-
-
-x = jnp.arange(8, dtype=jnp.float32)
-y = jnp.ones((8,), dtype=jnp.float32)
-spec = pl.BlockSpec((4,), lambda i: (i,))
-
-sum_out, diff_out = pl.pallas_call(
-    kernel,
-    out_shape=(
-        jax.ShapeDtypeStruct(x.shape, x.dtype),
-        jax.ShapeDtypeStruct(x.shape, x.dtype),
-    ),
-    in_specs=[spec, spec],
-    out_specs=(spec, spec),
-    grid=(2,),
-    interpret=True,
-)(x, y)
-
-assert jnp.all(sum_out == x + y)
-assert jnp.all(diff_out == x - y)
-print(sum_out, diff_out)
-```
-
 如果 `out_shape` 是 dict/list/tuple，`out_specs` 也要用同样的 pytree 结构。
-
-### pltpu.PrefetchScalarGridSpec：index_map 读取 SMEM metadata
-
-`PrefetchScalarGridSpec` 让 `index_map` 除了 grid 坐标外，还能读取前几个 scalar prefetch 参数。下面的例子根据 `block_ids` 动态选择输入块。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-from jax.experimental.pallas import tpu as pltpu
-
-
-BLOCK = 4
-
-
-def kernel(block_ids_ref, x_ref, o_ref):
-    o_ref[...] = x_ref[...]
-
-
-x = jnp.arange(16, dtype=jnp.float32)
-block_ids = jnp.array([2, 0, 3], dtype=jnp.int32)
-
-grid_spec = pltpu.PrefetchScalarGridSpec(
-    num_scalar_prefetch=1,
-    grid=(block_ids.shape[0],),
-    in_specs=[
-        pl.BlockSpec(
-            (BLOCK,),
-            lambda i, block_ids_ref: (block_ids_ref[i],),
-        )
-    ],
-    out_specs=pl.BlockSpec(
-        (BLOCK,),
-        lambda i, block_ids_ref: (i,),
-    ),
-)
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct((block_ids.shape[0] * BLOCK,), x.dtype),
-    grid_spec=grid_spec,
-    interpret=True,
-)(block_ids, x)
-
-expected = jnp.concatenate([x[8:12], x[0:4], x[12:16]])
-assert jnp.all(y == expected)
-print(y)
-```
-
-`num_scalar_prefetch=1` 表示 `block_ids` 不出现在 `in_specs` 中，但会作为 SMEM Ref 传给 kernel 和所有 `index_map`。
-
-### pl.Buffered / pipeline_mode：声明自动缓冲策略
-
-`pipeline_mode` 是 `BlockSpec` 的参数，用于告诉自动流水线该 operand 如何缓冲。这个例子在语义上和普通分块相同，但显式要求双缓冲。
-
-```python
-import jax
-import jax.numpy as jnp
-from jax.experimental import pallas as pl
-
-
-def kernel(x_ref, o_ref):
-    o_ref[...] = x_ref[...] + 2
-
-
-x = jnp.arange(8, dtype=jnp.float32)
-spec = pl.BlockSpec(
-    (4,),
-    lambda i: (i,),
-    pipeline_mode=pl.Buffered(buffer_count=2),
-)
-
-y = pl.pallas_call(
-    kernel,
-    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
-    in_specs=[spec],
-    out_specs=spec,
-    grid=(2,),
-    interpret=True,
-)(x)
-
-assert jnp.all(y == x + 2)
-print(y)
-```
-
-真实 TPU 性能差异要看编译后的 DMA 调度；`interpret=True` 只验证语义。
 
 ### pl.BoundedSlice：动态但有界的块大小（TPU/emit_pipeline）
 
@@ -1199,30 +809,6 @@ grid = (K_blocks, M_blocks, N_blocks)
 grid = (M_blocks, N_blocks, K_blocks)
 ```
 
-**无 mask 地使用越界 padding 做 reduction：**
-
-```python
-# 有风险：最后一个块的 padding 值不保证为 0
-o_ref[...] = jnp.sum(x_ref[...])
-```
-
-**把小标量放进 VMEM：**
-
-```python
-# 通常低效
-scratch_shapes=[pltpu.VMEM((1,), jnp.int32)]
-
-# 更适合
-scratch_shapes=[pltpu.SMEM((1,), jnp.int32)]
-```
-
-**错误标注 parallel：**
-
-```python
-# 如果 k 维会累加到同一个输出块，不要标 parallel
-dimension_semantics=(pltpu.PARALLEL, pltpu.PARALLEL, pltpu.ARBITRARY)
-```
-
 ## TPU 上的 grid 执行语义
 
 在单 TensorCore TPU kernel 中，grid 通常按字典序顺序推进。这一点和 GPU 的“很多 block 并行抢占执行”不同。
@@ -1244,6 +830,8 @@ out_specs = pl.BlockSpec((BM, BN), lambda i, j, k: (i, j))
 ```
 
 对于固定的 `(i, j)`，所有 `k` 会连续执行，因此同一个 `C[i, j]` 块可以作为累加器使用。
+
+但是 Megacore 不是。
 
 ## 与第 4 章的连接
 

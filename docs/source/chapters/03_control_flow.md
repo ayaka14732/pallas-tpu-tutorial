@@ -1,4 +1,4 @@
-# 第 3 章：Pallas 控制流
+# 第 3 章：Pallas 控制流与执行
 
 #### `pl.when`：只在条件成立时执行一段副作用代码
 
@@ -212,4 +212,47 @@ def kernel(x_ref, y_ref, o_ref, acc_ref, *, k: int):
 
 `ref.at[...]` 与 `ref[...]` 的区别：`ref.at[...]` 返回的仍然是一个 `Ref`（子引用），不触发实际的内存加载。这在 DMA 操作中非常重要——你需要传递一个 `Ref` 给 `make_async_copy`，而不是一个已加载的值。
 
-讨论 ref_addupdate lowering 的不可能性。
+## Scratch buffer：创建累加内存
+
+Scratch buffer 是 kernel 内部临时内存，不对应任何输入或输出。
+
+```python
+scratch_shapes = [
+    pltpu.VMEM((8, 128), jnp.float32),
+    pltpu.SMEM((16,), jnp.int32),
+    pltpu.SemaphoreType.DMA((2,)),
+]
+```
+
+Scratch Ref 会作为额外参数传入 kernel，顺序在输入和输出 Ref 之后：
+
+```python
+def kernel(x_ref, y_ref, o_ref, tmp_ref, idx_ref, dma_sem_ref):
+    ...
+```
+
+它和 `BlockSpec` 的关系是：
+
+- `BlockSpec` 管理来自输入/输出数组的窗口。
+- `scratch_shapes` 分配 kernel 自己使用的临时空间。
+- Scratch 生命周期覆盖整个 `pallas_call` grid 执行，因此可以保存跨 program 的状态。
+
+如果临时空间只在某个局部作用域使用，可以考虑第 4 章的 `pl.run_scoped`。
+
+## pipeline_mode
+
+`BlockSpec` 还可以指定 `pipeline_mode`，控制自动流水线中该 operand 使用多少缓冲。
+
+```python
+spec = pl.BlockSpec(
+    (BM, BN),
+    lambda i, j: (i, j),
+    pipeline_mode=pl.Buffered(2),
+)
+```
+
+常见用途：
+
+- `pl.Buffered(1)`：强制单缓冲，减少 VMEM 占用。
+- `pl.Buffered(2)`：双缓冲，尝试重叠 DMA 和计算。
+- `pl.Buffered(buffer_count=2, use_lookahead=True)`：允许 lookahead prefetch。

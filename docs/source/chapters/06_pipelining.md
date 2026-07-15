@@ -176,3 +176,39 @@ wait_all_stores()
 ```
 
 这个模式在 RPA v3 中被严格遵循：prologue 预取第一个 bq 和 bkv，main loop 处理所有序列，epilogue 等待所有输出 DMA 完成。
+
+### pl.Buffered / pipeline_mode：声明自动缓冲策略
+
+`pipeline_mode` 是 `BlockSpec` 的参数，用于告诉自动流水线该 operand 如何缓冲。这个例子在语义上和普通分块相同，但显式要求双缓冲。
+
+```python
+import jax
+import jax.numpy as jnp
+from jax.experimental import pallas as pl
+
+
+def kernel(x_ref, o_ref):
+    o_ref[...] = x_ref[...] + 2
+
+
+x = jnp.arange(8, dtype=jnp.float32)
+spec = pl.BlockSpec(
+    (4,),
+    lambda i: (i,),
+    pipeline_mode=pl.Buffered(buffer_count=2),
+)
+
+y = pl.pallas_call(
+    kernel,
+    out_shape=jax.ShapeDtypeStruct(x.shape, x.dtype),
+    in_specs=[spec],
+    out_specs=spec,
+    grid=(2,),
+    interpret=True,
+)(x)
+
+assert jnp.all(y == x + 2)
+print(y)
+```
+
+真实 TPU 性能差异要看编译后的 DMA 调度；`interpret=True` 只验证语义。

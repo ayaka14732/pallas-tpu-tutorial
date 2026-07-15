@@ -72,11 +72,6 @@ result = pl.pallas_call(
 
 Interpret 模式下可以使用 `pdb`、`print()` 等标准调试工具。
 
-也可以全局开启：
-```python
-pltpu.set_tpu_interpret_mode(True)
-```
-
 ## 常见性能问题诊断
 
 ### MXU 利用率低

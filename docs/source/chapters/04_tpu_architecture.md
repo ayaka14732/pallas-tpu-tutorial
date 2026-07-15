@@ -91,15 +91,15 @@ from jax.experimental.pallas import tpu_sc as plsc
 
 | TPU | 物理 TensorCore 数 / 芯片 | Lite 芯片 | 有 Megacore | HBM / 芯片 | HBM 带宽 / 芯片 | VMEM / TensorCore | SMEM / TensorCore |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| v2 | 2 | 否 | 否 | 16 GB | 0.716 TB/s | 16 MiB | 16 KiB |
-| v3 | 2 | 否 | 否 | 34.4 GB | 0.825 TB/s | 16 MiB | 16 KiB |
-| v4i | 1 | 是 | 否 | 8.59 GB | 0.614 TB/s | 16 MiB | 1 MiB |
-| v4 | 2 | 否 | 是 | 34.4 GB | 1.23 TB/s | 16 MiB | 1 MiB |
-| v5e | 1 | 是 | 否 | 17.2 GB | 0.820 TB/s | 128 MiB | 1 MiB |
-| v5p | 2 | 否 | 是 | 103 GB | 2.46 TB/s | 64 MiB | 1 MiB |
-| v6e（Trillium） | 1 | 是 | 否 | 34.4 GB | 1.64 TB/s | 128 MiB | 1 MiB |
-| 7x（Ironwood） | 2 | 否 | 否 | 206 GB | 7.40 TB/s | 64 MiB | 1 MiB |
-| 8i | 2 | 否 | 否 | 309 GB | 8.60 TB/s | 192 MiB | 1 MiB |
+| v2 | 2 | | | 16 GB | 0.716 TB/s | 16 MiB | 16 KiB |
+| v3 | 2 | | | 34.4 GB | 0.825 TB/s | 16 MiB | 16 KiB |
+| v4i | 1 | 是 | | 8.59 GB | 0.614 TB/s | 16 MiB | 1 MiB |
+| v4 | 2 | | 是 | 34.4 GB | 1.23 TB/s | 16 MiB | 1 MiB |
+| v5e | 1 | 是 | | 17.2 GB | 0.820 TB/s | 128 MiB | 1 MiB |
+| v5p | 2 | | 是 | 103 GB | 2.46 TB/s | 64 MiB | 1 MiB |
+| v6e（Trillium） | 1 | 是 | | 34.4 GB | 1.64 TB/s | 128 MiB | 1 MiB |
+| 7x（Ironwood） | 2 | | | 206 GB | 7.40 TB/s | 64 MiB | 1 MiB |
+| 8i | 2 | | | 309 GB | 8.60 TB/s | 192 MiB | 1 MiB |
 
 TPU v4 和 v4i 还具有 CMEM 这一内存空间，但在其他代次（包括更新代次）的 TPU 中没有，因此本教程不涉及 CMEM。
 

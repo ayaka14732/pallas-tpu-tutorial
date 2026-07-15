@@ -93,6 +93,8 @@ import jax
 import jax.numpy as jnp
 from jax.experimental import pallas as pl
 
+is_tpu_available = jax.devices()[0].platform == "tpu"
+
 def add_kernel(x_ref: jax.Ref, y_ref: jax.Ref, z_ref: jax.Ref) -> None:
     z_ref[...] = x_ref[...] + y_ref[...]
 
@@ -109,7 +111,7 @@ def vector_add(x: jax.Array, y: jax.Array) -> jax.Array:
         ],
         out_specs=pl.BlockSpec(block_shape=(block_size,), index_map=lambda i: (i,)),
         grid=(num_blocks,),
-        interpret=True,  # 在 CPU 上模拟执行
+        interpret=False if is_tpu_available else pltpu.InterpretParams(),  # 在 CPU 上模拟执行
     )(x, y)
 
 x = jnp.full((1024,), 1.0, dtype=jnp.float32)
@@ -142,13 +144,9 @@ for i in range(num_blocks):
 
 ## 解释模式
 
-其中，代码中的 `interpret=True` 表示在 CPU 上模拟 kernel 执行。如果你在本地开发，没有真实的 TPU 环境，可以使用这种方法执行代码。解释模式有两种开启方法：
+其中，代码中的 `interpret=pltpu.InterpretParams()` 表示在 CPU 上模拟 kernel 执行。如果你在本地开发，没有真实的 TPU 环境，可以使用这种方法执行代码：
 
 ```python
-# 方法 1：全局开启
-pltpu.set_tpu_interpret_mode(True)
-
-# 方法 2：在单个 pallas_call 中开启
 result = pl.pallas_call(
     kernel_fn,
     ...,
@@ -159,7 +157,7 @@ result = pl.pallas_call(
 解释模式下，所有 DMA 操作会被模拟为普通的内存拷贝，信号量操作会被模拟为计数器。这对于验证 kernel 逻辑的正确性非常有用，但不能反映真实的性能特征。
 
 :::{warning}
-在旧的代码中，你可能会看到 `interpret=True` 的写法。那是旧的 CPU 解释模式，不能很好地模拟 TPU 硬件，应该避免使用。
+在旧的代码中，你可能会看到 `interpret=True` 的写法。那是旧的 CPU 解释模式，不能很好地模拟 TPU 硬件，应避免使用。
 :::
 
 ## 第二个 Pallas kernel
