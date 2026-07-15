@@ -152,20 +152,24 @@ pltpu.set_tpu_interpret_mode(True)
 result = pl.pallas_call(
     kernel_fn,
     ...,
-    interpret=True,  # 在 CPU 上模拟执行
+    interpret=pltpu.InterpretParams(),  # 在 CPU 上模拟执行
 )(inputs)
 ```
 
 解释模式下，所有 DMA 操作会被模拟为普通的内存拷贝，信号量操作会被模拟为计数器。这对于验证 kernel 逻辑的正确性非常有用，但不能反映真实的性能特征。
 
-## 第二个 Pallas kernel
+:::{warning}
+在旧的代码中，你可能会看到 `interpret=True` 的写法。那是旧的 CPU 解释模式，不能很好地模拟 TPU 硬件，应该避免使用。
+:::
 
-### 使用 pl.program_id 和 pl.num_programs
+## 第二个 Pallas kernel
 
 ```python
 import jax
 import jax.numpy as jnp
 from jax.experimental import pallas as pl
+
+is_tpu_available = jax.devices()[0].platform == "tpu"
 
 def kernel(x_ref: jax.Ref, o_ref: jax.Ref) -> None:
     # 获取当前 program 在各个 grid 维度上的索引
@@ -190,7 +194,7 @@ def fn(x: jax.Array) -> jax.Array:
         in_specs=[pl.BlockSpec(block_shape=(8, 128), index_map=lambda i, j: (i, j))],
         out_specs=pl.BlockSpec(block_shape=(8, 128), index_map=lambda i, j: (i, j)),
         grid=(pl.cdiv(N, 8), pl.cdiv(M, 128)),
-        interpret=True,  # 在 CPU 上模拟执行
+        interpret=False if is_tpu_available else pltpu.InterpretParams(),  # 在 CPU 上模拟执行
     )(x)
 
 x = jnp.full((24, 384), 7.0, dtype=jnp.float32)
@@ -215,4 +219,6 @@ Executing grid (1, 1)
 2. 可以使用 `pl.when` 在 kernel 内部进行条件执行，具体用法将在第 3 章讲解。
 3. 可以使用 `pl.debug_print` 在 kernel 内部打印调试信息。但要注意，`debug_print` 会引入同步点，影响性能。仅用于调试，生产代码中应移除。
 
-注意：此示例在真实 TPU VM 上无法运行，详见 <https://github.com/jax-ml/jax/issues/25192>。
+:::{warning}
+此示例中的 `pl.debug_print` 在真实 TPU VM 上无法直接起作用，读者需要参考 [jax-ml/jax#25192 (comment)](https://github.com/jax-ml/jax/issues/25192#issuecomment-4971797607) 中的方法解决。
+:::
