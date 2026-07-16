@@ -15,34 +15,33 @@ Pallas TPU Kernel 开发教程
    chapters/03_control_flow
 
 .. toctree::
-   :caption: 第二部分：Pallas TPU 编程
+   :caption: 第二部分：Pallas TPU 编程基础
    :maxdepth: 2
 
    chapters/04_tpu_architecture
    chapters/05_memory_spaces
    chapters/06_pipelining
+   chapters/07_multicore
 
 .. toctree::
-   :caption: 第三部分：流水线与性能优化
+   :caption: 第三部分：性能优化
    :maxdepth: 2
 
-   chapters/07_matmul
-   chapters/07_profiling
+   chapters/08_profiling
 
 .. toctree::
    :caption: 第四部分：基本算子实现
    :maxdepth: 2
 
-   chapters/08_rmsnorm
-   chapters/09_softmax
-   chapters/10_scalar_prefetch_and_sparse
+   chapters/09_matmul
+   chapters/10_rmsnorm
+   chapters/11_softmax
 
 .. toctree::
    :caption: 第五部分：注意力机制实现
    :maxdepth: 2
 
-   chapters/11_flash_attention
-   chapters/12_distributed
+   chapters/12_flash_attention
    chapters/13_ragged_paged_attention
 
 .. toctree::

@@ -1,4 +1,4 @@
-# 第 9 章：Softmax
+# 第 11 章：Softmax
 
 ## 算子分析
 
