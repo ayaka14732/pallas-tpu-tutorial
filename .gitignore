@@ -1,5 +1,5 @@
 venv/
-/jax
+/jax-source
 /docs/build/
 /docs/_build/
 __pycache__

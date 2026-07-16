@@ -29,7 +29,7 @@
 | TensorCore | `pl.core_map` 或 Megacore grid 分区 | `jax.lax.axis_index("core")` | 同一 device 的 HBM，core 私有的 VMEM/SMEM |
 | JAX device | `jax.shard_map` | `jax.lax.axis_index("device")` | 全局 `jax.Array` 的一个本地 shard |
 
-“芯片”“TensorCore”和“JAX device”不总是一一对应。以本仓库 `./jax/` 中的硬件信息表为准：
+“芯片”“TensorCore”和“JAX device”不总是一一对应：
 
 - TPU v4、v5p 支持 Megacore，此时两个物理 TensorCore 可以作为一个 JAX device 暴露。
 - 同样是双 TensorCore 芯片，也可能以 split 模式暴露成两个单 core device。
@@ -83,6 +83,9 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
 
+is_tpu_available = jax.devices()[0].platform == "tpu"
+
+
 def add_kernel(x_ref, y_ref, o_ref):
     o_ref[...] = x_ref[...] + y_ref[...]
 
@@ -103,8 +106,8 @@ def add(x, y):
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=(pltpu.PARALLEL,),
         ),
-        # CPU 上验证时保留；在 TPU 上测试真实性能时删除这一行。
-        interpret=pltpu.InterpretParams(),
+        # CPU 使用解释模式；TPU 使用真正的 Mosaic lowering。
+        interpret=False if is_tpu_available else pltpu.InterpretParams(),
     )(x, y)
 
 
@@ -211,7 +214,7 @@ core_mesh = pltpu.TensorCoreMesh(axis_name="core")
 print(core_mesh.shape)  # 例如 OrderedDict([("core", 2)])
 ```
 
-本仓库当前 JAX 源码推荐 `pltpu.TensorCoreMesh(...)`。旧代码中的 `pltpu.create_tensorcore_mesh(...)` 已进入弃用流程。
+当前 JAX API 使用 `pltpu.TensorCoreMesh(...)`。旧代码中的 `pltpu.create_tensorcore_mesh(...)` 已进入弃用流程。
 
 ### `core_map` 的状态式接口
 
@@ -243,6 +246,7 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
 
+is_tpu_available = jax.devices()[0].platform == "tpu"
 NUM_CORES = 2
 ROWS_PER_CORE = 4
 core_mesh = pltpu.TensorCoreMesh(
@@ -259,8 +263,8 @@ def add_core_id(x):
 
     @pl.core_map(
         core_mesh,
-        # CPU 上模拟两个 core；真实 TPU 性能测试时删除 interpret。
-        interpret=pltpu.InterpretParams(),
+        # InterpretParams 用于在 CPU 上模拟 TPU，不能传给真实 TPU。
+        interpret=False if is_tpu_available else pltpu.InterpretParams(),
     )
     def per_core():
         core = jax.lax.axis_index("core")
@@ -314,7 +318,7 @@ num_cores = core_mesh.shape["core"]
 assert x.shape[0] % num_cores == 0
 ```
 
-上面的 CPU 解释模式故意显式写 `num_cores=2`，这样即使机器只有一个 CPU device，也能覆盖两条 core 路径。
+上面的 CPU 解释模式故意显式写 `num_cores=2`，这样即使机器只有一个 CPU device，也能覆盖两条 core 路径。`interpret` 则必须根据 backend 选择：CPU 使用 `pltpu.InterpretParams()`，真实 TPU 使用 `False`（也就是正常的 Mosaic lowering）。如果在 TPU 上传入 `InterpretParams()`，解释器引入的 host callback effects 会进入 `mpmd_map` 的 TPU lowering，当前会触发 `tokens_out` 报错。
 
 ### 为什么输入输出用 HBM Ref
 
@@ -443,7 +447,7 @@ device 3: [12, 13, 14, 15] + 3
 `out_specs=jax.P("device")` 表示把四个长度为 4 的局部结果沿第 0 维连接，恢复成长度为 16 的全局数组。
 
 :::{warning}
-本仓库当前 `jax.shard_map` 会检查实参的物理 sharding。不要把普通的单 device/复制数组直接交给 `in_specs=jax.P("device")`，期待 `shard_map` 隐式重分片。先用 `jax.device_put(x, NamedSharding(mesh, spec))` 或 `jax.reshard` 明确布局。
+当前 `jax.shard_map` 会检查实参的物理 sharding。不要把普通的单 device/复制数组直接交给 `in_specs=jax.P("device")`，期待 `shard_map` 隐式重分片。先用 `jax.device_put(x, NamedSharding(mesh, spec))` 或 `jax.reshard` 明确布局。
 :::
 
 ### `out_specs` 不只是输出布局
@@ -532,7 +536,7 @@ def per_device(x_local):
 
 `shard_map` 决定每个 device 获得哪些全局数据；Pallas kernel 只处理本地 shard。这样 BlockSpec 和 VMEM 容量都应根据**局部 shape**设计，而不是根据全局 shape 设计。
 
-本仓库当前 Pallas 输出类型还不能完整表达 `shard_map` 的 manual-axis varying 信息，因此官方 Pallas `core_map` 文档和相关测试在这个组合处使用 `check_vma=False`。这是一项接口边界，不是关闭检查的一般建议：外层 `in_specs`、`out_specs` 仍需人工确保正确。
+当前 Pallas 输出类型还不能完整表达 `shard_map` 的 manual-axis varying 信息，因此这个组合需要使用 `check_vma=False`。这是一项接口边界，不是关闭检查的一般建议：外层 `in_specs`、`out_specs` 仍需人工确保正确。
 
 ### 完整例子 5：device × core 两层映射
 
@@ -556,6 +560,8 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
 
+is_tpu_available = jax.devices()[0].platform == "tpu"
+
 # 第一层：四个 JAX device。
 device_mesh = jax.make_mesh((4,), ("device",))
 partition = jax.P("device", None)
@@ -574,7 +580,7 @@ core_mesh = pltpu.TensorCoreMesh(axis_name="core", num_cores=2)
         pltpu.VMEM((4, 128), jnp.int32),
         pltpu.SemaphoreType.DMA,
     ],
-    interpret=pltpu.InterpretParams(),
+    interpret=False if is_tpu_available else pltpu.InterpretParams(),
 )
 def identify_worker(
     x_hbm_ref,
@@ -637,7 +643,7 @@ worker    = (device_id, core_id)
 
 1. 删除 `jax_num_cpu_devices`，使用真实的 `jax.device_count()` 构造 device mesh。
 2. 把 `core_mesh` 改成 `pltpu.TensorCoreMesh(axis_name="core")`，不要写死 core 数量。
-3. 删除 `interpret=pltpu.InterpretParams()`，让 Pallas lowering 生成 TPU kernel。
+3. 保持示例中的 backend 分支，使 TPU 选择 `interpret=False` 并生成真正的 TPU kernel。
 4. 根据真实 device 数、每 device 的局部 shape 和 `core_mesh.shape["core"]` 重新计算输出类型及 VMEM scratch shape。
 
 ## 三种入口如何选择
@@ -685,23 +691,3 @@ worker    = (device_id, core_id)
 ### 7. 把解释模式当性能模拟器
 
 解释模式适合检查索引、shape 和数值；它不能证明真实 Megacore 的负载均衡、DMA 重叠或没有硬件竞态。最终必须在目标 TPU 上 profile。
-
-## 本章对应的 JAX 源码与测试
-
-本章 API 和例子主要沿着 `./jax/` 中以下实现、文档和测试核对：
-
-- `jax/docs/pallas/tpu/pipelining.md`：Megacore 内存模型与 `dimension_semantics`。
-- `jax/docs/pallas/tpu/core_map.md`：per-core 编程、`pl.kernel`、pipeline 及 `shard_map` 组合。
-- `jax/jax/_src/pallas/core.py`：`core_map` 的状态式接口、无返回值约束和 Pallas/VMA 边界。
-- `jax/jax/_src/pallas/mosaic/core.py`：`TensorCoreMesh`、core-local memory 和多 core VMEM 输入输出限制。
-- `jax/jax/_src/pallas/mosaic/tpu_info.py`：各 TPU 代次的 core 数、Megacore/split 判定。
-- `jax/tests/pallas/tpu_pallas_interpret_test.py`：CPU 上模拟多个 TensorCore 的 `core_map` 测试。
-- `jax/tests/pallas/tpu_pallas_pipeline_test.py`：Megacore elementwise、matmul 和 pipeline 分区测试。
-- `jax/tests/pallas/tpu_pallas_interpret_distributed_test.py`：`shard_map(core_map(...))` 两层组合测试。
-- `jax/docs/new_docs/201/shard-map.md` 与 `jax/tests/shard_map_test.py`：当前 `shard_map`、`PartitionSpec`、VMA 和集合通信语义。
-
-如果本地安装的 JAX 与 `./jax/` checkout 版本不同，应优先以项目锁定的版本为准。验证本章的最新 API 时，可以让 Python 直接导入仓库源码：
-
-```bash
-PYTHONPATH=./jax JAX_PLATFORMS=cpu venv/bin/python your_example.py
-```
