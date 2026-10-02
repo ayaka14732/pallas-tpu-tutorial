@@ -1,0 +1,68 @@
+## lane gather：y[s,l] = x[s, i[s,l]]：数值检查通过
+计算指令： vadd.8x128.s32×1、vlt.8x128.s32×1、vperm.0.8x128×1、vpop.8x128×1、vsel.8x128×1、vsetperm.2.all.u8×1
+{ va0: vlt.8x128.s32 vm0, v0, 0 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:68:61-68:94 <- 43:26-43:53 [lt; LLO 39]
+  va1: vadd.8x128.s32 v1, 128, v0 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:68:61-68:94 <- 43:26-43:53 [add; LLO 40]
+{ va0: vsel.8x128 v2, vm0, v1, v0 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:68:61-68:94 <- 43:26-43:53 [select_n; LLO 41]
+{ vx0: vsetperm.2.all.u8 pcr0, v2 }
+{ vx0: vperm.0.8x128 trf0, v3 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:68:61-68:94 <- 43:26-43:53 [gather; LLO 43] | Set PCR instruction
+{ vr0: vpop.8x128 v4, trf0 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:68:61-68:94 <- 43:26-43:53 [gather; LLO 44]
+
+## sublane gather：y[s,l] = x[i[s,l], l]：编译失败
+INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `permute` HLO name `permute.1`: Sublane gather not supported by this TPU generation
+
+## 用循环移位与选择合成 sublane gather：数值检查通过
+计算指令： vadd.8x128.s32×7、vand.8x128.u32×8、veq.8x128.s32×7、vlaneseq.8x128.u32×1、vne.8x128.s32×1、vrot.slane.down.8x128.u32×7、vsel.8x128×8、vshrl.8x128.s32×1
+{ va0: vlaneseq.8x128.u32 v0 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:53:14-53:61 <- 43:26-43:53 [iota; LLO 39]
+{ va0: vrot.slane.down.8x128.u32 v13, v9 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 57]
+  va1: vshrl.8x128.s32 v1, v0, 0x7 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 | chapter01/08_gather_scatter/01_pallas_lane_permute.py:53:14-53:61
+{ va0: vadd.8x128.s32 v2, 1, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 59] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+  va1: vadd.8x128.s32 v3, 2, v1 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 77] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+{ va0: vadd.8x128.s32 v4, 3, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 95] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+  va1: vand.8x128.u32 v5, 0x7, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 45]
+{ va0: vand.8x128.u32 v6, 0x7, v2 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 64]
+  va1: vand.8x128.u32 v7, 0x7, v3 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 82]
+{ va0: vadd.8x128.s32 v8, 4, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 113] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+  va1: vand.8x128.u32 v10, 0x7, v4 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 100]
+{ va0: vand.8x128.u32 v11, 0x7, v8 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 118]
+  va1: vadd.8x128.s32 v14, 5, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 131] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+{ va0: vne.8x128.s32 vm0, v12, v5 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 195]
+  va1: veq.8x128.s32 vm1, v12, v6 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 72]
+{ va0: vsel.8x128 v15, vm0, 0x0, v9 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 54]
+  va1: vrot.slane.down.8x128.u32 v16, v13 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 75]
+{ va0: vsel.8x128 v17, vm1, v13, v15 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 73]
+  va1: veq.8x128.s32 vm2, v12, v7 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 90]
+{ va0: vsel.8x128 v18, vm2, v16, v17 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 91]
+  va1: vrot.slane.down.8x128.u32 v19, v16 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 93]
+{ va0: veq.8x128.s32 vm3, v12, v10 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 108]
+  va1: veq.8x128.s32 vm4, v12, v11 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 126]
+{ va0: vsel.8x128 v20, vm3, v19, v18 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 109]
+  va1: vrot.slane.down.8x128.u32 v21, v19 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 111]
+{ va0: vand.8x128.u32 v22, 0x7, v14 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 136]
+  va1: vadd.8x128.s32 v23, 6, v1 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 149] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+{ va0: vsel.8x128 v24, vm4, v21, v20 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 127]
+  va1: vrot.slane.down.8x128.u32 v25, v21 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 129]
+{ va0: veq.8x128.s32 vm5, v12, v22 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 144]
+  va1: vand.8x128.u32 v26, 0x7, v23 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 154]
+{ va0: vsel.8x128 v27, vm5, v25, v24 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 145]
+  va1: vrot.slane.down.8x128.u32 v28, v25 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 147]
+{ va0: veq.8x128.s32 vm6, v12, v26 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 162]
+  va1: vadd.8x128.s32 v29, 7, v1 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:39-58:50 <- 43:26-43:53 [add; LLO 167] | chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55
+{ va0: vsel.8x128 v30, vm6, v28, v27 ;  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 163]
+  va1: vrot.slane.down.8x128.u32 v31, v28 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:59:18-59:48 <- 43:26-43:53 [roll; LLO 165]
+{ va0: vand.8x128.u32 v0, 0x7, v29 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:38-58:55 <- 43:26-43:53 [rem; LLO 172]
+{ va0: veq.8x128.s32 vm7, v12, v0 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:27-58:55 <- 43:26-43:53 [eq; LLO 180]
+{ va0: vsel.8x128 v2, vm7, v31, v30 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:58:17-58:73 <- 43:26-43:53 [select_n; LLO 181]
+
+## lane 循环移位 5 位：pltpu.roll(x, 5, axis=1)：数值检查通过
+计算指令： vpop.8x128×1、vrot.0.8x128×1
+{ vx0: vrot.0.8x128 trf0, v0, s16 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:71:76-71:100 <- 43:26-43:53 [roll; LLO 39]
+{ vr0: vpop.8x128 v1, trf0 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:71:76-71:100 <- 43:26-43:53 [roll; LLO 40]
+
+## sublane 循环移位 3 位：pltpu.roll(x, 3, axis=0)：数值检查通过
+计算指令： vrot.slane.down.8x128.u32×5
+{ va0: vrot.slane.down.8x128.u32 v1, v0 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:72:79-72:103 <- 43:26-43:53 [roll; LLO 40]
+{ va0: vrot.slane.down.8x128.u32 v2, v1 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:72:79-72:103 <- 43:26-43:53 [roll; LLO 41]
+{ va0: vrot.slane.down.8x128.u32 v3, v2 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:72:79-72:103 <- 43:26-43:53 [roll; LLO 42]
+{ va0: vrot.slane.down.8x128.u32 v4, v3 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:72:79-72:103 <- 43:26-43:53 [roll; LLO 43]
+{ va0: vrot.slane.down.8x128.u32 v5, v4 }  # chapter01/08_gather_scatter/01_pallas_lane_permute.py:72:79-72:103 <- 43:26-43:53 [roll; LLO 44]
+

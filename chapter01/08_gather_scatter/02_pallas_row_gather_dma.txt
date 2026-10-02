@@ -1,0 +1,26 @@
+行号 [5, 3, 60, 0, 17, 17, 42, 9] ：数值检查通过
+{ s1: sld s9, [smem:0x1] }
+{ s0: dma.simple [smem:s10], [hbm:s1], length=1, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 1 ;  # chapter01/08_gather_scatter/02_pallas_row_gather_dma.py:37:12-37:55 [dma_wait; LLO 175]
+  s1: sld s13, [smem:0x3e] ;
+  s1: sld s14, [smem:0x3f] ;
+  s1: sld s15, [smem:0x40] ;
+  s1: sld s16, [smem:0x41] ;
+  s1: sld s20, [smem:0x42] ;
+{ s0: dma.simple [vmem:s21], [hbm:s19], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s27], [hbm:s24], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s28], [hbm:s26], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s7], [hbm:s3], length=1, dst_flag=[sflag:52] }
+  s1: sld s8, [smem:0x43] ;
+{ s0: dma.simple [vmem:s9], [hbm:s6], length=1, dst_flag=[sflag:52] }
+  s1: sld s10, [smem:0x44] ;
+  s1: sld s11, [smem:0x45] ;
+{ s0: dma.simple [vmem:s15], [hbm:s14], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s19], [hbm:s16], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s24], [hbm:s23], length=1, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/08_gather_scatter/02_pallas_row_gather_dma.py:41:16-41:27 [dma_wait; LLO 177]
+{ s0: dma.simple [hbm:s2], [vmem:s21], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/08_gather_scatter/02_pallas_row_gather_dma.py:42:12-42:55 [dma_wait; LLO 179]
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ misc: vwait.ge [sflag:45], 1 ;

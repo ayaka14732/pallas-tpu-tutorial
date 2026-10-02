@@ -64,11 +64,11 @@ Python 循环在 tracing 时就执行完了，Mosaic 看到的是 8 段起点为
 ```python
 @pl.loop(0, 8)
 def _(i: jax.Array) -> None:
-    start = pl.multiple_of(i * 8, 8)
+    start = i * 8
     x_vmem[pl.ds(start, 8)] = x_vmem[pl.ds(start, 8)] * 2.0
 ```
 
-`pl.loop(lower, upper)` 是一个装饰器：被装饰的函数是循环体，参数 `i` 是运行时的循环变量，依次取 `lower` 到 `upper - 1`，函数定义完立即执行整个循环。`i` 不是 Python 整数，`i * 8` 是运行时的标量值，所以切片要用 `pl.ds(start, 8)`，不能写 `x_vmem[start:start + 8]`。`pl.multiple_of(value, 8)` 向编译器保证这个值是 8 的倍数，即窗口与 tile 对齐；第 3 节已经看到，Mosaic 只接受对齐的窗口。这个保证由程序员负责，写错时编译器不会检查。
+`pl.loop(lower, upper)` 是一个装饰器：被装饰的函数是循环体，参数 `i` 是运行时的循环变量，依次取 `lower` 到 `upper - 1`，函数定义完立即执行整个循环。`i` 不是 Python 整数，`i * 8` 是运行时的标量值，所以切片要用 `pl.ds(start, 8)`，不能写 `x_vmem[start:start + 8]`。
 
 第三种是 `pl.loop(0, 8, unroll=4)`：循环体复制 4 份，每次迭代处理 4 个 tile，只循环 2 次。
 
@@ -124,7 +124,7 @@ kernel 输入 `p = int32[2]`：从 `f32[64,128]` 中取第 `p[0]` 个行 tile，
 
 ```python
 pltpu.async_copy(p_hbm, p_smem, sem).wait()
-start = pl.multiple_of(p_smem[0] * 8, 8)
+start = p_smem[0] * 8
 pltpu.async_copy(x_hbm.at[pl.ds(start, 8)], x_vmem, sem).wait()
 
 @pl.when(p_smem[1] > 0)
@@ -157,6 +157,33 @@ L_020e:
 ```
 
 编译器把被跳过部分的 `vld` 与跳转放在同一个 bundle，把 `vmul` 放进延迟槽，都加上相反的谓词 `@!p1`：条件不成立时，这两条指令照样经过，但不产生效果。这样被跳过的代码也利用了跳转前后的空闲槽位。
+
+## 运行时起点不必对齐
+
+本小节实验[源码](04_pallas_runtime_unaligned_start.py)、[输出](04_pallas_runtime_unaligned_start.txt)。
+
+第 3 节看到，常数起点 `x_hbm.at[3:11]` 会被 Mosaic 以“未与 tile 对齐”拒绝。起点改由运行时的标量给出时，Mosaic 在编译期无从检查，于是不再拒绝。实验从 `f32[64,128]` 的第 `p[0]` 行起取 8 行，用两种方式实现：
+
+```python
+# 一：DMA 窗口的起点来自 SMEM
+pltpu.async_copy(x_hbm.at[pl.ds(p_smem[0], 8)], o_vmem, sem).wait()
+# 二：整个数组先进 TC VMEM，再从第 p[0] 行起 load 8 行
+o_vmem[...] = x_vmem[pl.ds(p_smem[0], 8)]
+```
+
+同一份编译结果分别用起点 8、3、13、56 调用，结果都等于 `x[start:start+8]`。清单中两者各只有一条指令：
+
+```text
+{ s0: dma.simple [vmem:s17], [hbm:s16], length=8, dst_flag=[sflag:52] }   # 一
+{ vld: vld.8x128 v0, [vmem:s17] }                                         # 二
+```
+
+这说明：
+
+- DMA 的 HBM 地址以 granule 为单位，第 3 节用 tpuasm 改写得到的结论，在公开接口中用运行时起点同样成立。
+- TC VMEM 的 `vld.8x128` 从任意行地址开始读连续 8 行，起点为 3 时跨越两个 tile，仍是一条指令。
+
+所以“窗口必须与 tile 对齐”是 Mosaic 对编译期常数的检查规则，不是硬件限制。需要非对齐的常数窗口时，可以把常数当作运行时的标量传入，绕过这项检查。窗口的大小仍须是常数，第 3 节中 9 行的窗口只能用 tpuasm 实现。
 
 ## 小结：标量单元能做什么
 

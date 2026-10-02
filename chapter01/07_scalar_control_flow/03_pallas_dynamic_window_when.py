@@ -36,7 +36,7 @@ def main() -> None:
         def kernel(x_hbm: Ref, p_hbm: Ref, o_hbm: Ref, x_vmem: Ref, p_smem: Ref, sem: Ref) -> None:
             pltpu.async_copy(p_hbm, p_smem, sem).wait()
             # DMA 窗口的起点来自运行时的标量。
-            start = pl.multiple_of(p_smem[0] * 8, 8)
+            start = p_smem[0] * 8
             pltpu.async_copy(x_hbm.at[pl.ds(start, 8)], x_vmem, sem).wait()
 
             @pl.when(p_smem[1] > 0)

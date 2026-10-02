@@ -1,0 +1,15 @@
+## DMA：起点 8、3、13、56 的结果都等于 x[start:start+8]
+{ s0: dma.simple [smem:s10], [hbm:s1], length=1, dst_flag=[sflag:52] }
+  s1: sld s13, [smem:0x3e] ;
+{ s0: sadd.s32 s16, s13, s0 }  # chapter01/07_scalar_control_flow/04_pallas_runtime_unaligned_start.py:39:12-39:72 [dma_start; LLO 28] | chapter01/07_scalar_control_flow/04_pallas_runtime_unaligned_start.py:39:12-39:79 [dma_wait; LLO 28]
+{ s0: dma.simple [vmem:s17], [hbm:s16], length=8, dst_flag=[sflag:52] }
+{ s0: dma.simple [hbm:s2], [vmem:s17], length=8, dst_flag=[sflag:52] }
+
+## vld：起点 8、3、13、56 的结果都等于 x[start:start+8]
+{ s0: dma.simple [smem:s10], [hbm:s1], length=1, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s13], [hbm:s0], length=64, dst_flag=[sflag:52] }
+  s1: sld s16, [smem:0x3e] ;
+{ s0: sadd.s32 s17, 0, s16 ;  # chapter01/07_scalar_control_flow/04_pallas_runtime_unaligned_start.py:61:26-61:53 [get; LLO 40]
+{ vld: vld.8x128 v0, [vmem:s17] }  # chapter01/07_scalar_control_flow/04_pallas_runtime_unaligned_start.py:61:26-61:53 [get; LLO 41]
+{ s0: dma.simple [hbm:s2], [vmem:s18], length=8, dst_flag=[sflag:52] }
+

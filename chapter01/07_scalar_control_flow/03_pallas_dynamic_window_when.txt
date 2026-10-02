@@ -21,7 +21,7 @@ p = [7, 1]：数值检查通过
 { s0: simm.s32 s18, 0 ;  # materialized constant
   s1: sld s13, [smem:0x3e] ;
   .encoding { s0.y = lo(imm2) ; s1.address = pair(imm1, imm0) } }
-{ s0: sshll.u32 s14, s13, 0x3 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:39:35-39:48 [mul; LLO 64]
+{ s0: sshll.u32 s14, s13, 0x3 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:39:20-39:33 [mul; LLO 64]
 { s0: sadd.s32 s17, s14, s0 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:68 [dma_start; LLO 29] | chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:75 [dma_wait; LLO 29]
 { s0: dma.simple [vmem:s18], [hbm:s17], length=8, dst_flag=[sflag:52] }
 { misc: vwait.ge [sflag:52], 8 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:75 [dma_wait; LLO 71]

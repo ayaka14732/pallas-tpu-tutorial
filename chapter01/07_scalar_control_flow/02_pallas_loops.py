@@ -66,8 +66,8 @@ def main() -> None:
 
             @pl.loop(0, 8)
             def _(i: jax.Array) -> None:
-                # i 是运行时的循环变量；pl.multiple_of 告诉编译器起点是 8 的倍数，即与 tile 对齐。
-                start = pl.multiple_of(i * 8, 8)
+                # i 是运行时的循环变量，起点 i * 8 也是运行时的值。
+                start = i * 8
                 x_vmem[pl.ds(start, 8)] = x_vmem[pl.ds(start, 8)] * 2.0
 
             pltpu.async_copy(x_vmem, o_hbm, sem).wait()
@@ -94,7 +94,7 @@ def main() -> None:
             # unroll=4：每次迭代处理 4 个 tile，循环只执行 2 次。
             @pl.loop(0, 8, unroll=4)
             def _(i: jax.Array) -> None:
-                start = pl.multiple_of(i * 8, 8)
+                start = i * 8
                 x_vmem[pl.ds(start, 8)] = x_vmem[pl.ds(start, 8)] * 2.0
 
             pltpu.async_copy(x_vmem, o_hbm, sem).wait()
@@ -122,7 +122,7 @@ def main() -> None:
 
             @pl.loop(0, n_smem[0])
             def _(i: jax.Array) -> None:
-                start = pl.multiple_of(i * 8, 8)
+                start = i * 8
                 x_vmem[pl.ds(start, 8)] = x_vmem[pl.ds(start, 8)] * 2.0
 
             pltpu.async_copy(x_vmem, o_hbm, sem).wait()
