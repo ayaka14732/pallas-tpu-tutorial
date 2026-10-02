@@ -1,0 +1,80 @@
+## i32[128,128]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
+  vld.8x128：16
+  vst.8x128：16
+  从 trf0 取回：16
+  提交到 trf0（vxpose.0.8x128）：14
+  提交到 trf0（vxpose.0.end.8x128）：1
+  提交到 trf0（vxpose.0.start.8x128）：1
+
+## 2 个 i32[128,128]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)；%copy.1 = copy(%copy-done)
+  vld.8x128：32
+  vst.8x128：32
+  从 trf0 取回：32
+  提交到 trf0（vxpose.0.8x128）：28
+  提交到 trf0（vxpose.0.end.8x128）：2
+  提交到 trf0（vxpose.0.start.8x128）：2
+
+## 3 个 i32[128,128]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)；%copy.1 = copy(%copy-done)；%copy.1 = copy(%copy-done)
+  vld.8x128：48
+  vst.8x128：48
+  从 trf0 取回：48
+  提交到 trf0（vxpose.0.8x128）：42
+  提交到 trf0（vxpose.0.end.8x128）：3
+  提交到 trf0（vxpose.0.start.8x128）：3
+
+## bf16[128,128]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
+  vld.8x128：8
+  vpackc.8x128.f32.f16：8
+  vst.8x128：8
+  vunpackl.8x128.f16.f32：8
+  vunpacku.8x128.f16.f32：8
+  从 trf0 取回：16
+  提交到 trf0（vxpose.0.8x128）：14
+  提交到 trf0（vxpose.0.end.8x128）：1
+  提交到 trf0（vxpose.0.start.8x128）：1
+
+## f32[256,256]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
+  vld.8x128：32
+  vst.8x128：32
+  从 trf0 取回：16
+  从 trf1 取回：16
+  提交到 trf0（vxpose.0.8x128）：7
+  提交到 trf0（vxpose.0.end.8x128）：1
+  提交到 trf0（vxpose.2.8x128）：7
+  提交到 trf0（vxpose.2.start.8x128）：1
+  提交到 trf1（vxpose.1.8x128）：7
+  提交到 trf1（vxpose.1.end.8x128）：1
+  提交到 trf1（vxpose.3.8x128）：7
+  提交到 trf1（vxpose.3.start.8x128）：1
+
+## f32[129,129]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
+  vld.8x128：17
+  vst.8x128：32
+  从 trf0 取回：16
+  从 trf1 取回：16
+  提交到 trf0（vxpose.0.8x128）：7
+  提交到 trf0（vxpose.0.end.8x128）：1
+  提交到 trf0（vxpose.2.8x128）：7
+  提交到 trf0（vxpose.2.start.8x128）：1
+  提交到 trf1（vxpose.1.8x128）：7
+  提交到 trf1（vxpose.1.end.8x128）：1
+  提交到 trf1（vxpose.3.8x128）：7
+  提交到 trf1（vxpose.3.start.8x128）：1
+
+## bf16[129,129]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
+  vld.8x128：9
+  vpackc.8x128.f32.f16：16
+  vst.8x128：16
+  vunpackl.8x128.f16.f32：9
+  vunpacku.8x128.f16.f32：8
+  从 trf0 取回：16
+  从 trf1 取回：16
+  提交到 trf0（vxpose.0.8x128）：7
+  提交到 trf0（vxpose.0.end.8x128）：1
+  提交到 trf0（vxpose.2.8x128）：7
+  提交到 trf0（vxpose.2.start.8x128）：1
+  提交到 trf1（vxpose.1.8x128）：7
+  提交到 trf1（vxpose.1.end.8x128）：1
+  提交到 trf1（vxpose.3.8x128）：7
+  提交到 trf1（vxpose.3.start.8x128）：1
+
