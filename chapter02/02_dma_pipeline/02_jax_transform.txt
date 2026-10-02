@@ -1,0 +1,9 @@
+数值检查通过；HLO 段：%multiply_add_fusion = fusion(%x.1)
+vld 683、vmul 683、vadd 683、vst 683，sbr.rel 3
+DMA：dma.strided×2；vwait.ge×2
+{ s0: @!p10 shalt }
+{ s0: @!p2 shalt }
+{ s0: @p3 dma.strided [vmem:s22], [hbm:s26], length=s19, dst_stride=s17, src_stride=s17, elements_per_stride=s17, dst_flag=[sflag:s21] }
+{ s0: @!p14 shalt }
+{ s0: @!p6 shalt }
+{ s0: @p7 dma.strided [hbm:s2], [vmem:s21], length=s25, dst_stride=s6, src_stride=s6, elements_per_stride=s6, dst_flag=[sflag:s27] }

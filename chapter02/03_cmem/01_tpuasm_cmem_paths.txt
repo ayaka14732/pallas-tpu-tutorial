@@ -1,0 +1,17 @@
+## 载体：结果为 2x
+{ s0: dma.simple [vmem:s10], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ vld: vld.8x128 v0, [vmem:0x0] ;
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }
+{ s0: dma.simple [hbm:s2], [vmem:s10], length=8, dst_flag=[sflag:52] }
+
+## 一：HBM → CMEM → TC VMEM（staging）：结果为 2y，数值检查通过
+{ s0: simm.s32 s20, 0 }
+{ s0: dma.simple [cmem:s20], [hbm:s1], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 }
+{ misc: vsyncadd.s32 [sflag:52], -8 }
+{ s0: dma.simple [vmem:s10], [cmem:s20], length=8, dst_flag=[sflag:52] }   # 原来的输入 DMA，源改为 CMEM
+
+## 二：HBM → CMEM → TC VREG（cld）：结果为 2y，数值检查通过
+{ cld: cld.8x128 crf, [cmem:0x0] }   # 原来的 vld，改为从 CMEM 地址 0 读入队列 crf
+{ vr0: vpop.8x128 v0, crf }          # 新插入：从 crf 取回到 v0
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # 原来的乘法

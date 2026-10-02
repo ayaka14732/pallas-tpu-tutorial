@@ -1,0 +1,1 @@
+编译失败：UNIMPLEMENTED: Mosaic failed to compile TPU kernel with MLIR module name `copy` HLO name `copy.2`: Scratch memref allocation only supported for vmem, smem and semaphore_mem.

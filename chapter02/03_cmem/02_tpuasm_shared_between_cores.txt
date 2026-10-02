@@ -1,0 +1,3 @@
+入口汇合从 bundle 518 开始，每个 TensorCore 的输入 DMA 在 bundle 522
+## 搬运在入口汇合之前：200 次中结果错误的次数，TensorCore 0 的一半 0 次，TensorCore 1 的一半 0 次
+## 搬运在入口汇合之后：200 次中结果错误的次数，TensorCore 0 的一半 0 次，TensorCore 1 的一半 200 次
