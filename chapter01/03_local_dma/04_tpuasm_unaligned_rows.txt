@@ -1,17 +1,15 @@
-## 载体 x[8:16, :] 的地址与 DMA
-{ s0: sadd.s32 s9, 8, s0 ;  # chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:45:16-45:71 [dma_start; LLO 13] | chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:45:16-45:78 [dma_wait; LLO 13]
-{ s0: @p0 dma.simple [vmem:s10], [hbm:s9], length=8, dst_flag=[sflag:52] }
-{ s0: @p0 dma.simple [hbm:s1], [vmem:s10], length=8, dst_flag=[sflag:52] }
-改写：sadd.s32 s9, 8, s0 → sadd.s32 s9, 3, s0
-结果等于 x[3:11, :]，数值检查通过
-
-## 载体 x[8:24, :] 的输入 DMA 与等待
+## 载体 x[8:16, :]：数值检查通过
+{ s0: sadd.s32 s9, 16, s0 ;
 { s0: @p0 dma.simple [vmem:s10], [hbm:s9], length=16, dst_flag=[sflag:52] }
-{ misc: @p0 vwait.ge [sflag:52], 16 ;  # chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:45:16-45:78
-{ misc: @p0 vsyncadd.s32 [sflag:52], -16 ;  # chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:45:16-45:78
+{ misc: @p0 vwait.ge [sflag:52], 16 ;
 { s0: @p0 dma.simple [hbm:s1], [vmem:s10], length=16, dst_flag=[sflag:52] }
-{ misc: @p0 vwait.ge [sflag:52], 16 ;  # chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:46:16-46:59
-{ misc: @p0 vsyncadd.s32 [sflag:52], -16 ;  # chapter01/03_local_dma/04_tpuasm_unaligned_rows.py:46:16-46:59
+{ misc: @p0 vwait.ge [sflag:52], 16 ;
 { misc: vwait.ge [sflag:45], 1 ;
-改写：输入 DMA length=16 → 9，第一处 vwait.ge 16 → 9，第一处 vsyncadd -16 → -9
-结果前 9 行等于 x[8:17, :]，数值检查通过
+
+## 改写后：原 DMA 之前插入 4 个 bundle，原 DMA 换成第二段
+{ s0: sadd.s32 s11, -13, s9 ; s1: simm.s32 s12, 5 }
+{ s0: simm.s32 s13, 8 ; s1: sadd.s32 s14, 5, s10 }
+{ s1: simm.s32 s15, 3 }
+{ s0: @p0 dma.strided [vmem:s10], [hbm:s11], length=10, dst_stride=s13, src_stride=s13, elements_per_stride=s12, dst_flag=[sflag:52] }
+{ s0: @p0 dma.strided [vmem:s14], [hbm:s9], length=6, dst_stride=s13, src_stride=s13, elements_per_stride=s15, dst_flag=[sflag:52] }
+结果等于 x[3:11, :]，数值检查通过

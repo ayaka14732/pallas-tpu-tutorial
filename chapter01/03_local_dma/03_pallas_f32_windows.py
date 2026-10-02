@@ -1,4 +1,4 @@
-"""只改 DMA 窗口：从 HBM 中的 f32[64,256] 取行窗口、列窗口和 9 行窗口，经 TC VMEM 写回输出的同一位置。"""
+"""只改 DMA 窗口：从 HBM 中的 f32[64,256] 与 f32[64,128] 取各种行窗口和列窗口，经 TC VMEM 写回输出的同一位置。"""
 import tpu_init
 tpu_init.initialise_one_chip()
 
@@ -12,19 +12,21 @@ import numpy as np
 
 import tpuasm_tools
 
-# (名称, 行起点, 行数, 列起点, 列数)
+# (名称, 数组列数, 行起点, 行数, 列起点, 列数)
 WINDOWS = (
-    ('行窗口 [16:32, :]', 16, 16, 0, 256),
-    ('列窗口 [:, 128:256]', 0, 64, 128, 128),
-    ('9 行窗口 [8:17, :]', 8, 9, 0, 256),
-    ('非对齐行起点 [3:11, :]', 3, 8, 0, 256),
+    ('f32[64,256] 的行窗口 [16:32, :]', 256, 16, 16, 0, 256),
+    ('f32[64,256] 的列窗口 [:, 128:256]', 256, 0, 64, 128, 128),
+    ('f32[64,256] 的 9 行窗口 [8:17, :]', 256, 8, 9, 0, 256),
+    ('f32[64,256] 的非对齐行窗口 [3:11, :]', 256, 3, 8, 0, 256),
+    ('f32[64,128] 的 9 行窗口 [8:17, :]', 128, 8, 9, 0, 128),
+    ('f32[64,128] 的非对齐行窗口 [3:11, :]', 128, 3, 8, 0, 128),
 )
 
 def main() -> None:
     mesh = jax.make_mesh((1,), ('device',))
     tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
-    x = jnp.arange(64 * 256, dtype=jnp.float32).reshape(64, 256)
-    for name, row, rows, column, columns in WINDOWS:
+    for name, width, row, rows, column, columns in WINDOWS:
+        x = jnp.arange(64 * width, dtype=jnp.float32).reshape(64, width)
 
         @jax.shard_map(
             mesh=mesh,

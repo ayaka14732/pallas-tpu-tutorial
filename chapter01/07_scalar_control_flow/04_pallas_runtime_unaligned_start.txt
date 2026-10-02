@@ -13,3 +13,7 @@
 { vld: vld.8x128 v0, [vmem:s17] }  # chapter01/07_scalar_control_flow/04_pallas_runtime_unaligned_start.py:61:26-61:53 [get; LLO 41]
 { s0: dma.simple [hbm:s2], [vmem:s18], length=8, dst_flag=[sflag:52] }
 
+## f32[64,256] 的 vld，起点直接用 p_smem[0]：编译失败：INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `wide` HLO name `wide.1`: E2003: CompileTimeMosaicUnprovenMemoryAccessAlignment: cannot statically prove that index in dimension 0 is a multiple of 8
+
+## f32[64,256] 的 vld，pl.multiple_of(p_smem[0], 8)：起点 8、16、56 的结果都正确
+

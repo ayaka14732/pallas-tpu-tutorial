@@ -1,0 +1,41 @@
+## f32[8, 128] × 2，axis=0，TC VMEM 中 jnp.concatenate：数值检查通过
+  向量指令：vld.8x128×2、vst.8x128×2
+  { s0: dma.simple [vmem:s10], [hbm:s0], length=8, dst_flag=[sflag:52] }
+  { s0: dma.simple [vmem:s13], [hbm:s1], length=8, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s2], [vmem:s16], length=16, dst_flag=[sflag:52] }
+
+## f32[8, 128] × 2，axis=0，DMA 写入输出窗口：数值检查通过
+  向量指令：无
+  { s0: @p0 dma.general [hbm:s2], [hbm:s0], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s14], dst_flag=[sflag:s13], ici_dest=s15 }
+  { s0: @p0 dma.general [hbm:s12], [hbm:s1], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s20], dst_flag=[sflag:s13], ici_dest=s15 }
+
+## f32[8, 128] × 2，axis=1，TC VMEM 中 jnp.concatenate：数值检查通过
+  向量指令：vld.8x128×2、vst.8x128×2
+  { s0: dma.simple [vmem:s10], [hbm:s0], length=8, dst_flag=[sflag:52] }
+  { s0: dma.simple [vmem:s13], [hbm:s1], length=8, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s2], [vmem:s16], length=16, dst_flag=[sflag:52] }
+
+## f32[8, 128] × 2，axis=1，DMA 写入输出窗口：数值检查通过
+  向量指令：无
+  { s0: @p0 dma.general [hbm:s2], [hbm:s0], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s14], dst_flag=[sflag:s13], ici_dest=s15 }
+  { s0: @p0 dma.general [hbm:s12], [hbm:s1], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s20], dst_flag=[sflag:s13], ici_dest=s15 }
+
+## f32[9, 128] × 2，axis=0，TC VMEM 中 jnp.concatenate：数值检查通过
+  向量指令：veq.8x128.s32×1、vlaneseq.8x128.u32×1、vld.8x128×4、vrot.slane.down.8x128.u32×14、vsel.8x128×2、vshrl.8x128.s32×1、vst.8x128×3
+  { s0: dma.simple [vmem:s10], [hbm:s0], length=9, dst_flag=[sflag:52] ;
+  { s0: dma.simple [vmem:s13], [hbm:s1], length=9, dst_flag=[sflag:52] ;
+  { s0: dma.simple [hbm:s2], [vmem:s0], length=18, dst_flag=[sflag:52] ;
+
+## f32[9, 128] × 2，axis=0，DMA 写入输出窗口：数值检查通过
+  向量指令：无
+  { s0: @p0 dma.general [hbm:s2], [hbm:s0], length=9, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s14], dst_flag=[sflag:s13], ici_dest=s15 }
+  { s0: @p0 dma.general [hbm:s12], [hbm:s1], length=9, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s20], dst_flag=[sflag:s13], ici_dest=s15 }
+
+## f32[8, 129] × 2，axis=1，TC VMEM 中 jnp.concatenate：数值检查通过
+  向量指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vld.8x128×4、vlt.8x128.s32×1、vpop.8x128×2、vrot.0.8x128×1、vrot.2.8x128×1、vsel.8x128×2、vst.8x128×2、vst.msk.8x128×1
+  { s0: dma.simple [vmem:s10], [hbm:s0], length=16, dst_flag=[sflag:52] }
+  { s0: dma.simple [vmem:s13], [hbm:s1], length=16, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s2], [vmem:s0], length=24, dst_flag=[sflag:52] }
+
+## f32[8, 129] × 2，axis=1，DMA 写入输出窗口：编译失败：INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `concatenate` HLO name `concatenate.1`: Slice sizes along tiled dimensions must be aligned to tiles. Failed to verify that the size at dimension 1 is divisible by the tile dimension 
+

@@ -79,7 +79,7 @@ DMA 不要求一端是 TC VMEM。HBM→HBM 复制用的是更通用的 `dma.gene
 
 本小节实验[源码](03_pallas_f32_windows.py)、[输出](03_pallas_f32_windows.txt)。
 
-输入改为 HBM 中的 `f32[64,256]`，每次只搬一个窗口到 TC VMEM，再写回输出的同一位置。TC VMEM buffer 改为窗口的大小，两次 DMA 的 HBM 一端改为窗口：
+每次只搬输入的一个窗口到 TC VMEM，再写回输出的同一位置。TC VMEM buffer 改为窗口的大小，两次 DMA 的 HBM 一端改为窗口：
 
 ```python
 scratch_types=(pltpu.VMEM((rows, columns), x.dtype), pltpu.SemaphoreType.DMA),
@@ -90,59 +90,70 @@ pltpu.async_copy(x_vmem, o_hbm.at[pl.ds(row, rows), pl.ds(column, columns)], sem
 
 `ref.at[...]` 不读写内存，只返回一个指向原 Ref 一部分的新 Ref，可以作为 DMA 的源或目的。`pl.ds(start, size)` 表示从 `start` 开始、长度为 `size` 的区间，相当于切片 `start:start + size`。`size` 必须是编译期常量；`start` 可以是常量，也可以是运行时的标量值，本章第 7 节会用到后者。
 
-窗口起点在清单中是一条加在基址上的 `sadd.s32`：
+先看 `f32[64,256]` 的两个窗口。窗口起点在清单中是一条加在基址上的 `sadd.s32`：
 
 | 窗口 | 源地址偏移 | DMA |
 | --- | ---: | --- |
 | `[16:32, :]` | 32 | `dma.simple ... length=32` |
 | `[:, 128:256]` | 8 | `dma.strided ... length=64, src_stride=16, dst_stride=8, elements_per_stride=8` |
 
-这两组数字说明了 HBM 中数组的存放方式：数组被切成 `8×128` 的 tile（每个 4096 B，即 8 个 granule），tile 按行优先顺序连续存放。`f32[64,256]` 每行 tile 有 2 个，于是：
+这两组数字说明了 HBM 中数组的存放方式：数组被切成 `8×128` 的 tile（每个 4096 B，即 8 个 granule），tile 按行优先顺序连续存放，每个 tile 内部按行存放，一行 128 个 f32 正好是一个 granule。`f32[64,256]` 每行 tile 有 2 个，于是：
 
 - 行窗口 `[16:32, :]` 是第 2、3 行 tile，起点为 `2 × 2 × 8 = 32` 个 granule，4 个 tile 连续，一次 `dma.simple` 搬 32 个 granule。
 - 列窗口 `[:, 128:256]` 是每行 tile 中的第 2 个，起点为 8 个 granule。8 个 tile 不连续，所以改用 `dma.strided`：每段搬 8 个 granule，源每段前进 16 个 granule，目的每段前进 8 个 granule。
 
-窗口变了，DMA 的形式就跟着变，但仍然是一条指令，不需要逐 tile 发起多次 DMA。
+`dma.strided` 的四个具名操作数含义为：共搬 `length` 个 granule，每段 `elements_per_stride` 个，源和目的每段分别前进 `src_stride`、`dst_stride` 个 granule。窗口变了，DMA 的形式就跟着变，但仍然是一条指令，不需要逐 tile 发起多次 DMA。
 
-## Mosaic 拒绝的窗口，硬件可以执行
+## 行窗口的起点与大小：Mosaic 的规则与硬件的能力
 
-同一实验中的另外两个窗口无法编译：
+同一实验中，起点或大小不是 8 的倍数的行窗口，结果取决于数组有几列 tile：
 
-```text
-9 行窗口 [8:17, :]：Slice sizes along tiled dimensions must be aligned to tiles. ...
-非对齐行起点 [3:11, :]：Offsets along tiled dimensions must be aligned to tiles. ...
-```
+| 窗口 | `f32[64,128]`（一列 tile） | `f32[64,256]`（两列 tile） |
+| --- | --- | --- |
+| 9 行 `[8:17, :]` | 正确，`dma.simple ... length=9` | 编译失败：`Slice sizes along tiled dimensions must be aligned to tiles` |
+| 非对齐起点 `[3:11, :]` | 正确，`dma.simple ... length=8` | 编译失败：`Offsets along tiled dimensions must be aligned to tiles` |
 
-这是 Mosaic 的校验规则：在分块存放的维度上，窗口的起点和大小必须是 tile 的整数倍。它不等于硬件限制。上一小节已经看到，HBM 地址和 DMA 长度的单位都是 granule；对只有一列 tile 的数组，一个 granule 恰好是一行 128 个 f32，相邻的行就是相邻的 granule。
+一列 tile 时，相邻的行就是相邻的 granule，任意行窗口在 HBM 中都连续，一次 `dma.simple` 就能搬完。9 行窗口的等待也随之变成 `vwait.ge [sflag:52], 9`：同步标志按实际搬运的 granule 计数。
+
+两列 tile 时，`[3:11, :]` 的第 3–7 行在第 0 行 tile 中，第 8–10 行在第 1 行 tile 中，每个列 tile 内都分成不连续的两段，一条 DMA 描述不了。Mosaic 于是要求窗口与 tile 对齐。但这只说明一条 DMA 不够，不说明硬件做不到：拆成两条 `dma.strided` 就可以。
 
 本小节实验[源码](04_tpuasm_unaligned_rows.py)、[输出](04_tpuasm_unaligned_rows.txt)。
 
-做法是先让 Mosaic 编译一个合法的对齐版本作为载体，再用 tpuasm 改写机器清单中的几个数，重新汇编后装载运行。载体是一个只做 DMA 的 kernel，输入为 `f32[64,128]`，读第 8 行开始的 `rows` 行：
+做法是先让 Mosaic 编译一个合法的对齐版本作为载体，再用 tpuasm 改写机器清单，重新汇编后装载运行。载体读 `f32[64,256]` 的 `x[8:16, :]`：
 
 ```python
-pltpu.async_copy(x_hbm.at[pl.ds(8, rows)], x_vmem, sem).wait()
+pltpu.async_copy(x_hbm.at[pl.ds(8, 8)], x_vmem, sem).wait()
 pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 ```
 
-改写用 [`tpuasm_tools`](../../tpuasm_tools.py) 中的两个函数完成：`replace_listing(serialized, edit)` 取出完整清单，交给 `edit` 做文本替换，再重新汇编，替换 executable 中的程序；`load(serialized, template)` 按原 executable 的调用约定装载改写后的 executable，得到可以像普通函数一样调用的对象：
+它的输入 DMA 是 `sadd.s32 s9, 16, s0` 加一条 `dma.simple [vmem:s10], [hbm:s9], length=16`。改写把这一条 DMA 换成两条 `dma.strided`：
 
-```python
-def unaligned(source: str) -> str:
-    return source.replace('sadd.s32 s9, 8, s0', 'sadd.s32 s9, 3, s0', 1)
-
-patched = tpuasm_tools.load(tpuasm_tools.replace_listing(tpuasm_tools.serialize(carrier), unaligned), carrier)
-patched(x)
+```text
+# 新插入的 4 个 bundle：准备地址与段长，发出第一段
+{ s0: sadd.s32 s11, -13, s9 ; s1: simm.s32 s12, 5 }      # 源 = 第 3 行（16 − 13）；每段 5 个 granule
+{ s0: simm.s32 s13, 8 ; s1: sadd.s32 s14, 5, s10 }       # 两段之间相隔 8 个 granule；第二段的目的
+{ s1: simm.s32 s15, 3 }                                   # 第二段每段 3 个 granule
+{ s0: @p0 dma.strided [vmem:s10], [hbm:s11], length=10, dst_stride=s13, src_stride=s13, elements_per_stride=s12, dst_flag=[sflag:52] }
+# 原来的 DMA 替换为第二段：第 8–10 行
+{ s0: @p0 dma.strided [vmem:s14], [hbm:s9], length=6, dst_stride=s13, src_stride=s13, elements_per_stride=s15, dst_flag=[sflag:52] }
 ```
 
-非对齐起点：载体读 `f32[64,128]` 的 `x[8:16]`，地址计算是 `sadd.s32 s9, 8, s0`。把立即数 8 改成 3，改写后的 executable 输出逐元素等于 `x[3:11]`。
+第一段在每个列 tile 中搬第 3–7 行（5 个 granule），第二段搬第 8–10 行（3 个 granule），两个列 tile 共 `10 + 6 = 16` 个 granule，与载体相同，所以后面的 `vwait.ge ... 16` 不用改。改写后的 executable 输出逐元素等于 `x[3:11, :]`。
 
-9 行窗口：载体读 `x[8:24]`。把输入 DMA 的 `length=16` 改成 9，同时把紧随其后的 `vwait.ge ... 16` 和 `vsyncadd ... -16` 改成 9 和 -9，输出的前 9 行逐元素等于 `x[8:17]`。
+改写用 [`tpuasm_tools`](../../tpuasm_tools.py) 中的三个函数完成：
 
-第二个改写必须同时修改等待阈值。DMA 完成时只给同步标志加上实际搬运的 granule 数；若只改 `length` 而保留 `vwait.ge ... 16`，TensorCore 会永远等不到第 16 个 granule。这也印证了上面的结论：同步标志按 granule 计数。
+```python
+patched = tpuasm_tools.insert_bundles(tpuasm_tools.replace_listing(serialized, second_part), {pc: FIRST})
+result = tpuasm_tools.load(patched, carrier)(x)
+```
 
-这两个改写不是推荐的日常写法，而是在回答一个问题：DMA 引擎能否以单个 granule 为粒度选择起点和长度。答案是能，限制来自 Mosaic 的校验。数组有多列 tile 时，非对齐的行窗口在 HBM 中不再连续，需要 `dma.strided` 来描述。
+- `replace_listing(serialized, edit)` 取出完整清单，交给 `edit` 做等长的文本替换，再重新汇编，替换 executable 中的程序。
+- `insert_bundles(serialized, {pc: text})` 在原第 `pc` 个 bundle 之前插入一段清单，tpuasm 自动调整其后的分支与元数据。
+- `load(serialized, template)` 按原 executable 的调用约定装载改写后的 executable，得到可以像普通函数一样调用的对象。
 
-Mosaic 只能检查编译期的常数。第 7 节会看到，起点改由运行时的标量给出时，非对齐的起点在公开接口中就能使用；而窗口大小必须是常数，9 行的窗口仍只能用 tpuasm 实现。
+插入的指令要注意两点：新 DMA 也要带谓词 `@p0`，否则 TensorCore 1 也会发出它；一个 bundle 中 DMA 的长度与 `simm` 的立即数共用编码字段，不能放在同一个 bundle，所以 `simm.s32 s15, 3` 单独占一个 bundle。
+
+这个例子说明：Mosaic 拒绝一个窗口，是因为它只会为一个窗口生成一条 DMA；DMA 引擎本身可以以单个 granule 为粒度选择起点和长度，用多条 DMA 拼出任意的行窗口。
 
 ## 只改信号量数量：等待可以合并
 

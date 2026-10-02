@@ -158,11 +158,11 @@ L_020e:
 
 编译器把被跳过部分的 `vld` 与跳转放在同一个 bundle，把 `vmul` 放进延迟槽，都加上相反的谓词 `@!p1`：条件不成立时，这两条指令照样经过，但不产生效果。这样被跳过的代码也利用了跳转前后的空闲槽位。
 
-## 运行时起点不必对齐
+## 运行时的起点与 pl.multiple_of
 
 本小节实验[源码](04_pallas_runtime_unaligned_start.py)、[输出](04_pallas_runtime_unaligned_start.txt)。
 
-第 3 节看到，常数起点 `x_hbm.at[3:11]` 会被 Mosaic 以“未与 tile 对齐”拒绝。起点改由运行时的标量给出时，Mosaic 在编译期无从检查，于是不再拒绝。实验从 `f32[64,128]` 的第 `p[0]` 行起取 8 行，用两种方式实现：
+窗口起点来自运行时的标量时，Mosaic 在编译期不知道它的值。实验从 `f32[64,128]` 的第 `p[0]` 行起取 8 行，用两种方式实现：
 
 ```python
 # 一：DMA 窗口的起点来自 SMEM
@@ -178,12 +178,22 @@ o_vmem[...] = x_vmem[pl.ds(p_smem[0], 8)]
 { vld: vld.8x128 v0, [vmem:s17] }                                         # 二
 ```
 
-这说明：
+第 3 节说过，一列 tile 的数组中相邻的行就是相邻的 granule；TC VMEM 中也一样，`vld.8x128` 从任意行地址读连续 8 行，起点为 3 时跨越两个 tile，仍是一条指令。
 
-- DMA 的 HBM 地址以 granule 为单位，第 3 节用 tpuasm 改写得到的结论，在公开接口中用运行时起点同样成立。
-- TC VMEM 的 `vld.8x128` 从任意行地址开始读连续 8 行，起点为 3 时跨越两个 tile，仍是一条指令。
+数组改为 `f32[64,256]`（两列 tile）后，同样的 `x_vmem[pl.ds(p_smem[0], 8)]` 编译失败：
 
-所以“窗口必须与 tile 对齐”是 Mosaic 对编译期常数的检查规则，不是硬件限制。需要非对齐的常数窗口时，可以把常数当作运行时的标量传入，绕过这项检查。窗口的大小仍须是常数，第 3 节中 9 行的窗口只能用 tpuasm 实现。
+```text
+E2003: CompileTimeMosaicUnprovenMemoryAccessAlignment: cannot statically prove that index in dimension 0 is a multiple of 8
+```
+
+两列 tile 时，第 3–10 行在 TC VMEM 中不连续，一条 `vld` 读不出来，所以 Mosaic 要求能证明起点是 8 的倍数。如果程序员知道这个起点一定对齐，可以用 `pl.multiple_of` 告诉编译器：
+
+```python
+start = pl.multiple_of(p_smem[0], 8)
+o_vmem[...] = x_vmem[pl.ds(start, 8)]
+```
+
+编译通过，起点 8、16、56 的结果都正确。`pl.multiple_of(value, n)` 不产生任何指令，只是向编译器保证 `value` 是 n 的倍数；这个保证由程序员负责，起点实际不对齐时，结果是错的，编译器和硬件都不会报错。前面循环中的 `start = i * 8`，编译器自己就能推出它是 8 的倍数，所以不需要写。
 
 ## 小结：标量单元能做什么
 
