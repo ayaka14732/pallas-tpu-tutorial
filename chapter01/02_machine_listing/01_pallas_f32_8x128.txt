@@ -53,18 +53,18 @@ vwait.ge: 3
 { s0: simm.s32 s7, 0 ;  # materialized constant
   .encoding { s0.y = lo(imm0) } }
 { s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
-{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 41]
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 41]
   .encoding { misc.value = imm2 } }
-{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:26-39:37 [get; LLO 25]
-  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 42]
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:39:26-39:37 [get; LLO 25]
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 42]
   .encoding { misc.value = imm2 } }
-{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:26-39:43 [mul; LLO 26]
-{ vst: vst.8x128 [vmem:0x0], v1 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:12-39:23 [swap; LLO 27]
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:39:26-39:43 [mul; LLO 26]
+{ vst: vst.8x128 [vmem:0x0], v1 ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:39:12-39:23 [swap; LLO 27]
   .encoding { vst.opcode = s0 } }
 { s0: dma.simple [hbm:s1], [vmem:s7], length=8, dst_flag=[sflag:52] }
-{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 43]
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 43]
   .encoding { misc.value = imm2 } }
-{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 44]
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/02_machine_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 44]
   .encoding { misc.value = imm2 } }
 # end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
 # exit bundle: %scale.1 = custom-call(%x_hbm.1)

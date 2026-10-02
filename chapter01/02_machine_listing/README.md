@@ -1,6 +1,6 @@
 # TensorCore 与机器清单
 
-本章的每一节都先问同一个问题：编译器最后让 TensorCore 执行了哪些指令。本节先建立回答这个问题的工具：取得一个 kernel 的机器清单（listing），并读懂它的结构。
+本章的每一节都要问同一个问题：编译器最后让 TensorCore 执行了哪些指令。本节建立回答这个问题的工具：取得一个 kernel 的机器清单（listing），并读懂它的结构。
 
 本节实验：最小 Pallas kernel [源码](01_pallas_f32_8x128.py)、[输出](01_pallas_f32_8x128.txt)；同一运算的原生 XLA baseline [源码](02_jax_f32_8x128.py)、[输出](02_jax_f32_8x128.txt)。
 
@@ -8,40 +8,27 @@
 
 一个 Pallas kernel 先由 Mosaic 降低，再由闭源的 libtpu 编译成 TensorCore 程序映像，最后装进 executable。我们读取的就是这份程序映像本身：[tpuasm](../../../tpuasm) 从 `compiled.runtime_executable().serialize()` 中取出机器字节，用 libtpu 自己的编解码器反汇编，再把编译时保存的源码位置写成注释。
 
-本教程不再读编译器的 final bundles 或 LLO dump。那些文本是编译器内部的表示，其中混有不会执行的伪指令，没有标出指令落在哪个物理发射槽，同一段文本有时对应不止一种机器编码，而且无法改写后重新装载。tpuasm 清单则逐字节对应实际执行的程序，可以修改、重新汇编，并在真机上运行。本章第 2 节就会用这种方法，让硬件执行一条 Mosaic 拒绝编译的 DMA。
+本教程不再读编译器的 final bundles 或 LLO dump。那些文本是编译器内部的表示，其中混有不会执行的伪指令，没有标出指令落在哪个物理发射槽，同一段文本有时对应不止一种机器编码，而且无法改写后重新装载。tpuasm 清单则逐字节对应实际执行的程序，可以修改、重新汇编，并在真机上运行。本章第 3 节就会用这种方法，让硬件执行一条 Mosaic 拒绝编译的 DMA。
 
 仓库根目录的 [`tpuasm_tools.py`](../../tpuasm_tools.py) 把常用步骤封装成几个函数：
 
 | 函数 | 作用 |
 | --- | --- |
-| `compile(function, *args, mesh=...)` | 在源码映射上下文中 `jax.jit(...).lower(...).compile()` |
+| `compile(function, *args, mesh=...)` | `jax.jit(function).lower(*args).compile()`，并保留源码位置 |
 | `listing_outline(compiled)` | 完整清单的结构概览：各段从第几个 bundle 开始 |
 | `kernel_listing(compiled)` | 只保留编译器归属到 HLO 指令的代码，省略 runtime 代码 |
 | `count_mnemonics(listing)` | 按助记符统计指令条数 |
 
-## 单芯片、单 TensorCore 的写法
+## 实验的 kernel
 
-实验脚本的第一步，是在 `import jax` 之前调用 `tpu_init.initialise_one_chip()`。它设置 `TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1`、`TPU_PROCESS_BOUNDS=1,1,1` 和 `TPU_VISIBLE_CHIPS=0`，让 TPU runtime 只打开本 host 的一颗芯片。不同芯片编号的进程可以同时运行，互不干扰。
-
-这一步只决定 runtime 打开几颗芯片。程序用这颗芯片上的几个 TensorCore，是 SPMD 层面的事，XLA 和 Pallas 的处理方式不同：
-
-- Pallas kernel 写在 `jax.shard_map` 里，用 `pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)` 声明只用一个 TensorCore。
-- 原生 XLA 不加任何 SPMD 设置，由编译器自行决定。
-
-> 暂且可以理解为：一颗 TPU v4 芯片有两个 TensorCore，它们执行同一份程序，各自从 SMEM 读出自己的编号。`num_cores=1` 时，编号为 1 的 TensorCore 读到编号后直接跳过 kernel 主体。第二章第 1 节详细介绍这种称为 Megacore 的组织方式。
-
-因此，本章 Pallas 实验的指令全部由 TensorCore 0 执行。XLA baseline 则可能把工作分给两个 TensorCore；遇到这种情况时，清单中的计数是每个 TensorCore 各执行一份，正文会单独说明。
-
-## 最小 kernel
-
-实验的 kernel 把一个 `f32[8,128]` 从 HBM 搬到 TC VMEM，乘以 2，再搬回 HBM：
+实验沿用上一节的最小 kernel，源码没有改动：把一个 `f32[8,128]` 从 HBM 搬到 TC VMEM，乘以 2，再搬回 HBM。脚本只在编译之后多打印两样东西：
 
 ```python
-def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
-    pltpu.async_copy(x_hbm, x_vmem, sem).wait()
-    x_vmem[...] = x_vmem[...] * 2.0
-    pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+print(tpuasm_tools.listing_outline(compiled))  # 完整清单的结构概览
+print(tpuasm_tools.kernel_listing(compiled))   # 只含 kernel 的清单
 ```
+
+本章 Pallas 实验的指令全部由 TensorCore 0 执行。XLA baseline 则可能把工作分给两个 TensorCore；遇到这种情况时，清单中的计数是每个 TensorCore 各执行一份，正文会单独说明。
 
 ## 完整清单的结构
 
@@ -119,7 +106,7 @@ kernel 段分为三个区间。第一个区间判断由谁执行：
 - `vwait.ge` 等到这个标志不小于 8，随后 `vsyncadd ... -8` 把它减回 0。
 - `vld` 把 TC VMEM 中的一个 `8×128` tile 读进 TC VREG `v0`，`vmul` 乘以立即数 2.0，`vst` 写回 TC VMEM。
 
-本章第 2 节逐项解释 DMA 的这些操作数。这里先注意两点：源码中的一次 `x * 2` 对应恰好一条 `vmul.8x128.f32`；`vld`、`vmul`、`vst` 分别落在 `vld`、`va0`、`vst` 三个不同的槽。
+本章第 3 节逐项解释 DMA 的这些操作数。这里先注意两点：源码中的一次 `x * 2` 对应恰好一条 `vmul.8x128.f32`；`vld`、`vmul`、`vst` 分别落在 `vld`、`va0`、`vst` 三个不同的槽。
 
 第三个区间（`image bundles [518, 534)`）在 kernel 主体之后执行，两个 TensorCore 都会经过：
 

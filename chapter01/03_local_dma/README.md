@@ -8,7 +8,15 @@ TensorCore 的向量单元只能读写 TC VMEM。数据在 HBM 中时，必须�
 
 本小节实验[源码](01_pallas_f32_copy_64x128.py)、[输出](01_pallas_f32_copy_64x128.txt)。
 
-`f32[64,128]` 经 TC VMEM 原样复制回 HBM，kernel 中只有两次 `async_copy(...).wait()`。输入方向在清单中是：
+相对于第 1 节的最小 kernel，输入改为 `f32[64,128]`，并删去中间的计算，kernel 主体只剩两次 DMA：
+
+```python
+def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
+    pltpu.async_copy(x_hbm, x_vmem, sem).wait()
+    pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+```
+
+输入方向在清单中是：
 
 ```text
 { s0: @p0 dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
@@ -22,13 +30,20 @@ TensorCore 的向量单元只能读写 TC VMEM。数据在 HBM 中时，必须�
 
 `async_copy(...)` 对应第一条指令，`.wait()` 对应后两条。发起和等待是两个独立的事件：`dma.simple` 发出后 TensorCore 立即继续发射后面的 bundle，DMA 引擎在后台搬运；等待只在 `vwait.ge` 处发生。这个实验没有计算，所以清单中没有 `vld`/`vst`：DMA 只改变数据所在的内存，不经过 TC VREG。
 
-本例的 DMA 指令都带谓词 `@p0`。这次编译器没有像第 1 节那样用分支跳过主体，而是先用 `seq.s32 p0, s6, 0` 判断 TensorCore 编号是否为 0，再给主体的每条指令加上谓词：TensorCore 1 照样经过这些 bundle，但其中的指令都不执行。
+本例的 DMA 指令都带谓词 `@p0`。这次编译器没有像第 2 节那样用分支跳过主体，而是先用 `seq.s32 p0, s6, 0` 判断 TensorCore 编号是否为 0，再给主体的每条指令加上谓词：TensorCore 1 照样经过这些 bundle，但其中的指令都不执行。
 
 ## DMA 的长度单位：512 B 的 granule
 
 本小节实验[源码](02_pallas_dtype_payload_64x128.py)、[输出](02_pallas_dtype_payload_64x128.txt)。
 
-只改 dtype，shape 固定为 `[64,128]`：
+脚本对三种 dtype 各编译一次同一个复制 kernel，只改输入数组的 dtype：
+
+```python
+for dtype in (jnp.float32, jnp.bfloat16, jnp.int8):
+    x = (jnp.arange(64 * 128) % 100).astype(dtype).reshape(64, 128)
+```
+
+kernel 中的 `pltpu.VMEM(x.shape, x.dtype)` 和 `out_type` 都随输入的 dtype 变化，不需要另改。结果：
 
 | dtype | 字节数 | `length` |
 | --- | ---: | ---: |
@@ -40,7 +55,16 @@ TensorCore 的向量单元只能读写 TC VMEM。数据在 HBM 中时，必须�
 
 ## 只改源和目的：HBM 直接复制到 HBM
 
-同一实验的第二个 kernel 不分配 TC VMEM，直接 `async_copy(x_hbm, o_hbm, sem)`：
+同一实验的第二个 kernel 从 `scratch_types` 中去掉 TC VMEM buffer，只保留信号量，DMA 的目的直接写输出 Ref：
+
+```python
+scratch_types=(pltpu.SemaphoreType.DMA,),
+...
+def kernel(x_hbm: Ref, o_hbm: Ref, sem: Ref) -> None:
+    pltpu.async_copy(x_hbm, o_hbm, sem).wait()
+```
+
+清单中只有一条 DMA：
 
 ```text
 { s0: @p0 dma.general [hbm:s1], [hbm:s0], length=64, stride_descriptor=[smem:0x0], stride_count=0,
@@ -55,7 +79,18 @@ DMA 不要求一端是 TC VMEM。HBM→HBM 复制用的是更通用的 `dma.gene
 
 本小节实验[源码](03_pallas_f32_windows.py)、[输出](03_pallas_f32_windows.txt)。
 
-输入改为 HBM 中的 `f32[64,256]`，每次只搬一个窗口到 TC VMEM，再写回输出的同一位置。窗口起点在清单中是一条加在基址上的 `sadd.s32`：
+输入改为 HBM 中的 `f32[64,256]`，每次只搬一个窗口到 TC VMEM，再写回输出的同一位置。TC VMEM buffer 改为窗口的大小，两次 DMA 的 HBM 一端改为窗口：
+
+```python
+scratch_types=(pltpu.VMEM((rows, columns), x.dtype), pltpu.SemaphoreType.DMA),
+...
+pltpu.async_copy(x_hbm.at[pl.ds(row, rows), pl.ds(column, columns)], x_vmem, sem).wait()
+pltpu.async_copy(x_vmem, o_hbm.at[pl.ds(row, rows), pl.ds(column, columns)], sem).wait()
+```
+
+`ref.at[...]` 不读写内存，只返回一个指向原 Ref 一部分的新 Ref，可以作为 DMA 的源或目的。`pl.ds(start, size)` 表示从 `start` 开始、长度为 `size` 的区间，相当于切片 `start:start + size`。`size` 必须是编译期常量；`start` 可以是常量，也可以是运行时的标量值，本章第 7 节会用到后者。
+
+窗口起点在清单中是一条加在基址上的 `sadd.s32`：
 
 | 窗口 | 源地址偏移 | DMA |
 | --- | ---: | --- |
@@ -82,7 +117,22 @@ DMA 不要求一端是 TC VMEM。HBM→HBM 复制用的是更通用的 `dma.gene
 
 本小节实验[源码](04_tpuasm_unaligned_rows.py)、[输出](04_tpuasm_unaligned_rows.txt)。
 
-做法是先让 Mosaic 编译一个合法的对齐版本作为载体，再用 tpuasm 改写机器清单中的几个数，重新汇编后装载运行。
+做法是先让 Mosaic 编译一个合法的对齐版本作为载体，再用 tpuasm 改写机器清单中的几个数，重新汇编后装载运行。载体是一个只做 DMA 的 kernel，输入为 `f32[64,128]`，读第 8 行开始的 `rows` 行：
+
+```python
+pltpu.async_copy(x_hbm.at[pl.ds(8, rows)], x_vmem, sem).wait()
+pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+```
+
+改写用 [`tpuasm_tools`](../../tpuasm_tools.py) 中的两个函数完成：`replace_listing(serialized, edit)` 取出完整清单，交给 `edit` 做文本替换，再重新汇编，替换 executable 中的程序；`load(serialized, template)` 按原 executable 的调用约定装载改写后的 executable，得到可以像普通函数一样调用的对象：
+
+```python
+def unaligned(source: str) -> str:
+    return source.replace('sadd.s32 s9, 8, s0', 'sadd.s32 s9, 3, s0', 1)
+
+patched = tpuasm_tools.load(tpuasm_tools.replace_listing(tpuasm_tools.serialize(carrier), unaligned), carrier)
+patched(x)
+```
 
 非对齐起点：载体读 `f32[64,128]` 的 `x[8:16]`，地址计算是 `sadd.s32 s9, 8, s0`。把立即数 8 改成 3，改写后的 executable 输出逐元素等于 `x[3:11]`。
 
@@ -96,14 +146,21 @@ DMA 不要求一端是 TC VMEM。HBM→HBM 复制用的是更通用的 `dma.gene
 
 本小节实验[源码](05_pallas_two_inputs_async.py)、[输出](05_pallas_two_inputs_async.txt)。
 
-kernel 依次发起 x、y 两个输入 DMA，再依次等待，然后相加：
+kernel 改为两个输入 x、y，各有一个 TC VMEM buffer；信号量改为一个数组。先依次发起两个输入 DMA，再依次等待，然后相加：
 
 ```python
-x_copy = pltpu.async_copy(x_hbm, x_vmem, sems.at[0])
-y_copy = pltpu.async_copy(y_hbm, y_vmem, sems.at[semaphores - 1])
-x_copy.wait()
-y_copy.wait()
+scratch_types=(pltpu.VMEM(x.shape, x.dtype), pltpu.VMEM(y.shape, y.dtype), pltpu.SemaphoreType.DMA((semaphores,))),
+...
+def kernel(x_hbm: Ref, y_hbm: Ref, o_hbm: Ref, x_vmem: Ref, y_vmem: Ref, sems: Ref) -> None:
+    x_copy = pltpu.async_copy(x_hbm, x_vmem, sems.at[0])
+    y_copy = pltpu.async_copy(y_hbm, y_vmem, sems.at[semaphores - 1])
+    x_copy.wait()
+    y_copy.wait()
+    x_vmem[...] = x_vmem[...] + y_vmem[...]
+    pltpu.async_copy(x_vmem, o_hbm, sems.at[0]).wait()
 ```
+
+输入 Ref 按输入的顺序排在前面，输出 Ref 随后，scratch Ref 最后。`pltpu.SemaphoreType.DMA((n,))` 分配 n 个信号量组成的数组，`sems.at[i]` 取其中第 i 个。`async_copy` 返回的描述符可以先保存起来，稍后再调用 `.wait()`。实验比较 `semaphores = 1`（两个输入共用 `sems.at[0]`）与 `semaphores = 2`（各用一个）。
 
 两个输入各用一个信号量时，两次等待分别是 `vwait.ge [sflag:52], 64` 和 `vwait.ge [sflag:53], 64`。共用一个信号量时，两条 `dma.simple` 都写 `sflag:52`，编译器把两次等待合并成一条：
 
@@ -124,14 +181,14 @@ y_copy.wait()
 
 本小节实验[源码](06_jax_f32_64x128.py)、[输出](06_jax_f32_64x128.txt)。
 
-XLA 对 `f32[64,128] × 2` 生成的 fusion 中，DMA 是 `dma.strided ... length=32`，而 `vld`、`vmul.8x128.f32`、`vst` 各只有 4 条，正好是全部 8 个 tile 的一半。开头的指令解释了原因：
+XLA baseline 直接编译 `lambda x: x * 2.0`，输入为 `f32[64,128]`，不写任何 DMA。XLA 对 `f32[64,128] × 2` 生成的 fusion 中，DMA 是 `dma.strided ... length=32`，而 `vld`、`vmul.8x128.f32`、`vst` 各只有 4 条，正好是全部 8 个 tile 的一半。开头的指令解释了原因：
 
 ```text
 { s1: sld s6, [smem:0x1] }
 { s0: sshll.u32 s7, s6, 0x5 }
 ```
 
-XLA 读出 TensorCore 编号后乘以 32（左移 5 位），作为 HBM 地址的 granule 偏移：TensorCore 0 处理第 0–31 行，TensorCore 1 处理第 32–63 行。与第 1 节只有一个 tile 的例子不同，这次 XLA 让两个 TensorCore 各算一半，清单中的计数是每个 TensorCore 各执行一份。
+XLA 读出 TensorCore 编号后乘以 32（左移 5 位），作为 HBM 地址的 granule 偏移：TensorCore 0 处理第 0–31 行，TensorCore 1 处理第 32–63 行。与第 2 节只有一个 tile 的例子不同，这次 XLA 让两个 TensorCore 各算一半，清单中的计数是每个 TensorCore 各执行一份。
 
 > 暂且可以理解为：XLA 会自动把一颗芯片上的工作分给两个 TensorCore。第二章第 1 节详细介绍这种分工，以及 Pallas 中如何显式地做到同样的事。
 

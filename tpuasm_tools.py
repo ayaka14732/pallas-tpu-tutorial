@@ -18,10 +18,6 @@ from tpuasm import BundleInsertion, assemble_listing, compiler_source_mapping, e
 
 TARGET = 'tpu-v4-tc'
 ROOT = Path(__file__).resolve().parent
-COMPILER_OPTIONS = {
-    'xla_msa_enable': 'false',
-    'xla_tpu_vmem_scavenging_mode': 'NONE',
-}
 # 源码映射需要在 TPU 初始化之前装入编译器钩子；导入本模块时进入一次，整个进程保持，退出时恢复。
 _SOURCE_MAPPING = contextlib.ExitStack()
 _SOURCE_MAPPING.enter_context(compiler_source_mapping())
@@ -34,7 +30,7 @@ def compile(function: Callable[..., Any], *arguments: Any, mesh: jax.sharding.Me
     # 设置 abstract mesh 后，kernel 中重复调用的 jnp 函数不会复用第一次追踪的 jaxpr，来源注释的行号才准确。
     abstract_mesh = jax.sharding.use_abstract_mesh(mesh.abstract_mesh) if mesh is not None else contextlib.nullcontext()
     with abstract_mesh:
-        return jax.jit(function, compiler_options=COMPILER_OPTIONS | (compiler_options or {})).lower(*arguments).compile()
+        return jax.jit(function, compiler_options=compiler_options).lower(*arguments).compile()
 
 def serialize(compiled: Compiled) -> bytes:
     return bytes(cast(LoadedExecutable, compiled.runtime_executable()).serialize())

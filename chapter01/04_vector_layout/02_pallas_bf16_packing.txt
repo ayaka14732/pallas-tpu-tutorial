@@ -1,0 +1,68 @@
+u32[s, l] 的低 16 bit 来自 bf16 的第几行： [np.uint16(0), np.uint16(2), np.uint16(4), np.uint16(6), np.uint16(8), np.uint16(10), np.uint16(12), np.uint16(14)] 按 sublane s = [0, 2, 4, 6, 8, 10, 12, 14]
+u32[s, l] 的高 16 bit 来自 bf16 的第几行：按 sublane s = [1, 3, 5, 7, 9, 11, 13, 15]
+列号是否不变： True
+cfence: 1
+dma.simple: 2
+sadd.s32: 2
+sand.u32: 3
+sbr.rel: 1
+simm.s32: 2
+sld: 3
+sne.s32: 1
+sor.u32: 2
+sshll.u32: 2
+sshrl.u32: 1
+vld.8x128: 1
+vst.8x128: 1
+vsyncadd.remote.s32: 1
+vsyncadd.s32: 3
+vtrace: 2
+vwait.ge: 3
+# function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %reinterpret.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_0204 }
+# end function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]
+{}
+# function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]; image bundles [508, 516)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:37:12-37:55 [dma_wait; LLO 56]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s10, 8 ;  # materialized constant
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:38:40-38:51 [get; LLO 51] | Coalesced load.
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:37:12-37:55 [dma_wait; LLO 57]
+  .encoding { misc.value = imm2 ; s0.y = lo(imm0) } }
+{ vst: vst.8x128 [vmem:0x8], v0 }  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:38:12-38:23 [swap; LLO 37]
+{ s0: dma.simple [hbm:s1], [vmem:s10], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:39:12-39:55 [dma_wait; LLO 58]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/04_vector_layout/02_pallas_bf16_packing.py:39:12-39:55 [dma_wait; LLO 59]
+  .encoding { misc.value = imm2 } }
+# end function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]
+# exit bundle: %reinterpret.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]; image bundles [517, 533)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(reinterpret)/reinterpret/mpmd_map [symbol 4, reinterpret.1]

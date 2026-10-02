@@ -1,0 +1,6 @@
+Mosaic 生成的打包指令：
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/04_vector_layout/04_tpuasm_bf16_pack_formats.py:45:40-45:51 [get; LLO 25] | chapter01/04_vector_layout/04_tpuasm_bf16_pack_formats.py:45:40-45:72
+{ vld: vld.8x128 v1, [vmem:0x8] }  # chapter01/04_vector_layout/04_tpuasm_bf16_pack_formats.py:45:40-45:51 [get; LLO 26] | chapter01/04_vector_layout/04_tpuasm_bf16_pack_formats.py:45:40-45:72
+{ va0: vpackc.8x128.f32.f16 v2, v1, v0 }  # chapter01/04_vector_layout/04_tpuasm_bf16_pack_formats.py:45:40-45:72 [convert_element_type; LLO 37]
+vpackc：sublane s 的 (低 16 bit, 高 16 bit) = [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9), (10, 11), (12, 13), (14, 15)]
+vpack ：sublane s 的 (低 16 bit, 高 16 bit) = [(0, 8), (1, 9), (2, 10), (3, 11), (4, 12), (5, 13), (6, 14), (7, 15)]

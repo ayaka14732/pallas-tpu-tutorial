@@ -1,0 +1,30 @@
+## 默认参数：54 个 bundle，shalt 5 条，数值检查通过
+{ s0: @!p5 shalt }  # BoundsCheck 0 [deref of opnd#0] for dma.hbm_to_vmem\nhlo: scale.1
+{ s0: @!p10 shalt }  # BoundsCheck 0 [deref of opnd#2] for dma.hbm_to_vmem\nhlo: scale.1
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:42:16-42:75 [dma_wait; LLO 98]
+{ s0: @!p10 shalt }  # BoundsCheck 3 [deref of opnd#0] for dma.vmem_to_hbm\nhlo: scale.1
+{ s0: @!p0 shalt }  # BoundsCheck 3 [deref of opnd#2] for dma.vmem_to_hbm\nhlo: scale.1
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:44:16-44:59 [dma_wait; LLO 100]
+{ s0: @p1 shalt }  # Semaphore (scratch argument 1) has a nonzero value upon exit from a Mosaic kernel. Make sure every DMA is awaited, and every semaphore signal is pair
+{ misc: vwait.ge [sflag:45], 1 ;
+
+## 只关闭越界检查：34 个 bundle，shalt 1 条，数值检查通过
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:42:16-42:75 [dma_wait; LLO 50]
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:44:16-44:59 [dma_wait; LLO 52]
+{ s0: @p1 shalt }  # Semaphore (scratch argument 1) has a nonzero value upon exit from a Mosaic kernel. Make sure every DMA is awaited, and every semaphore signal is pair
+{ misc: vwait.ge [sflag:45], 1 ;
+
+## 只关闭信号量检查：50 个 bundle，shalt 4 条，数值检查通过
+{ s0: @!p5 shalt }  # BoundsCheck 0 [deref of opnd#0] for dma.hbm_to_vmem\nhlo: scale.1
+{ s0: @!p10 shalt }  # BoundsCheck 0 [deref of opnd#2] for dma.hbm_to_vmem\nhlo: scale.1
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:42:16-42:75 [dma_wait; LLO 90]
+{ s0: @!p10 shalt }  # BoundsCheck 3 [deref of opnd#0] for dma.vmem_to_hbm\nhlo: scale.1
+{ s0: @!p0 shalt }  # BoundsCheck 3 [deref of opnd#2] for dma.vmem_to_hbm\nhlo: scale.1
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:44:16-44:59 [dma_wait; LLO 92]
+{ misc: vwait.ge [sflag:45], 1 ;
+
+## 两者都关闭：30 个 bundle，shalt 0 条，数值检查通过
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:42:16-42:75 [dma_wait; LLO 42]
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_first_kernel/03_pallas_checks.py:44:16-44:59 [dma_wait; LLO 44]
+{ misc: vwait.ge [sflag:45], 1 ;
+

@@ -1,0 +1,91 @@
+f32[9,130]：数值检查通过
+cfence: 1
+dma.simple: 2
+sadd.s32: 2
+sand.u32: 3
+sbr.rel: 1
+simm.s32: 1
+sld: 3
+sne.s32: 1
+sor.u32: 2
+sshll.u32: 2
+sshrl.u32: 1
+vand.8x128.u32: 1
+veq.8x128.s32: 1
+vlaneseq.8x128.u32: 1
+vld.8x128: 4
+vlt.8x128.s32: 1
+vmand.8x128.u1: 1
+vmul.8x128.f32: 4
+vshrl.8x128.s32: 1
+vst.8x128: 2
+vst.msk.8x128: 2
+vsyncadd.remote.s32: 1
+vsyncadd.s32: 3
+vtrace: 2
+vwait.ge: 3
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %scale.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_020b }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+{}
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [508, 523)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=32, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 32 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:37:12-37:55 [dma_wait; LLO 60]
+  .encoding { misc.value = imm2 } }
+{ va0: vlaneseq.8x128.u32 v0 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 34]
+  vld: vld.8x128 v3, [vmem:0x0] ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:37 [get; LLO 25]
+  misc: vsyncadd.s32 [sflag:52], -32 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:37:12-37:55 [dma_wait; LLO 61]
+  .encoding { misc.value = imm2 } }
+{ va0: vand.8x128.u32 v1, 0x7f, v0 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 35]
+  va1: vshrl.8x128.s32 v2, v0, 0x7 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 40]
+  vld: vld.8x128 v5, [vmem:0x8] ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:37 [get; LLO 26]
+  .encoding { va1.y = lo(imm1) } }
+{ va0: vlt.8x128.s32 vm0, v1, 2 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 36]
+  va1: veq.8x128.s32 vm1, v2, 0 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 41]
+  vld: vld.8x128 v7, [vmem:0x10, sm=1] }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:37 [get; LLO 27]
+{ va0: vmul.8x128.f32 v4, 2.0, v3 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:43 [mul; LLO 29]
+  vld: vld.8x128 v9, [vmem:0x18, sm=1] ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:37 [get; LLO 28]
+  misc: vmand.8x128.u1 vm2, vm1, vm0 }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 45]
+{ va0: vmul.8x128.f32 v6, 2.0, v5 }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:43 [mul; LLO 30]
+{ va0: vmul.8x128.f32 v8, 2.0, v7 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:43 [mul; LLO 31]
+  vst: vst.8x128 [vmem:0x0], v4 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 33]
+  .encoding { vst.opcode = s0 } }
+{ va0: vmul.8x128.f32 v10, 2.0, v9 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:26-38:43 [mul; LLO 32]
+  vst: vst.msk.8x128 [vmem:0x8], vm0, v6 }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 37]
+{ vst: vst.8x128 [vmem:0x10, sm=1], v8 }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 38]
+{ vst: vst.msk.8x128 [vmem:0x18, sm=1], vm2, v10 }  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:38:12-38:23 [swap; LLO 46]
+{ s0: dma.simple [hbm:s1], [vmem:s7], length=32, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 32 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:39:12-39:55 [dma_wait; LLO 62]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -32 ;  # chapter01/04_vector_layout/03_pallas_f32_unaligned.py:39:12-39:55 [dma_wait; LLO 63]
+  .encoding { misc.value = imm2 } }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+# exit bundle: %scale.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [524, 540)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]

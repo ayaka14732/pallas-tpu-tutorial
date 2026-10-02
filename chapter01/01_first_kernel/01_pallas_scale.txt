@@ -1,0 +1,5 @@
+数值检查通过
+
+# 编译后的 HLO
+ENTRY %main.1 (x_hbm.1: f32[8,128]) -> f32[8,128] {
+ROOT %scale.1 = f32[8,128]{1,0:T(8,128)} custom-call(%x_hbm.1), custom_call_target="tpu_custom_call", operand_layout_constraints={f32[8,128]{1,0}}, sharding={me

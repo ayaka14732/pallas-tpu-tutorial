@@ -1,0 +1,10 @@
+数值检查通过
+
+# 向量指令
+  vld: vld.8x128 v0, [vmem:0x8] ;  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:38:16-38:27 [get; LLO 26]
+{ va0: vmul.8x128.f32 v1, v0, v0 ;  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:40:16-40:21 [mul; LLO 28]
+  vst: vst.8x128 [vmem:0x10], v0 }  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:43:12-43:26 [swap; LLO 38]
+{ va0: vmul.8x128.f32 v2, v1, v0 }  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:41:26-41:31 [mul; LLO 30]
+{ va1: vadd.8x128.f32 v3, v2, v1 }  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:41:26-41:35 [add; LLO 32]
+{ va1: vadd.8x128.f32 v4, v3, v0 }  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:41:26-41:39 [add; LLO 34]
+{ vst: vst.8x128 [vmem:0x18], v4 }  # chapter01/01_first_kernel/02_pallas_values_and_refs.py:41:12-41:23 [swap; LLO 36]
