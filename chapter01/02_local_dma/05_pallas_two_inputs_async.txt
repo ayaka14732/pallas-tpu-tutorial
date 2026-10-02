@@ -1,0 +1,20 @@
+## 1 个 DMA semaphore：数值检查通过
+{ s0: dma.simple [vmem:s10], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s13], [hbm:s1], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 128 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:43:16-43:29 [dma_wait; LLO 83]
+  misc: vsyncadd.s32 [sflag:52], -128 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:43:16-43:29 [dma_wait; LLO 84]
+{ s0: dma.simple [hbm:s2], [vmem:s10], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:46:16-46:66 [dma_wait; LLO 85]
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:46:16-46:66 [dma_wait; LLO 86]
+
+## 2 个 DMA semaphore：数值检查通过
+{ s0: dma.simple [vmem:s10], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ s0: dma.simple [vmem:s13], [hbm:s1], length=64, dst_flag=[sflag:53] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:43:16-43:29 [dma_wait; LLO 84]
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:43:16-43:29 [dma_wait; LLO 85]
+{ misc: vwait.ge [sflag:53], 64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:44:16-44:29 [dma_wait; LLO 86]
+  misc: vsyncadd.s32 [sflag:53], -64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:44:16-44:29 [dma_wait; LLO 87]
+{ s0: dma.simple [hbm:s2], [vmem:s10], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:46:16-46:66 [dma_wait; LLO 88]
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/02_local_dma/05_pallas_two_inputs_async.py:46:16-46:66 [dma_wait; LLO 89]
+

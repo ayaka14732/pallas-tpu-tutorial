@@ -1,0 +1,92 @@
+数值检查通过
+
+# 完整清单的结构概览
+bundle    0: prelude-prefix-start
+bundle    9: routine:wait-for-active-dma
+bundle   16: routine:program-exit
+bundle   19: routine:allocation-table-find
+bundle   28: routine:allocation-table-get-or-add
+bundle   54: routine:allocation-table-cut-and-add
+bundle   71: routine:branch-impl
+bundle  122: routine:branch
+bundle  128: trampoline:program-start
+bundle  503: function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [503, 507)
+bundle  504: entry bundle: %scale.1 = custom-call(%x_hbm.1)
+bundle  507: end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+bundle  508: function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [508, 517)
+bundle  517: end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+bundle  517: exit bundle: %scale.1 = custom-call(%x_hbm.1)
+bundle  518: function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [518, 534)
+bundle  534: end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+bundle  650: 清单结束（共 650 个 bundle）
+
+# kernel 段的指令统计
+cfence: 1
+dma.simple: 2
+sadd.s32: 2
+sand.u32: 3
+sbr.rel: 1
+simm.s32: 1
+sld: 3
+sne.s32: 1
+sor.u32: 2
+sshll.u32: 2
+sshrl.u32: 1
+vld.8x128: 1
+vmul.8x128.f32: 1
+vst.8x128: 1
+vsyncadd.remote.s32: 1
+vsyncadd.s32: 3
+vtrace: 2
+vwait.ge: 3
+
+# kernel 段
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %scale.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_0205 }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+{}
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [508, 517)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 41]
+  .encoding { misc.value = imm2 } }
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:26-39:37 [get; LLO 25]
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:38:12-38:55 [dma_wait; LLO 42]
+  .encoding { misc.value = imm2 } }
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:26-39:43 [mul; LLO 26]
+{ vst: vst.8x128 [vmem:0x0], v1 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:39:12-39:23 [swap; LLO 27]
+  .encoding { vst.opcode = s0 } }
+{ s0: dma.simple [hbm:s1], [vmem:s7], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 43]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/01_tensorcore_listing/01_pallas_f32_8x128.py:40:12-40:55 [dma_wait; LLO 44]
+  .encoding { misc.value = imm2 } }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]
+# exit bundle: %scale.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(scale)/scale/mpmd_map [symbol 4, scale.1]; image bundles [518, 534)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(scale)/scale/mpmd_map [symbol 4, scale.1]

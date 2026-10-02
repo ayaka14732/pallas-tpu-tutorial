@@ -1,0 +1,103 @@
+数值检查通过
+
+# 完整清单的结构概览
+bundle    0: prelude-prefix-start
+bundle    9: routine:wait-for-active-dma
+bundle   16: routine:program-exit
+bundle   19: routine:allocation-table-find
+bundle   28: routine:allocation-table-get-or-add
+bundle   54: routine:allocation-table-cut-and-add
+bundle   71: routine:branch-impl
+bundle  122: routine:branch
+bundle  128: trampoline:program-start
+bundle  504: entry bundle: %broadcast_multiply_fusion = fusion(%x.1)
+bundle  542: exit bundle: %broadcast_multiply_fusion = fusion(%x.1)
+bundle  680: 清单结束（共 680 个 bundle）
+
+# fusion 段的指令统计
+dma.simple: 2
+por: 8
+sadd.s32: 8
+sand.u32: 4
+sbr.rel: 1
+shalt: 4
+simm.s32: 3
+sld: 1
+slt.s32: 8
+sne.s32: 5
+vld.8x128: 1
+vmul.8x128.f32: 1
+vst.8x128: 1
+vsyncadd.s32: 2
+vsyncpa.u1: 4
+vwait.ge: 2
+
+# fusion 段
+# entry bundle: %broadcast_multiply_fusion = fusion(%x.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_021e }
+{}
+{ misc: vsyncpa.u1 [sflag:52], 0 }
+{ s0: sand.u32 s9, 0x7fffffff, s0 ;
+  s1: sadd.s32 s13, 8, s0 ;
+  misc: vsyncpa.u1 [sflag:53], 0 }
+{ s0: sadd.s32 s10, 8, s9 ;
+  s1: slt.s32 p2, s9, s0 }
+{ s0: sne.s32 p1, s9, s10 ;
+  s1: slt.s32 p3, s13, s10 }
+{ s0: por p4, p3, p2 }
+{ s0: por p5, !p4, !p1 }
+{ s0: @!p5 shalt }  # BoundsCheck 0 [deref of opnd#0] for dma.hbm_to_vmem\nhlo: broadcast_multiply_fusion
+{ s0: simm.s32 s16, 2147483647 ;  # materialized constant
+  s1: simm.s32 s19, 0 ;  # materialized constant
+  .encoding { s1.y = lo(imm2) } }
+{ s0: sand.u32 s17, 0x0, s16 ;
+  s1: sadd.s32 s20, 8, s19 ;
+  .encoding { s0.y = lo(imm0) } }
+{ s0: sadd.s32 s18, 8, s17 ;
+  s1: slt.s32 p7, s17, 0 ;
+  .encoding { s1.y = lo(imm0) } }
+{ s0: sne.s32 p6, s17, s18 ;
+  s1: slt.s32 p8, s20, s18 }
+{ s0: por p9, p8, p7 }
+{ s0: por p10, !p9, !p6 }
+{ s0: @!p10 shalt }  # BoundsCheck 0 [deref of opnd#2] for dma.hbm_to_vmem\nhlo: broadcast_multiply_fusion
+{ s0: dma.simple [vmem:s19], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ s0: sand.u32 s0, 0x8, s16 ;
+  s1: simm.s32 s24, 8 ;  # materialized constant
+  vld: vld.8x128 v0, [vmem:0x0] ;
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 ; s1.y = lo(imm0) } }
+{ s0: sadd.s32 s23, 8, s0 ;
+  s1: sadd.s32 s25, 8, s24 ;
+  va0: vmul.8x128.f32 v1, 2.0, v0 }
+{ s0: sne.s32 p11, s0, s23 ;
+  s1: slt.s32 p12, s0, 8 ;
+  .encoding { s1.y = lo(imm0) } }
+{ s0: slt.s32 p13, s25, s23 ;
+  vst: vst.8x128 [vmem:0x8], v1 }
+{ s0: por p14, p13, p12 }
+{ s0: por p0, !p14, !p11 }
+{ s0: @!p0 shalt }  # BoundsCheck 3 [deref of opnd#0] for dma.vmem_to_hbm\nhlo: broadcast_multiply_fusion
+{ s0: sand.u32 s28, 0x7fffffff, s1 ;
+  s1: sadd.s32 s3, 8, s1 }
+{ s0: sadd.s32 s29, 8, s28 ;
+  s1: slt.s32 p2, s28, s1 }
+{ s0: sne.s32 p1, s28, s29 ;
+  s1: slt.s32 p3, s3, s29 }
+{ s0: por p4, p3, p2 }
+{ s0: por p5, !p4, !p1 }
+{ s0: @!p5 shalt }  # BoundsCheck 3 [deref of opnd#2] for dma.vmem_to_hbm\nhlo: broadcast_multiply_fusion
+{ s0: dma.simple [hbm:s1], [vmem:s24], length=8, dst_flag=[sflag:53] }
+{ misc: vwait.ge [sflag:53], 8 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:53], -8 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncpa.u1 [sflag:52], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncpa.u1 [sflag:53], 1 ;
+  .encoding { misc.value = imm2 } }
+# exit bundle: %broadcast_multiply_fusion = fusion(%x.1)

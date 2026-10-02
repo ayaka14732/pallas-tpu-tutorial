@@ -1,0 +1,12 @@
+## float32[64,128]：32768 B，数值检查通过
+{ s0: @p0 dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ s0: @p0 dma.simple [hbm:s1], [vmem:s7], length=64, dst_flag=[sflag:52] }
+
+## bfloat16[64,128]：16384 B，数值检查通过
+{ s0: @p0 dma.simple [vmem:s7], [hbm:s0], length=32, dst_flag=[sflag:52] }
+{ s0: @p0 dma.simple [hbm:s1], [vmem:s7], length=32, dst_flag=[sflag:52] }
+
+## int8[64,128]：8192 B，数值检查通过
+{ s0: @p0 dma.simple [vmem:s7], [hbm:s0], length=16, dst_flag=[sflag:52] }
+{ s0: @p0 dma.simple [hbm:s1], [vmem:s7], length=16, dst_flag=[sflag:52] }
+

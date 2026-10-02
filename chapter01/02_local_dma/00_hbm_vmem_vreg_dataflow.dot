@@ -1,0 +1,40 @@
+digraph hbm_vmem_vreg_dataflow {
+    graph [
+        rankdir=LR,
+        bgcolor="#FFFFFF",
+        pad=0.15,
+        nodesep=0.35,
+        ranksep=0.45,
+        fontname="DejaVu Sans",
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        color="#000000",
+        fillcolor="#FFFFFF",
+        penwidth=1.0,
+        fontname="DejaVu Sans",
+        fontsize=12,
+        margin="0.14,0.08",
+    ];
+    edge [
+        color="#000000",
+        penwidth=1.0,
+        arrowsize=0.75,
+        fontname="DejaVu Mono",
+        fontsize=10,
+    ];
+
+    x_hbm [label="x\nHBM"];
+    x_vmem [label="x\nTC VMEM"];
+    v0 [label="v0\nTC VREG"];
+    v1 [label="v1\nTC VREG"];
+    o_vmem [label="o\nTC VMEM"];
+    o_hbm [label="o\nHBM"];
+
+    x_hbm -> x_vmem [label="s0: dma.simple\nmisc: vwait.ge"];
+    x_vmem -> v0 [label="vld: vld"];
+    v0 -> v1 [label="va0: vmul"];
+    v1 -> o_vmem [label="vst: vst"];
+    o_vmem -> o_hbm [label="s0: dma.simple\nmisc: vwait.ge"];
+}
