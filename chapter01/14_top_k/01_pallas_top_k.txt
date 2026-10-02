@@ -1,0 +1,25 @@
+## max 与 argmax，f32[8,128]
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.index.xlane.0.8x128.f32×1、vmax.xlane.2.8x128.f32×1、vpop.8x128×2
+
+## lax.top_k(x, 1)，f32[8,128]：编译失败：is_stable=True is not supported in Pallas top_k. For efficiency, only is_stable=False is supported
+
+## lax.top_k(x, 1, is_stable=False)，f32[8,128]
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.index.xlane.0.8x128.f32×1、vmax.xlane.2.8x128.f32×1、vpop.8x128×2
+
+## lax.top_k(x, 8, is_stable=False)，f32[8,128]
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、veq.8x128.s32×8、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vmax.index.xlane.0.8x128.f32×2、vmax.index.xlane.1.8x128.f32×2、vmax.index.xlane.2.8x128.f32×2、vmax.index.xlane.3.8x128.f32×2、vmax.xlane.0.8x128.f32×2、vmax.xlane.1.8x128.f32×2、vmax.xlane.2.8x128.f32×2、vmax.xlane.3.8x128.f32×2、vpop.8x128×16、vsel.8x128×21
+
+## lax.top_k(x, 8, is_stable=False)，f32[8,256]
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vadd.8x128.s32×1、vand.8x128.u32×1、veq.8x128.s32×15、vge.8x128.f32×8、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vmax.8x128.f32×8、vmax.index.xlane.0.8x128.f32×3、vmax.index.xlane.1.8x128.f32×2、vmax.index.xlane.2.8x128.f32×2、vmax.index.xlane.3.8x128.f32×1、vmax.xlane.0.8x128.f32×2、vmax.xlane.1.8x128.f32×2、vmax.xlane.2.8x128.f32×2、vmax.xlane.3.8x128.f32×2、vperm.0.8x128×3、vperm.1.8x128×3、vperm.2.8x128×1、vperm.3.8x128×1、vpop.8x128×24、vsel.8x128×44、vsetperm.0.all.u8×1、vsetperm.1.all.u8×1、vsetperm.2.all.u8×3、vsetperm.3.all.u8×3
+
+## lax.top_k(x, 8, is_stable=False)，bf16[8,128]：编译失败：bfloat16 top_k is not supported on TPUv5 or older
+
+## lax.top_k(x, 8, is_stable=False)，每行只有 3 个有限值，其余为 -inf
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：False
+  第 0 行下标：[0, 2, 1, 127, 127, 127, 127, 127]；CPU：[0, 2, 1, 3, 4, 5, 6, 7]
+  计算指令：vand.8x128.u32×1、veq.8x128.s32×8、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vmax.index.xlane.0.8x128.f32×2、vmax.index.xlane.1.8x128.f32×2、vmax.index.xlane.2.8x128.f32×2、vmax.index.xlane.3.8x128.f32×2、vmax.xlane.0.8x128.f32×2、vmax.xlane.1.8x128.f32×2、vmax.xlane.2.8x128.f32×2、vmax.xlane.3.8x128.f32×2、vpop.8x128×16、vsel.8x128×21
+
