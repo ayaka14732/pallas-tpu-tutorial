@@ -1,0 +1,41 @@
+## bf16[16,128] @ bf16[128,128]：与精确结果逐元素一致 True；HLO 段：%fusion = fusion(%a.1, %copy-done)
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vmatmul.8x128.f32 → mrf0：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vpop ← mrf0：1
+  vunpackl.8x128.f16.f32：1
+
+## bf16[16,128] @ bf16[128,128]ᵀ（RHS 以 (N,K) 存放）：与精确结果逐元素一致 True；HLO 段：%fusion = fusion(%a.1, %copy-done)
+  vdwg.128x128.f16 gmr0 ← gsft0：1
+  vmatmul.8x128.f32 → mrf0：1
+  vmatpush.packed.xpose.8x128.f16 → gsft0：8
+  vpackc.8x128.f32.f16：8
+  vpop ← mrf0：1
+  vunpackl.8x128.f16.f32：10
+  vunpacku.8x128.f16.f32：7
+
+## f32[16,128] @ f32[128,128]：与精确结果逐元素一致 True；HLO 段：%fusion = fusion(%a.1, %copy-done)
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vmatmul.8x128.f32 → mrf0：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vpackc.8x128.f32.f16：8
+  vpop ← mrf0：1
+
+## bf16[128,128] @ bf16[128,128]：与精确结果逐元素一致 True；HLO 段：%fusion = fusion(%copy-done, %b.1)
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vdwg.128x128.f16 gmr2 ← gsfn2：1
+  vdwg.128x128.f16 gmr3 ← gsfn3：1
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatmul.packed.8x128.f16 → mrf1：1
+  vmatmul.packed.8x128.f16 → mrf2：1
+  vmatmul.packed.8x128.f16 → mrf3：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vmatpush.packed.8x128.f16 → gsfn1：8
+  vmatpush.packed.8x128.f16 → gsfn2：8
+  vmatpush.packed.8x128.f16 → gsfn3：8
+  vpop ← mrf0：2
+  vpop ← mrf1：2
+  vpop ← mrf2：2
+  vpop ← mrf3：2
+

@@ -1,0 +1,23 @@
+digraph mxu_dataflow {
+    graph [rankdir=LR, bgcolor="#FFFFFF", pad=0.15, nodesep=0.35, ranksep=0.5, fontname="DejaVu Sans"];
+    node [shape=box, style="rounded,filled", color="#000000", fillcolor="#FFFFFF", penwidth=1.0, fontname="DejaVu Sans", fontsize=12, margin="0.14,0.08"];
+    edge [color="#000000", penwidth=1.0, arrowsize=0.75, fontname="DejaVu Mono", fontsize=10];
+
+    rhs [label="RHS\nTC VREG × 8"];
+    gsfn [label="gsfn0\n暂存（按 (K,N)）"];
+    gsft [label="gsft0\n暂存（转置后）"];
+    gmr [label="gmr0\nMXU0 正在使用的 gains"];
+    lhs [label="LHS\nTC VREG"];
+    mxu [label="MXU0"];
+    mrf [label="mrf0\n结果队列"];
+    out [label="结果\nTC VREG"];
+
+    rhs -> gsfn [label="vmatpush"];
+    rhs -> gsft [label="vmatpush.xpose"];
+    gsfn -> gmr [label="vdwg"];
+    gsft -> gmr [label="vdwg"];
+    gmr -> mxu;
+    lhs -> mxu [label="vmatmul"];
+    mxu -> mrf;
+    mrf -> out [label="vpop"];
+}

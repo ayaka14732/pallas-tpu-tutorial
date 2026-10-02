@@ -1,0 +1,107 @@
+## bf16[16,128] @ bf16[128,128]
+  与精确结果逐元素一致：True
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vpop ← mrf0：2
+
+## bf16[16,128] @ bf16[128,128]ᵀ（RHS 以 (N,K) 存放）
+  与精确结果逐元素一致：True
+  vdwg.128x128.f16 gmr0 ← gsft0：1
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatpush.packed.xpose.8x128.f16 → gsft0：8
+  vpop ← mrf0：2
+
+## f32[16,128] @ f32[128,128]
+  与“f64 精确结果”的最大相对误差：2.2e-03
+  与“只有 RHS 先舍入成 bf16”的最大相对误差：1.3e-03
+  与“两侧都先舍入成 bf16”的最大相对误差：1.1e-07
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vmatmul.8x128.f32 → mrf0：1
+  vmatmul.8x128.f32 → mrf1：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vmatpush.packed.8x128.f16 → gsfn1：8
+  vpackc.8x128.f32.f16：8
+  vpop ← mrf0：1
+  vpop ← mrf1：1
+
+## f32[16,128] @ f32[128,128]，precision=HIGHEST
+  与“f64 精确结果”的最大相对误差：1.0e-07
+  与“只有 RHS 先舍入成 bf16”的最大相对误差：1.6e-03
+  与“两侧都先舍入成 bf16”的最大相对误差：2.3e-03
+  vadd.8x128.f32：10
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vdwg.128x128.f16 gmr2 ← gsfn2：1
+  vdwg.128x128.f16 gmr3 ← gsfn3：1
+  vmatmul.hi.8x128.f32 → mrf0：2
+  vmatmul.hi.8x128.f32 → mrf1：2
+  vmatmul.hi.8x128.f32 → mrf2：1
+  vmatmul.hi.8x128.f32 → mrf3：2
+  vmatmul.hi.dwg.8x128.f32 → (gmr0, gsfn0, mrf0)：1
+  vmatmul.hi.dwg.8x128.f32 → (gmr1, gsfn1, mrf1)：1
+  vmatmul.hi.dwg.8x128.f32 → (gmr3, gsfn3, mrf3)：1
+  vmatmul.low.8x128.f32 → mrf2：1
+  vmatmul.low.dwg.8x128.f32 → (gmr2, gsfn2, mrf2)：1
+  vmatpush.hi.8x128.f32 → gsfn0：32
+  vmatpush.hi.8x128.f32 → gsfn1：32
+  vmatpush.hi.8x128.f32 → gsfn2：16
+  vmatpush.hi.8x128.f32 → gsfn3：32
+  vmatpush.low.8x128.f32 → gsfn2：16
+  vpop ← mrf0：3
+  vpop ← mrf1：3
+  vpop ← mrf2：3
+  vpop ← mrf3：3
+
+## bf16[128,128] @ bf16[128,128]
+  与精确结果逐元素一致：True
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vdwg.128x128.f16 gmr2 ← gsfn2：1
+  vdwg.128x128.f16 gmr3 ← gsfn3：1
+  vmatmul.packed.8x128.f16 → mrf0：2
+  vmatmul.packed.8x128.f16 → mrf1：2
+  vmatmul.packed.8x128.f16 → mrf2：2
+  vmatmul.packed.8x128.f16 → mrf3：2
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vmatpush.packed.8x128.f16 → gsfn1：8
+  vmatpush.packed.8x128.f16 → gsfn2：8
+  vmatpush.packed.8x128.f16 → gsfn3：8
+  vpop ← mrf0：4
+  vpop ← mrf1：4
+  vpop ← mrf2：4
+  vpop ← mrf3：4
+
+## bf16[16,256] @ bf16[256,128]
+  与精确结果逐元素一致：True
+  vadd.8x128.f32：2
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatmul.packed.8x128.f16 → mrf1：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vmatpush.packed.8x128.f16 → gsfn1：8
+  vpackc.8x128.f32.f16：2
+  vpop ← mrf0：2
+  vpop ← mrf1：2
+  vunpackl.8x128.f16.f32：2
+  vunpacku.8x128.f16.f32：2
+
+## bf16[16,128] @ bf16[128,256]
+  与精确结果逐元素一致：True
+  vdwg.128x128.f16 gmr0 ← gsfn0：1
+  vdwg.128x128.f16 gmr1 ← gsfn1：1
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatmul.packed.8x128.f16 → mrf1：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vmatpush.packed.8x128.f16 → gsfn1：8
+  vpackc.8x128.f32.f16：16
+  vpop ← mrf0：2
+  vpop ← mrf1：2
+  vunpackl.8x128.f16.f32：16
+  vunpacku.8x128.f16.f32：16
+
+## int8[32,128] @ int8[128,128]：编译失败
+INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `matmul` HLO name `matmul.1`: E2001: CompileTimeMosaicUnsupportedRhsType: Unsupported matmul RHS type on target: vector<128x128xi8>
+

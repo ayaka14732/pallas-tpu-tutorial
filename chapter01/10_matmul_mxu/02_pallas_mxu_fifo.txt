@@ -1,0 +1,16 @@
+## RHS 复用
+  第 0 块 LHS：与精确结果一致 True，非零元素 2046/2046
+  第 1 块 LHS：与精确结果一致 False，非零元素 0/2043
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatmul.packed.dwg.8x128.f16 → (gmr0, gsfn0, mrf0)：1
+  vmatpush.packed.8x128.f16 → gsfn0：8
+  vpop ← mrf0：4
+
+## RHS 以 (N,K) 存放
+  第 0 块 LHS：与精确结果一致 False，非零元素 0/2046
+  第 1 块 LHS：与精确结果一致 False，非零元素 0/2043
+  vmatmul.packed.8x128.f16 → mrf0：1
+  vmatmul.packed.dwg.8x128.f16 → (gmr0, gsfn0, mrf0)：1
+  vmatpush.packed.xpose.8x128.f16 → gsft0：8
+  vpop ← mrf0：4
+
