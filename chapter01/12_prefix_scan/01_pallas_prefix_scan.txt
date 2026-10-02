@@ -1,0 +1,16 @@
+## jnp.cumsum(x, axis=1)：编译失败：Unimplemented primitive in Pallas TPU lowering for tc: cumsum. Please file an issue at https://github.com/jax-ml/jax/issues/new/choose.
+
+## jnp.cumsum(x, axis=0)：编译失败：Unimplemented primitive in Pallas TPU lowering for tc: cumsum. Please file an issue at https://github.com/jax-ml/jax/issues/new/choose.
+
+## 手写 Hillis–Steele，沿 lane：与 NumPy 结果一致 True
+  vadd.8x128.f32×7、vand.8x128.u32×1、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vpop.8x128×7、vrot.0.8x128×2、vrot.1.8x128×2、vrot.2.8x128×2、vrot.3.8x128×1、vsel.8x128×7
+
+## 手写 Hillis–Steele，沿 sublane：与 NumPy 结果一致 True
+  vadd.8x128.f32×3、vlaneseq.8x128.u32×1、vlt.8x128.s32×3、vrot.slane.down.8x128.u32×17、vsel.8x128×3、vshrl.8x128.s32×1
+
+## 手写后缀和，沿 sublane：与 NumPy 结果一致 True
+  vadd.8x128.f32×3、vge.8x128.s32×3、vlaneseq.8x128.u32×1、vrot.slane.down.8x128.u32×7、vsel.8x128×3、vshrl.8x128.s32×1
+
+## 手写 Hillis–Steele，沿 lane，bf16 输入：与 NumPy 结果一致 True
+  vadd.8x128.f32×7、vand.8x128.u32×1、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vpop.8x128×7、vrot.0.8x128×2、vrot.1.8x128×2、vrot.2.8x128×2、vrot.3.8x128×1、vsel.8x128×7、vunpackl.8x128.f16.f32×1
+

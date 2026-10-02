@@ -1,0 +1,6 @@
+## jnp.cumsum(x, axis=1)：与 NumPy 结果一致 True；HLO 段共 237 个 bundle：%reduce_window_sum.1 = reduce-window(%x.1, %constant.2)
+  vadd.8x128.f32×129、vmov.8x128×1、vpop.8x128×17、vxpose.0.8x128×7、vxpose.0.end.8x128×1、vxpose.0.start.end.8x128×1、vxpose.2.8x128×7、vxpose.2.start.8x128×1
+
+## jnp.cumsum(x, axis=0)：与 NumPy 结果一致 True；HLO 段共 51 个 bundle：%reduce_window_sum.1 = reduce-window(%x.1, %constant.2)
+  vadd.8x128.f32×9、vmov.8x128×1
+

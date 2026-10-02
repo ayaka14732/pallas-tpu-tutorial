@@ -1,0 +1,66 @@
+## broadcast_to：数值检查通过；vld 16 条，vadd 7 条，vst 16 条
+  vld: vld.8x128 v0, [vmem:0x0, sm=1] ;
+{ vst: vst.8x128 [vmem:0x10], v0 ;
+  vld: vld.8x128 v1, [vmem:0x1, sm=1] ;
+{ vst: vst.8x128 [vmem:0x18], v1 ;
+  vld: vld.8x128 v2, [vmem:0x2, sm=1] ;
+{ vst: vst.8x128 [vmem:0x20], v2 ;
+  vld: vld.8x128 v3, [vmem:0x3, sm=1] ;
+{ vst: vst.8x128 [vmem:0x28], v3 ;
+  vld: vld.8x128 v4, [vmem:0x4, sm=1] ;
+{ vst: vst.8x128 [vmem:0x30], v4 ;
+  vld: vld.8x128 v5, [vmem:0x5, sm=1] ;
+{ vst: vst.8x128 [vmem:0x38], v5 ;
+  vld: vld.8x128 v6, [vmem:0x6, sm=1] ;
+{ vst: vst.8x128 [vmem:0x40], v6 ;
+  vld: vld.8x128 v7, [vmem:0x7, sm=1] ;
+{ vst: vst.8x128 [vmem:0x48], v7 ;
+  vld: vld.8x128 v8, [vmem:0x10, ss=0] ;
+{ vst: vst.8x128 [vmem:0x8, sm=1], v8 ;
+  vld: vld.8x128 v9, [vmem:0x18, ss=0] ;
+{ va1: vadd.8x128.f32 v10, v9, v8 ;
+  vld: vld.8x128 v11, [vmem:0x20, ss=0] ;
+{ vld: vld.8x128 v12, [vmem:0x28, ss=0] ;
+{ va1: vadd.8x128.f32 v13, v11, v10 ;
+  vst: vst.8x128 [vmem:0x9, sm=1], v10 ;
+  vld: vld.8x128 v14, [vmem:0x30, ss=0] ;
+{ vld: vld.8x128 v16, [vmem:0x38, ss=0] ;
+{ va1: vadd.8x128.f32 v15, v12, v13 ;
+  vst: vst.8x128 [vmem:0xa, sm=1], v13 ;
+  vld: vld.8x128 v18, [vmem:0x40, ss=0] ;
+{ vld: vld.8x128 v20, [vmem:0x48, ss=0] ;
+{ va1: vadd.8x128.f32 v17, v14, v15 ;
+  vst: vst.8x128 [vmem:0xb, sm=1], v15 }
+{ va1: vadd.8x128.f32 v19, v16, v17 ;
+  vst: vst.8x128 [vmem:0xc, sm=1], v17 }
+{ va1: vadd.8x128.f32 v21, v18, v19 ;
+  vst: vst.8x128 [vmem:0xd, sm=1], v19 }
+{ va1: vadd.8x128.f32 v22, v20, v21 ;
+  vst: vst.8x128 [vmem:0xe, sm=1], v21 }
+{ vst: vst.8x128 [vmem:0xf, sm=1], v22 }
+
+## stride=0：数值检查通过；vld 8 条，vadd 7 条，vst 8 条
+  vld: vld.8x128 v0, [vmem:0x0, ss=0] ;
+{ vst: vst.8x128 [vmem:0x8, sm=1], v0 ;
+  vld: vld.8x128 v1, [vmem:0x1, ss=0] ;
+{ va1: vadd.8x128.f32 v2, v1, v0 ;
+  vld: vld.8x128 v3, [vmem:0x2, ss=0] ;
+{ vld: vld.8x128 v4, [vmem:0x3, ss=0] ;
+{ va1: vadd.8x128.f32 v5, v3, v2 ;
+  vst: vst.8x128 [vmem:0x9, sm=1], v2 ;
+  vld: vld.8x128 v6, [vmem:0x4, ss=0] ;
+{ vld: vld.8x128 v8, [vmem:0x5, ss=0] ;
+{ va1: vadd.8x128.f32 v7, v4, v5 ;
+  vst: vst.8x128 [vmem:0xa, sm=1], v5 ;
+  vld: vld.8x128 v10, [vmem:0x6, ss=0] ;
+{ vld: vld.8x128 v12, [vmem:0x7, ss=0] ;
+{ va1: vadd.8x128.f32 v9, v6, v7 ;
+  vst: vst.8x128 [vmem:0xb, sm=1], v7 }
+{ va1: vadd.8x128.f32 v11, v8, v9 ;
+  vst: vst.8x128 [vmem:0xc, sm=1], v9 }
+{ va1: vadd.8x128.f32 v13, v10, v11 ;
+  vst: vst.8x128 [vmem:0xd, sm=1], v11 }
+{ va1: vadd.8x128.f32 v14, v12, v13 ;
+  vst: vst.8x128 [vmem:0xe, sm=1], v13 }
+{ vst: vst.8x128 [vmem:0xf, sm=1], v14 }
+
