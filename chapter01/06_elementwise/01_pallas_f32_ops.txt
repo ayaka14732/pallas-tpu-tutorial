@@ -1,0 +1,17 @@
+x + y：最大误差 0 ULP，最大绝对误差 2.4e-07；vadd.8x128.f32×1
+x - y：最大误差 0 ULP，最大绝对误差 2.4e-07；vsub.8x128.f32×1
+x * y：最大误差 0 ULP，最大绝对误差 4.8e-07；vmul.8x128.f32×1
+x * y + 1：最大误差 21 ULP，最大绝对误差 7.1e-07；vadd.8x128.f32×1、vmul.8x128.f32×1
+maximum(x, y)：最大误差 0 ULP，最大绝对误差 0.0e+00；vmax.8x128.f32×1
+-x：最大误差 0 ULP，最大绝对误差 0.0e+00；vsub.8x128.f32×1
+abs(x)：最大误差 0 ULP，最大绝对误差 0.0e+00；vand.8x128.u32×1
+x / y：最大误差 2 ULP，最大绝对误差 1.0e-06；vadd.8x128.f32×1、vand.8x128.u32×2、veq.8x128.f32×1、vmor.8x128.u1×1、vmul.8x128.f32×3、vor.8x128.u32×1、vpop.8x128×1、vrcp.8x128.f32×1、vsel.8x128×2、vsub.8x128.f32×1、vweird.8x128.f32×2
+1 / y：最大误差 1 ULP，最大绝对误差 2.1e-07；vadd.8x128.f32×1、vand.8x128.u32×2、veq.8x128.f32×1、vmor.8x128.u1×1、vmul.8x128.f32×2、vor.8x128.u32×1、vpop.8x128×1、vrcp.8x128.f32×1、vsel.8x128×2、vsub.8x128.f32×1、vweird.8x128.f32×2
+exp(x)：最大误差 47 ULP，最大绝对误差 1.8e-04；vmul.8x128.f32×1、vpop.8x128×1、vpow2.8x128.f32×1
+exp2(x)：最大误差 57 ULP，最大绝对误差 5.5e-05；vpop.8x128×1、vpow2.8x128.f32×1
+log(y)：最大误差 3652 ULP，最大绝对误差 1.0e-04；vlog2.8x128.f32×1、vmul.8x128.f32×1、vpop.8x128×1
+sqrt(y)：最大误差 2 ULP，最大绝对误差 2.4e-07；vand.8x128.u32×1、veq.8x128.f32×2、vmul.8x128.f32×5、vpop.8x128×1、vrsqrt.8x128.f32×1、vsel.8x128×2、vsub.8x128.f32×1
+rsqrt(y)：最大误差 2 ULP，最大绝对误差 1.7e-07；vmor.8x128.u1×1、vmul.8x128.f32×4、vpop.8x128×1、vrsqrt.8x128.f32×1、vsel.8x128×1、vsub.8x128.f32×1、vweird.8x128.f32×2
+tanh(x)：最大误差 710 ULP，最大绝对误差 4.2e-05；vpop.8x128×1、vtanh.8x128.f32×1
+sigmoid(x)：最大误差 58 ULP，最大绝对误差 9.5e-07；vadd.8x128.f32×2、vand.8x128.u32×2、veq.8x128.f32×1、vmor.8x128.u1×1、vmul.8x128.f32×3、vor.8x128.u32×1、vpop.8x128×2、vpow2.8x128.f32×1、vrcp.8x128.f32×1、vsel.8x128×2、vsub.8x128.f32×1、vweird.8x128.f32×2
+sin(x)：最大误差 2 ULP，最大绝对误差 8.7e-08；vadd.8x128.f32×6、vadd.8x128.s32×18、vand.8x128.u32×17、vclz×1、vcvt.8x128.f32.s32×15、vcvt.8x128.s32.f32×11、veq.8x128.s32×2、vf32.e.s32×1、vf32.f32×1、vf32.s.s32×1、vge.8x128.s32×1、vimm.8x128.s32×6、vle.8x128.f32×1、vle.8x128.s32×1、vlt.8x128.s32×7、vmul.8x128.f32×24、vor.8x128.u32×13、vsel.8x128×23、vshll.8x128.s32×14、vshrl.8x128.s32×25、vsub.8x128.s32×6、vweird.8x128.f32×1、vxor.8x128.u32×3

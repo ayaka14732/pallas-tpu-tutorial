@@ -1,0 +1,12 @@
+where(x > y, x, y)：与 CPU 结果一致：True；用到的掩码寄存器：['vm0']
+  vgt.8x128.f32×1、vsel.8x128×1
+where(x > 0, x, 0.1 * x)：与 CPU 结果一致：True；用到的掩码寄存器：['vm0']
+  vgt.8x128.f32×1、vmul.8x128.f32×1、vsel.8x128×1
+where((x > 0) & (y > 0), x, y)：与 CPU 结果一致：True；用到的掩码寄存器：['vm0', 'vm1']
+  vgt.8x128.f32×2、vsel.8x128×2
+where((x > 0) | ~(y > 0), x, y)：与 CPU 结果一致：True；用到的掩码寄存器：['vm0', 'vm1', 'vm2', 'vm3', 'vm4']
+  veq.8x128.s32×1、vgt.8x128.f32×2、vmor.8x128.u1×1、vmxor.8x128.u1×1、vsel.8x128×1
+同时活跃 6 个掩码：与 CPU 结果一致：True；用到的掩码寄存器：['vm0', 'vm1', 'vm2', 'vm3', 'vm4', 'vm5']
+  vadd.8x128.f32×10、vgt.8x128.f32×6、vmul.8x128.f32×6、vsel.8x128×12、vsub.8x128.f32×6
+同时活跃 12 个掩码：与 CPU 结果一致：True；用到的掩码寄存器：['vm0', 'vm1', 'vm2', 'vm3', 'vm4', 'vm5', 'vm6', 'vm7']
+  vadd.8x128.f32×22、vgt.8x128.f32×13、vimm.8x128.s32×4、vmul.8x128.f32×12、vsel.8x128×28、vsmask×4、vsub.8x128.f32×12

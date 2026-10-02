@@ -1,0 +1,6 @@
+x / y：最大误差 2 ULP；vadd.8x128.f32×1、vand.8x128.u32×2、veq.8x128.f32×1、vmor.8x128.u1×1、vmul.8x128.f32×3、vor.8x128.u32×1、vpop.8x128×1、vrcp.8x128.f32×1、vsel.8x128×2、vsub.8x128.f32×1、vweird.8x128.f32×2
+exp(x)：最大误差 47 ULP；vmul.8x128.f32×1、vpop.8x128×1、vpow2.8x128.f32×1
+log(y)：最大误差 3652 ULP；vlog2.8x128.f32×1、vmul.8x128.f32×1、vpop.8x128×1
+tanh(x)：最大误差 710 ULP；vpop.8x128×1、vtanh.8x128.f32×1
+sin(x)：最大误差 2 ULP；vadd.8x128.f32×6、vadd.8x128.s32×18、vand.8x128.u32×17、vclz×1、vcvt.8x128.f32.s32×15、vcvt.8x128.s32.f32×11、veq.8x128.s32×2、vf32.e.s32×1、vf32.f32×1、vf32.s.s32×1、vge.8x128.s32×1、vimm.8x128.s32×6、vle.8x128.f32×1、vle.8x128.s32×1、vlt.8x128.s32×7、vmul.8x128.f32×24、vor.8x128.u32×13、vsel.8x128×23、vshll.8x128.s32×14、vshrl.8x128.s32×25、vsub.8x128.s32×6、vweird.8x128.f32×1、vxor.8x128.u32×3
+x * y + 1：最大误差 21 ULP；vadd.8x128.f32×1、vmul.8x128.f32×1

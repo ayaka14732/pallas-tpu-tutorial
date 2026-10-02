@@ -1,0 +1,18 @@
+x + y：与 CPU 结果一致：True；vadd.8x128.s32×1
+x - y：与 CPU 结果一致：True；vsub.8x128.s32×1
+x * y：与 CPU 结果一致：True；vadd.8x128.s32×5、vand.8x128.u32×4、vcvt.8x128.f32.s32×6、vcvt.8x128.s32.f32×6、vmul.8x128.f32×6、vshll.8x128.s32×2、vshrl.8x128.s32×4
+x & y：与 CPU 结果一致：True；vand.8x128.u32×1
+x | y：与 CPU 结果一致：True；vor.8x128.u32×1
+x ^ y：与 CPU 结果一致：True；vxor.8x128.u32×1
+x << 3：与 CPU 结果一致：True；vshll.8x128.s32×1
+x >> 3（逻辑）：与 CPU 结果一致：True；vshrl.8x128.s32×1
+x << y：与 CPU 结果一致：True；vand.8x128.u32×1、vshll.8x128.s32×1
+maximum(x, y)：编译失败：INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `elementwise` HLO name `elementwise.1`: failed to legalize operation 'arith.maxui': %84 = "arith.maxui"(%78, %83) : (vector<8x128xi32>, vector<8x128xi32>) -> vector<8x128xi32>
+population_count(x)：与 CPU 结果一致：True；vpcnt×1
+clz(x)：与 CPU 结果一致：True；vclz×1
+x // y：与 CPU 结果一致：True；vadd.8x128.s32×32、vge.8x128.s32×32、vor.8x128.u32×32、vsel.8x128×63、vshll.8x128.s32×63、vshrl.8x128.s32×32、vsub.8x128.s32×31、vxor.8x128.u32×33
+int32 maximum(x, y)：与 CPU 结果一致：True；vgt.8x128.s32×1、vsel.8x128×1
+int32 x >> 3（算术）：与 CPU 结果一致：True；vshra.8x128.s32×1
+int32 x * y：与 CPU 结果一致：True；vadd.8x128.s32×5、vand.8x128.u32×4、vcvt.8x128.f32.s32×6、vcvt.8x128.s32.f32×6、vmul.8x128.f32×6、vshll.8x128.s32×2、vshrl.8x128.s32×4
+int32 x // y：与 CPU 结果一致：True；vadd.8x128.s32×33、vge.8x128.s32×32、vgt.8x128.s32×2、vimm.8x128.s32×1、vlt.8x128.s32×2、vmxor.8x128.u1×1、vne.8x128.s32×3、vor.8x128.u32×32、vsel.8x128×75、vshll.8x128.s32×63、vshrl.8x128.s32×32、vsub.8x128.s32×38、vxor.8x128.u32×33
+int32 x % y：与 CPU 结果一致：True；vadd.8x128.s32×32、veq.8x128.s32×1、vge.8x128.s32×32、vlt.8x128.s32×3、vmxor.8x128.u1×1、vne.8x128.s32×1、vor.8x128.u32×32、vsel.8x128×69、vshll.8x128.s32×62、vshrl.8x128.s32×32、vsub.8x128.s32×35、vxor.8x128.u32×33
