@@ -6,5 +6,5 @@ bundle 516：misc: vsyncadd.s32 [sflag:45], -1 → vnop
 { misc: vnop }
   misc: vnop }
 { misc: vsyncadd.remote.s32 [sflag:s2], 1 }
-{ misc: vwait.ge [sflag:45], 1 }
-{ misc: vsyncadd.s32 [sflag:45], -1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+{ misc: vsyncadd.s32 [sflag:45], -1 ;

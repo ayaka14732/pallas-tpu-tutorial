@@ -131,17 +131,21 @@ def find_bundles(serialized: bytes, text: str, *, encoding: str = 'canonical') -
     spans = _bundle_spans(lines)
     return [pc for pc in pallas_bundles(serialized) if text in '\n'.join(lines[spans[pc][0]:spans[pc][1] + 1])]
 
-def edit_bundles(serialized: bytes, edits: dict[int, tuple[str, str]], *, encoding: str = 'canonical') -> bytes:
-    """只在指定编号的 bundle 内做文本替换：edits[pc] = (原文本, 新文本)，原文本在该 bundle 中必须恰好出现一次。"""
+def edit_bundles(serialized: bytes, edits: dict[int, tuple[str, str]]) -> bytes:
+    """只在指定编号的 bundle 内做文本替换：edits[pc] = (原文本, 新文本)，原文本在该 bundle 中必须恰好出现一次。
+
+    使用精确编码的清单，其余 bundle 逐字节保持不变；被修改的 bundle 去掉 `.encoding` 约束，由汇编器为它重新选择编码。
+    """
     (record, index, image), = executable_programs(serialized)
-    lines = format_assembly(image, target=TARGET, encoding=encoding).splitlines()
+    lines = format_assembly(image, target=TARGET).splitlines()
     spans = _bundle_spans(lines)
     # 从后往前改，前面 bundle 的行号不受影响。
     for pc, (old, new) in sorted(edits.items(), reverse=True):
         start, end = spans[pc]
         bundle = '\n'.join(lines[start:end + 1])
         assert bundle.count(old) == 1, (pc, bundle)
-        lines[start:end + 1] = bundle.replace(old, new).split('\n')
+        bundle = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', bundle.replace(old, new))
+        lines[start:end + 1] = bundle.split('\n')
     return replace_executable_programs(serialized, {(record, index): assemble_listing('\n'.join(lines))})
 
 def insert_bundles(serialized: bytes, insertions: dict[int, str]) -> bytes:

@@ -1,0 +1,9 @@
+## 载体：两颗芯片交换 TC VMEM 中的数据，数值检查通过
+{ s0: sor.u32 s21, 0x88008000, s17 ;
+{ s0: dma.general [vmem:s23], [vmem:s9], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s24], dst_flag=[sflag:s0], ici_dest=s21 }
+
+## 改写后：数据经 TC VMEM → 本芯片 CMEM → 对方 CMEM → 对方 TC VMEM，20 组输入的数值检查全部通过
+{ s0: dma.simple [vmem:s9], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ s0: sor.u32 s21, 0x80008000, s17 ;
+{ s0: dma.general [cmem:s26], [cmem:s25], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s24], dst_flag=[sflag:s0], ici_dest=s21 }
+{ s0: dma.simple [hbm:s1], [vmem:s23], length=8, dst_flag=[sflag:52] }

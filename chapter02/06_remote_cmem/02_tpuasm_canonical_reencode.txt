@@ -1,0 +1,2 @@
+## encoding='exact'：结果正确：True
+## encoding='canonical'：canonical 编码改变了 102 / 970 个 bundle 的机器字节；60 秒内没有返回，程序挂起
