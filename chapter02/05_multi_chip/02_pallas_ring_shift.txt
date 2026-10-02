@@ -1,0 +1,5 @@
+## jax.make_mesh 的顺序：mesh 中依次为 device [0, 2, 1, 3]，坐标 [(0, 0), (0, 1), (1, 0), (1, 1)]；环上每一步的跳数 [1, 2, 1, 2]
+  一轮数值检查通过；每轮约 2.99 µs
+## 物理环的顺序：mesh 中依次为 device [0, 1, 3, 2]，坐标 [(0, 0), (1, 0), (1, 1), (0, 1)]；环上每一步的跳数 [1, 1, 1, 1]
+  一轮数值检查通过；每轮约 2.43 µs
+{ s0: dma.general [vmem:s3], [vmem:s13], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s4], dst_flag=[sflag:s30], ici_dest=s2 }

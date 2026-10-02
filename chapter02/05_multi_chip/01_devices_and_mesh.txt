@@ -1,0 +1,8 @@
+jax.devices()：
+  id=0，coords=[0, 0, 0]，core_on_chip=0，num_cores=2，process_index=0
+  id=1，coords=[1, 0, 0]，core_on_chip=0，num_cores=2，process_index=0
+  id=2，coords=[0, 1, 0]，core_on_chip=0，num_cores=2，process_index=0
+  id=3，coords=[1, 1, 0]，core_on_chip=0，num_cores=2，process_index=0
+jax.make_mesh((4,), ...) 中第 i 个位置的 device id： [0, 2, 1, 3]
+对应的芯片坐标： [(0, 0, 0), (0, 1, 0), (1, 0, 0), (1, 1, 0)]
+jax.make_mesh((2, 2), ...) 的 device id： [[0, 1], [2, 3]]
