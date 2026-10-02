@@ -1,0 +1,88 @@
+数值检查通过：输出的第 0 块来自 TensorCore 1，第 1 块来自 TensorCore 0
+dma.general 1、dma.simple 2、vsyncadd.remote 3、vwait.ge 7
+# function jit(exchange)/exchange/mpmd_map [symbol 4, exchange.1]; image bundles [504, 559)
+{ misc: vtrace 0x80000000 }
+{ s0: simm.s32 s1, 0 }  # materialized constant
+# entry bundle: %exchange.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s1: sld s7, [smem:0x0] }
+{ s0: sadd.s32 s8, 1, s6 }
+{ s0: sand.u32 s9, 0x1, s8 ;  # smod.u32 w/div 2
+  s1: sand.u32 s10, 0xfff, s7 }
+{ s0: sand.u32 s11, 0x3, s9 ;
+  s1: sshll.u32 s13, s10, 0x12 }
+{ s0: sshll.u32 s12, s11, 0x10 }
+{ s0: sadd.s32 s14, 131072, s12 }
+{ s0: sshrl.u32 s15, s14, 0x2 }
+{ s0: sor.u32 s16, 0x2d, s15 }
+{ s0: sor.u32 s17, s16, s13 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ s0: sshll.u32 s18, s6, 0x3 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:67 [dma_start; LLO 106] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:74 [dma_wait; LLO 106] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:67 [dma_start; LLO 106] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:74 [dma_wait; LLO 106]
+  s1: simm.s32 s22, 0 ;  # materialized constant
+  misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 ; s1.y = lo(imm0) } }
+{ s0: sadd.s32 s21, s18, s0 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:67 [dma_start; LLO 22] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:74 [dma_wait; LLO 22]
+{ s0: dma.simple [vmem:s22], [hbm:s21], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:74 [dma_wait; LLO 114]
+  .encoding { misc.value = imm2 } }
+{ s0: ssub.s32 s23, 1, s6 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:59-47:67 [sub; LLO 35] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:51:115-51:123 [sub; LLO 35] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:43:12-43:74 [dma_wait; LLO 115]
+  .encoding { misc.value = imm2 } }
+{ s0: sand.u32 s24, 0x3, s23 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 38]
+{ s0: sshll.u32 s25, s24, 0x10 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 40]
+{ s0: sadd.s32 s26, 131072, s25 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 41]
+{ s0: sshrl.u32 s27, s26, 0x2 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 42]
+{ s0: sor.u32 s28, 0x8, s27 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 43]
+{ misc: vsyncadd.remote.s32 [sflag:s28], 1 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:47:12-47:69 [semaphore_signal; LLO 45]
+{ misc: vsyncadd.s32 [sflag:8], -1 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:48:12-48:39 [semaphore_wait; LLO 47]
+  .encoding { misc.value = imm2 } }
+{ s0: sshll.u32 s29, s23, 0x1a ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28
+  s1: sshll.u32 s30, s23, 0xd ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28
+  misc: vwait.ge [sflag:8], 0 }
+{ s0: sadd.s32 s2, 134217728, s29 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 108]
+  s1: sadd.s32 s3, 16384, s30 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 110]
+  .encoding { s1.y = lo(imm1) } }
+{ s0: sor.u32 s4, 0x80008000, s2 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 75]
+  s1: sor.u32 s0, 0x36, s3 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 84]
+{ s0: sand.u32 s5, 0xfffff000, s4 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 79]
+  s1: simm.s32 s7, 8 ;  # materialized constant
+  .encoding { s1.y = lo(imm1) } }
+{ s0: simm.s32 s8, 53 }  # materialized constant
+{ s0: dma.general [vmem:s7], [vmem:s22], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s8], dst_flag=[sflag:s0], ici_dest=s5 }  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:52:12-52:28 [dma_start; LLO 86] | vmem-to-vmem
+{ misc: vwait.ge [sflag:53], 8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:53:12-53:32 [dma_wait; LLO 116]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:53], -8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:53:12-53:32 [dma_wait; LLO 117]
+  .encoding { misc.value = imm2 } }
+{ misc: vwait.ge [sflag:54], 8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:54:12-54:32 [dma_wait; LLO 118]
+  .encoding { misc.value = imm2 } }
+{ s0: sadd.s32 s11, s18, s1 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:67 [dma_start; LLO 90] | chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:74 [dma_wait; LLO 90]
+  misc: vsyncadd.s32 [sflag:54], -8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:54:12-54:32 [dma_wait; LLO 119]
+  .encoding { misc.value = imm2 } }
+{ s0: dma.simple [hbm:s11], [vmem:s7], length=8, dst_flag=[sflag:55] }
+{ misc: vwait.ge [sflag:55], 8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:74 [dma_wait; LLO 120]
+  .encoding { misc.value = imm2 } }
+# exit bundle: %exchange.1 = custom-call(%x_hbm.1)
+{ misc: vsyncadd.s32 [sflag:55], -8 ;  # chapter02/04_core_remote_dma/01_pallas_core_exchange.py:55:12-55:74 [dma_wait; LLO 121]
+  .encoding { misc.value = imm2 } }
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s17, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(exchange)/exchange/mpmd_map [symbol 4, exchange.1]

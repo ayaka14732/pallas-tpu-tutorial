@@ -1,0 +1,11 @@
+## TensorCore 1 等待信号：TensorCore 0 的结果 200 次全部正确；TensorCore 1 的结果错误 0 次
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vsyncadd.remote.s32 [sflag:s24], 1 }
+{ misc: vsyncadd.s32 [sflag:53], -1 ;
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+
+## TensorCore 1 不等待：TensorCore 0 的结果 200 次全部正确；TensorCore 1 的结果错误 200 次
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vsyncadd.remote.s32 [sflag:s24], 1 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+
