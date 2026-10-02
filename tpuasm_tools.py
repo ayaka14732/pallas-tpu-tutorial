@@ -41,8 +41,8 @@ def full_listing(serialized: bytes) -> str:
     source_map, = executable_source_maps(serialized)
     return format_assembly(image, target=TARGET, source_map=source_map).replace(f'{ROOT}/', '')
 
-def kernel_listing(compiled: Compiled | bytes) -> str:
-    """只保留编译器归属到 HLO 指令的代码：Pallas kernel 的函数段，以及 XLA fusion 的 entry 到 exit 之间；中间被省略的 runtime 代码记为一行注释。"""
+def kernel_listing(compiled: Compiled | bytes, *, pallas_only: bool = False) -> str:
+    """只保留编译器归属到 HLO 指令的代码：Pallas kernel 的函数段，以及 XLA fusion 的 entry 到 exit 之间；中间被省略的 runtime 代码记为一行注释。pallas_only=True 时只保留 Pallas kernel 的函数段。"""
     serialized = compiled if isinstance(compiled, bytes) else serialize(compiled)
     lines: list[str] = []
     in_function = False
@@ -51,9 +51,9 @@ def kernel_listing(compiled: Compiled | bytes) -> str:
     for line in full_listing(serialized).splitlines():
         if line.startswith('# function '):
             in_function = True
-        if line.startswith('# entry bundle'):
+        if line.startswith('# entry bundle') and not pallas_only:
             in_hlo = True
-        if in_function or in_hlo or line.startswith('# exit bundle'):
+        if in_function or in_hlo or line.startswith('# exit bundle') and not pallas_only:
             if lines and skipped:
                 lines.append(f'# ... 省略 runtime 代码 {skipped} 个 bundle')
             skipped = 0

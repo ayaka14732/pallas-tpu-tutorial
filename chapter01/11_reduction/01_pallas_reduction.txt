@@ -1,0 +1,135 @@
+## sum(x, axis=1)，f32[8,128]：与 CPU 结果一致 True
+  vadd.xlane.0.8x128.f32×1、vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vpop.8x128×1
+  va0: vlaneseq.8x128.u32 v1 ;
+{ va0: vand.8x128.u32 v2, 0x7f, v1 ;
+  vx0: vadd.xlane.0.8x128.f32 trf0, v0 }
+{ va0: veq.8x128.s32 vm0, v2, 0 }
+{ vr0: vpop.8x128 v3, trf0 }
+
+## max(x, axis=1)，f32[8,128]：与 CPU 结果一致 True
+  vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.xlane.0.8x128.f32×1、vpop.8x128×1
+  va0: vlaneseq.8x128.u32 v1 ;
+{ va0: vand.8x128.u32 v2, 0x7f, v1 ;
+  vx0: vmax.xlane.0.8x128.f32 trf0, v0 }
+{ va0: veq.8x128.s32 vm0, v2, 0 }
+{ vr0: vpop.8x128 v3, trf0 }
+
+## sum(x, axis=0)，f32[8,128]：与 CPU 结果一致 True
+  vadd.8x128.f32×3、vrot.slane.down.8x128.u32×7
+{ va0: vrot.slane.down.8x128.u32 v1, v0 }
+{ va0: vrot.slane.down.8x128.u32 v2, v1 }
+{ va0: vrot.slane.down.8x128.u32 v3, v2 }
+{ va0: vrot.slane.down.8x128.u32 v4, v3 }
+{ va1: vadd.8x128.f32 v5, v4, v0 }
+{ va0: vrot.slane.down.8x128.u32 v6, v5 }
+{ va0: vrot.slane.down.8x128.u32 v7, v6 }
+{ va1: vadd.8x128.f32 v8, v7, v5 }
+{ va0: vrot.slane.down.8x128.u32 v9, v8 }
+{ va1: vadd.8x128.f32 v10, v9, v8 }
+
+## max(x, axis=0)，f32[8,128]：与 CPU 结果一致 True
+  vmax.8x128.f32×7、vrot.slane.down.8x128.u32×7
+{ va0: vrot.slane.down.8x128.u32 v1, v0 }
+{ va0: vmax.8x128.f32 v2, v0, v1 ;
+  va1: vrot.slane.down.8x128.u32 v3, v1 }
+{ va0: vmax.8x128.f32 v4, v2, v3 ;
+  va1: vrot.slane.down.8x128.u32 v5, v3 }
+{ va0: vmax.8x128.f32 v6, v4, v5 ;
+  va1: vrot.slane.down.8x128.u32 v7, v5 }
+{ va0: vmax.8x128.f32 v8, v6, v7 ;
+  va1: vrot.slane.down.8x128.u32 v9, v7 }
+{ va0: vmax.8x128.f32 v10, v8, v9 ;
+  va1: vrot.slane.down.8x128.u32 v11, v9 }
+{ va0: vmax.8x128.f32 v12, v10, v11 ;
+  va1: vrot.slane.down.8x128.u32 v13, v11 }
+{ va0: vmax.8x128.f32 v14, v12, v13 }
+
+## 手写树形 max，roll 位移 4、2、1：与 CPU 结果一致 True
+  vmax.8x128.f32×3、vrot.slane.down.8x128.u32×17
+{ va0: vrot.slane.down.8x128.u32 v1, v0 }
+{ va0: vrot.slane.down.8x128.u32 v2, v1 }
+{ va0: vrot.slane.down.8x128.u32 v3, v2 }
+{ va0: vrot.slane.down.8x128.u32 v4, v3 }
+{ va0: vmax.8x128.f32 v5, v0, v4 }
+{ va0: vrot.slane.down.8x128.u32 v6, v5 }
+{ va0: vrot.slane.down.8x128.u32 v7, v6 }
+{ va0: vrot.slane.down.8x128.u32 v8, v7 }
+{ va0: vrot.slane.down.8x128.u32 v9, v8 }
+{ va0: vrot.slane.down.8x128.u32 v10, v9 }
+{ va0: vrot.slane.down.8x128.u32 v11, v10 }
+{ va0: vmax.8x128.f32 v12, v5, v11 }
+{ va0: vrot.slane.down.8x128.u32 v13, v12 }
+{ va0: vrot.slane.down.8x128.u32 v14, v13 }
+{ va0: vrot.slane.down.8x128.u32 v15, v14 }
+{ va0: vrot.slane.down.8x128.u32 v16, v15 }
+{ va0: vrot.slane.down.8x128.u32 v17, v16 }
+{ va0: vrot.slane.down.8x128.u32 v18, v17 }
+{ va0: vrot.slane.down.8x128.u32 v19, v18 }
+{ va0: vmax.8x128.f32 v20, v12, v19 }
+
+## 手写树形 max，roll 位移 4、6、7：与 CPU 结果一致 True
+  vmax.8x128.f32×3、vrot.slane.down.8x128.u32×7
+{ va0: vrot.slane.down.8x128.u32 v1, v0 }
+{ va0: vrot.slane.down.8x128.u32 v2, v1 }
+{ va0: vrot.slane.down.8x128.u32 v3, v2 }
+{ va0: vrot.slane.down.8x128.u32 v4, v3 }
+{ va0: vmax.8x128.f32 v5, v0, v4 }
+{ va0: vrot.slane.down.8x128.u32 v6, v5 }
+{ va0: vrot.slane.down.8x128.u32 v7, v6 }
+{ va0: vmax.8x128.f32 v8, v5, v7 }
+{ va0: vrot.slane.down.8x128.u32 v9, v8 }
+{ va0: vmax.8x128.f32 v10, v8, v9 }
+
+## sum(x, axis=0)，f32[64,128]：与 CPU 结果一致 True
+  vadd.8x128.f32×10、vrot.slane.down.8x128.u32×7
+{ va1: vadd.8x128.f32 v3, v1, v0 ;
+{ va1: vadd.8x128.f32 v5, v3, v2 ;
+{ va1: vadd.8x128.f32 v7, v5, v4 ;
+{ va1: vadd.8x128.f32 v9, v7, v6 }
+{ va1: vadd.8x128.f32 v11, v9, v8 }
+{ va1: vadd.8x128.f32 v13, v11, v10 }
+{ va1: vadd.8x128.f32 v14, v13, v12 }
+{ va0: vrot.slane.down.8x128.u32 v15, v14 }
+{ va0: vrot.slane.down.8x128.u32 v16, v15 }
+{ va0: vrot.slane.down.8x128.u32 v17, v16 }
+{ va0: vrot.slane.down.8x128.u32 v18, v17 }
+{ va1: vadd.8x128.f32 v19, v18, v14 }
+{ va0: vrot.slane.down.8x128.u32 v20, v19 }
+{ va0: vrot.slane.down.8x128.u32 v21, v20 }
+{ va1: vadd.8x128.f32 v22, v21, v19 }
+{ va0: vrot.slane.down.8x128.u32 v23, v22 }
+{ va1: vadd.8x128.f32 v24, v23, v22 }
+
+## sum(x)，f32[8,128]：与 CPU 结果一致 True
+  vadd.8x128.f32×3、vadd.xlane.0.8x128.f32×1、vand.8x128.u32×1、veq.8x128.s32×2、vlaneseq.8x128.u32×1、vmand.8x128.u1×1、vmov.8x128×1、vpop.8x128×1、vpush×1、vrot.slane.down.8x128.u32×7、vshrl.8x128.s32×1
+  va0: vlaneseq.8x128.u32 v12 ;
+{ va0: vand.8x128.u32 v14, 0x7f, v12 ;
+  va1: vshrl.8x128.s32 v13, v12, 0x7 ;
+  vx0: vadd.xlane.0.8x128.f32 trf0, v0 }
+{ va0: veq.8x128.s32 vm0, v13, 0 ;
+  va1: veq.8x128.s32 vm1, v14, 0 }
+{ vr0: vpop.8x128 v1, trf0 }
+{ va0: vrot.slane.down.8x128.u32 v2, v1 }
+{ va0: vrot.slane.down.8x128.u32 v3, v2 }
+{ va0: vrot.slane.down.8x128.u32 v4, v3 }
+{ va0: vrot.slane.down.8x128.u32 v5, v4 }
+{ va1: vadd.8x128.f32 v6, v5, v1 }
+{ va0: vrot.slane.down.8x128.u32 v7, v6 }
+{ va0: vrot.slane.down.8x128.u32 v8, v7 }
+{ va1: vadd.8x128.f32 v9, v8, v6 }
+{ va0: vrot.slane.down.8x128.u32 v10, v9 }
+{ va1: vadd.8x128.f32 v11, v10, v9 }
+{ va0: vmov.8x128 v15, s0 }
+
+## sum(x, axis=1)，bf16[16,128]：与 CPU 结果一致 True
+  vadd.xlane.0.8x128.f32×1、vadd.xlane.2.8x128.f32×1、vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vpop.8x128×2、vunpackl.8x128.f16.f32×1、vunpacku.8x128.f16.f32×1
+  va0: vlaneseq.8x128.u32 v3 ;
+{ va0: vunpackl.8x128.f16.f32 v1, v0 ;
+  va1: vunpacku.8x128.f16.f32 v2, v0 }
+{ va0: vand.8x128.u32 v4, 0x7f, v3 }
+{ va0: veq.8x128.s32 vm0, v4, 0 ;
+  vx0: vadd.xlane.2.8x128.f32 trf0, v1 }
+{ vx0: vadd.xlane.0.8x128.f32 trf0, v2 }
+{ vr0: vpop.8x128 v5, trf0 }
+{ vr0: vpop.8x128 v6, trf0 }
+

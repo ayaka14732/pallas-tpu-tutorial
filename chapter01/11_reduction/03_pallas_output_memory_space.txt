@@ -1,0 +1,8 @@
+## out_type=jax.ShapeDtypeStruct((8, 1), jnp.float32)：数值检查通过；kernel 中的 DMA：
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ s0: dma.simple [cmem:s1], [vmem:s10], length=8, dst_flag=[sflag:52] }
+
+## out_type=pltpu.HBM((8, 1), jnp.float32)：数值检查通过；kernel 中的 DMA：
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ s0: dma.simple [hbm:s1], [vmem:s10], length=8, dst_flag=[sflag:52] }
+
