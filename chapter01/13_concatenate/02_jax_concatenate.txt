@@ -1,0 +1,12 @@
+## f32[8, 128] × 2，axis=0：数值检查通过；HLO 段共 66 个 bundle：%pad_maximum_fusion = fusion(%b.1, %a.1)
+  向量指令：vld.8x128×2、vlt.8x128.s32×2、vmax.8x128.f32×1、vmov.8x128×2、vsel.8x128×2、vst.8x128×1；DMA：dma.simple×3
+
+## f32[8, 128] × 2，axis=1：数值检查通过；HLO 段共 66 个 bundle：%pad_maximum_fusion = fusion(%b.1, %a.1)
+  向量指令：vld.8x128×2、vlt.8x128.s32×2、vmax.8x128.f32×1、vmov.8x128×2、vsel.8x128×2、vst.8x128×1；DMA：dma.simple×3
+
+## f32[9, 128] × 2，axis=0：数值检查通过；HLO 段共 102 个 bundle：%pad_maximum_fusion = fusion(%b.1, %a.1)
+  向量指令：vadd.8x128.s32×3、vge.8x128.s32×5、vlaneseq.8x128.u32×1、vld.8x128×5、vlt.8x128.s32×5、vmax.8x128.f32×2、vmov.8x128×8、vrot.slane.down.8x128.u32×14、vsel.8x128×12、vshrl.8x128.s32×1、vsmask×1、vst.8x128×2；DMA：dma.strided×3
+
+## f32[8, 129] × 2，axis=1：数值检查通过；HLO 段共 96 个 bundle：%pad_maximum_fusion = fusion(%b.1, %a.1)
+  向量指令：vadd.8x128.s32×3、vand.8x128.u32×1、vge.8x128.s32×5、vlaneseq.8x128.u32×1、vld.8x128×5、vlt.8x128.s32×6、vmax.8x128.f32×2、vmov.8x128×8、vpop.8x128×2、vrot.0.8x128×1、vrot.2.8x128×1、vsel.8x128×12、vst.8x128×2；DMA：dma.simple×3
+
