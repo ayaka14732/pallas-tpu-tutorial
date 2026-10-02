@@ -1,0 +1,70 @@
+p = [3, 1]：数值检查通过
+p = [5, 0]：数值检查通过
+p = [7, 1]：数值检查通过
+# function jit(select)/select/mpmd_map [symbol 6, select.1]; image bundles [505, 509)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %select.1 = custom-call(%x_hbm.1, %p_hbm.1)
+{ s1: sld s9, [smem:0x1] }
+{ s0: sne.s32 p0, s9, 0 }
+{ s0: @p0 sbr.rel L_0211 }
+# end function jit(select)/select/mpmd_map [symbol 6, select.1]
+{}
+# function jit(select)/select/mpmd_map [symbol 6, select.1]; image bundles [510, 524)
+{ s0: simm.s32 s10, 62 ;  # materialized constant
+  .encoding { s0.y = pair(imm1, imm0) } }
+{ s0: dma.simple [smem:s10], [hbm:s1], length=1, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 1 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:37:12-37:55 [dma_wait; LLO 69]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -1 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:37:12-37:55 [dma_wait; LLO 70]
+  .encoding { misc.value = imm2 } }
+{ s0: sfence }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:37:12-37:55 [dma_wait; LLO 26]
+{ s0: simm.s32 s18, 0 ;  # materialized constant
+  s1: sld s13, [smem:0x3e] ;
+  .encoding { s0.y = lo(imm2) ; s1.address = pair(imm1, imm0) } }
+{ s0: sshll.u32 s14, s13, 0x3 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:39:35-39:48 [mul; LLO 64]
+{ s0: sadd.s32 s17, s14, s0 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:68 [dma_start; LLO 29] | chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:75 [dma_wait; LLO 29]
+{ s0: dma.simple [vmem:s18], [hbm:s17], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:75 [dma_wait; LLO 71]
+  .encoding { misc.value = imm2 } }
+{ s1: sld s19, [smem:0x3f] ;
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:40:12-40:75 [dma_wait; LLO 72]
+  .encoding { misc.value = imm2 ; s1.address = pair(imm1, imm0) } }
+{ s0: sle.s32 p1, s19, 0 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:42:21-42:34 [gt; LLO 66] | chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:42:13-42:35
+{ s0: @p1 sbr.rel L_020e ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:42:13-42:35
+  vld: @!p1 vld.8x128 v0, [vmem:0x0] }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:44:30-44:41 <- 42:13-42:35 [get; LLO 47]
+{ va0: @!p1 vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:44:30-44:47 <- 42:13-42:35 [mul; LLO 48]
+# end function jit(select)/select/mpmd_map [symbol 6, select.1]
+{}
+# function jit(select)/select/mpmd_map [symbol 6, select.1]; image bundles [525, 529)
+{ vst: vst.8x128 [vmem:0x0], v1 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:44:16-44:27 <- 42:13-42:35 [swap; LLO 49]
+  .encoding { vst.opcode = s0 } }
+L_020e:
+{ s0: dma.simple [hbm:s2], [vmem:s18], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:46:12-46:55 [dma_wait; LLO 73]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter01/07_scalar_control_flow/03_pallas_dynamic_window_when.py:46:12-46:55 [dma_wait; LLO 74]
+  .encoding { misc.value = imm2 } }
+# end function jit(select)/select/mpmd_map [symbol 6, select.1]
+# exit bundle: %select.1 = custom-call(%x_hbm.1, %p_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(select)/select/mpmd_map [symbol 6, select.1]; image bundles [530, 546)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s17, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(select)/select/mpmd_map [symbol 6, select.1]

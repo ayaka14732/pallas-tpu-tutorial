@@ -1,0 +1,280 @@
+## Python for：数值检查通过；kernel 段 38 个 bundle，vld 8 条，vmul 8 条
+# function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %unrolled.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_020d }
+# end function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]
+{}
+# function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]; image bundles [508, 525)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:42:12-42:55 [dma_wait; LLO 62]
+  .encoding { misc.value = imm2 } }
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 25]
+  misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:42:12-42:55 [dma_wait; LLO 63]
+  .encoding { misc.value = imm2 } }
+{ va0: vmul.8x128.f32 v1, 2.0, v0 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 26]
+  vld: vld.8x128 v2, [vmem:0x8] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 28]
+{ va0: vmul.8x128.f32 v3, 2.0, v2 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 29]
+  vld: vld.8x128 v4, [vmem:0x10] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 31]
+{ va0: vmul.8x128.f32 v5, 2.0, v4 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 32]
+  vst: vst.8x128 [vmem:0x0], v1 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 27]
+  vld: vld.8x128 v6, [vmem:0x18] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 34]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v7, 2.0, v6 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 35]
+  vst: vst.8x128 [vmem:0x8], v3 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 30]
+  vld: vld.8x128 v8, [vmem:0x20] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 37]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v9, 2.0, v8 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 38]
+  vst: vst.8x128 [vmem:0x10], v5 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 33]
+  vld: vld.8x128 v10, [vmem:0x28] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 40]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v11, 2.0, v10 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 41]
+  vst: vst.8x128 [vmem:0x18], v7 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 36]
+  vld: vld.8x128 v12, [vmem:0x30] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 43]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v13, 2.0, v12 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 44]
+  vst: vst.8x128 [vmem:0x20], v9 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 39]
+  vld: vld.8x128 v14, [vmem:0x38] ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:65 [get; LLO 46]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v15, 2.0, v14 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:42-45:71 [mul; LLO 47]
+  vst: vst.8x128 [vmem:0x28], v11 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 42]
+{ vst: vst.8x128 [vmem:0x30], v13 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 45]
+{ vst: vst.8x128 [vmem:0x38], v15 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:45:16-45:39 [swap; LLO 48]
+{ s0: dma.simple [hbm:s1], [vmem:s7], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:46:12-46:55 [dma_wait; LLO 64]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:46:12-46:55 [dma_wait; LLO 65]
+  .encoding { misc.value = imm2 } }
+# end function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]
+# exit bundle: %unrolled.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]; image bundles [526, 542)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(unrolled)/unrolled/mpmd_map [symbol 4, unrolled.1]
+
+## pl.loop(0, 8)：数值检查通过；kernel 段 35 个 bundle，vld 1 条，vmul 1 条
+# function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %static_loop.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_020a }
+# end function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]
+{}
+# function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]; image bundles [508, 519)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:65:12-65:55 [dma_wait; LLO 69]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s10, 0 ;  # copy for cssa
+  misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:65:12-65:55 [dma_wait; LLO 70]
+  .encoding { misc.value = imm2 } }
+L_0200:
+{ s0: sshll.u32 s11, s10, 0x3 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:70:39-70:44 <- 67:13-67:26 [mul; LLO 55]
+  s1: sadd.s32 s10, 1, s10 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:67:13-67:26 | copy for cssa
+{ s0: sadd.s32 s12, 0, s11 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:71:42-71:65 <- 67:13-67:26 [get; LLO 32] | chapter01/07_scalar_control_flow/02_pallas_loops.py:71:16-71:39 <- 67:13-67:26 [swap; LLO 32]
+  s1: sge.s32 p1, s10, 8 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:67:13-67:26 | loop exit test
+  .encoding { s0.y = lo(imm0) } }
+{ vld: vld.8x128 v0, [vmem:s12] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:71:42-71:65 <- 67:13-67:26 [get; LLO 33]
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:71:42-71:71 <- 67:13-67:26 [mul; LLO 34]
+{ vst: vst.8x128 [vmem:s12], v1 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:71:16-71:39 <- 67:13-67:26 [swap; LLO 35]
+{ s0: @p1 dma.simple [hbm:s1], [vmem:s7], length=64, dst_flag=[sflag:52] }
+{ s0: @!p1 sbr.rel L_0200 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:67:13-67:26
+# end function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]
+{}
+# function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]; image bundles [520, 522)
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:73:12-73:55 [dma_wait; LLO 71]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:73:12-73:55 [dma_wait; LLO 72]
+  .encoding { misc.value = imm2 } }
+# end function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]
+# exit bundle: %static_loop.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]; image bundles [523, 539)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(static_loop)/static_loop/mpmd_map [symbol 4, static_loop.1]
+
+## pl.loop(0, 8, unroll=4)：数值检查通过；kernel 段 37 个 bundle，vld 4 条，vmul 4 条
+# function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %unrolled_loop.1 = custom-call(%x_hbm.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_020c }
+# end function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]
+{}
+# function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]; image bundles [508, 524)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:92:12-92:55 [dma_wait; LLO 105]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s10, 0 ;  # copy for cssa
+  misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:92:12-92:55 [dma_wait; LLO 106]
+  .encoding { misc.value = imm2 } }
+L_0200:
+{ s0: sshll.u32 s11, s10, 0x3 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:97:39-97:44 <- 95:13-95:36 [mul; LLO 82] | chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65
+  s1: sadd.s32 s10, 4, s10 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:95:13-95:36 | copy for cssa
+{ s0: sadd.s32 s12, 0, s11 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65 <- 95:13-95:36 [get; LLO 32] | chapter01/07_scalar_control_flow/02_pallas_loops.py:98:16-98:39 <- 95:13-95:36 [swap; LLO 32]
+  s1: sge.s32 p1, s10, 8 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:95:13-95:36 | loop exit test
+  .encoding { s0.y = lo(imm0) } }
+{ vld: vld.8x128 v0, [vmem:s12] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65 <- 95:13-95:36 [get; LLO 33]
+{ va0: vmul.8x128.f32 v1, 2.0, v0 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:71 <- 95:13-95:36 [mul; LLO 34]
+  vld: vld.8x128 v2, [vmem:s12 + 0x8] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65 <- 95:13-95:36 [get; LLO 84]
+{ va0: vmul.8x128.f32 v3, 2.0, v2 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:71 <- 95:13-95:36 [mul; LLO 40]
+  vld: vld.8x128 v4, [vmem:s12 + 0x10] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65 <- 95:13-95:36 [get; LLO 87]
+{ va0: vmul.8x128.f32 v5, 2.0, v4 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:71 <- 95:13-95:36 [mul; LLO 46]
+  vst: vst.8x128 [vmem:s12], v1 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:16-98:39 <- 95:13-95:36 [swap; LLO 35]
+  vld: vld.8x128 v6, [vmem:s12 + 0x18] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:65 <- 95:13-95:36 [get; LLO 90]
+{ va0: vmul.8x128.f32 v7, 2.0, v6 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:42-98:71 <- 95:13-95:36 [mul; LLO 52]
+  vst: vst.8x128 [vmem:s12 + 0x8], v3 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:16-98:39 <- 95:13-95:36 [swap; LLO 85]
+{ vst: vst.8x128 [vmem:s12 + 0x10], v5 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:16-98:39 <- 95:13-95:36 [swap; LLO 88]
+{ s0: @!p1 sbr.rel L_0200 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:95:13-95:36
+  vst: vst.8x128 [vmem:s12 + 0x18], v7 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:98:16-98:39 <- 95:13-95:36 [swap; LLO 91]
+{ s0: @p1 dma.simple [hbm:s1], [vmem:s7], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:100:12-100:55 [dma_wait; LLO 107]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:100:12-100:55 [dma_wait; LLO 108]
+  .encoding { misc.value = imm2 } }
+# end function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]
+# exit bundle: %unrolled_loop.1 = custom-call(%x_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]; image bundles [525, 541)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(unrolled_loop)/unrolled_loop/mpmd_map [symbol 4, unrolled_loop.1]
+
+## pl.loop(0, n_smem[0])：数值检查通过；kernel 段 43 个 bundle，vld 1 条，vmul 1 条
+# function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]; image bundles [505, 509)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %dynamic_loop.1 = custom-call(%x_hbm.1, %n_hbm.1)
+{ s1: sld s9, [smem:0x1] }
+{ s0: sne.s32 p0, s9, 0 }
+{ s0: @p0 sbr.rel L_0214 }
+# end function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]
+{}
+# function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]; image bundles [510, 521)
+{ s0: simm.s32 s10, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s10], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:119:12-119:55 [dma_wait; LLO 86]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s13, 62 ;  # materialized constant
+  misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:119:12-119:55 [dma_wait; LLO 87]
+  .encoding { misc.value = imm2 ; s0.y = pair(imm1, imm0) } }
+{ s0: dma.simple [smem:s13], [hbm:s1], length=1, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 1 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:121:12-121:55 [dma_wait; LLO 88]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -1 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:121:12-121:55 [dma_wait; LLO 89]
+  .encoding { misc.value = imm2 } }
+{ s0: sfence }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:121:12-121:55 [dma_wait; LLO 38]
+{ s1: sld s16, [smem:0x3e] ;
+  .encoding { s1.address = pair(imm1, imm0) } }
+{ s0: sle.s32 p1, s16, 0 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:123:13-123:34
+{ s0: @p1 sbr.rel L_0211 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:123:13-123:34
+  s1: @!p1 simm.s32 s17, 0 }  # copy for cssa
+# end function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]
+{}
+# function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]; image bundles [522, 528)
+L_020a:
+{ s0: sshll.u32 s18, s17, 0x3 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:125:39-125:44 <- 123:13-123:34 [mul; LLO 71]
+  s1: sadd.s32 s17, 1, s17 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:123:13-123:34 | copy for cssa
+{ s0: sadd.s32 s19, 0, s18 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:126:42-126:65 <- 123:13-123:34 [get; LLO 47] | chapter01/07_scalar_control_flow/02_pallas_loops.py:126:16-126:39 <- 123:13-123:34 [swap; LLO 47]
+  s1: sge.s32 p2, s17, s16 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:123:13-123:34
+  .encoding { s0.y = lo(imm0) } }
+{ vld: vld.8x128 v0, [vmem:s19] }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:126:42-126:65 <- 123:13-123:34 [get; LLO 48]
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:126:42-126:71 <- 123:13-123:34 [mul; LLO 49]
+{ vst: vst.8x128 [vmem:s19], v1 }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:126:16-126:39 <- 123:13-123:34 [swap; LLO 50]
+{ s0: @!p2 sbr.rel L_020a }  # chapter01/07_scalar_control_flow/02_pallas_loops.py:123:13-123:34
+# end function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]
+{}
+# function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]; image bundles [529, 532)
+L_0211:
+{ s0: dma.simple [hbm:s2], [vmem:s10], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:128:12-128:55 [dma_wait; LLO 90]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/07_scalar_control_flow/02_pallas_loops.py:128:12-128:55 [dma_wait; LLO 91]
+  .encoding { misc.value = imm2 } }
+# end function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]
+# exit bundle: %dynamic_loop.1 = custom-call(%x_hbm.1, %n_hbm.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]; image bundles [533, 549)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s17, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(dynamic_loop)/dynamic_loop/mpmd_map [symbol 6, dynamic_loop.1]
+
