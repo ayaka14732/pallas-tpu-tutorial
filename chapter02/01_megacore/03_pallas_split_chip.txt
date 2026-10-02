@@ -1,0 +1,34 @@
+devices： [(0, [0, 0, 0], 0, 1), (1, [0, 0, 0], 1, 1)]
+数值检查通过；kernel 段 16 个 bundle；vld 4、vmul 4、vst 4；vsyncadd.remote 0
+# function scale/mpmd_map [symbol 4, scale.2]; image bundles [483, 499)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %scale.2 = custom-call(%x_hbm.2)
+{ s0: simm.s32 s6, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s6], [hbm:s0], length=32, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 32 ;  # chapter02/01_megacore/03_pallas_split_chip.py:45:12-45:55 [dma_wait; LLO 42]
+  .encoding { misc.value = imm2 } }
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:37 [get; LLO 18]
+  misc: vsyncadd.s32 [sflag:52], -32 ;  # chapter02/01_megacore/03_pallas_split_chip.py:45:12-45:55 [dma_wait; LLO 43]
+  .encoding { misc.value = imm2 } }
+{ va0: vmul.8x128.f32 v1, 2.0, v0 ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:43 [mul; LLO 22]
+  vld: vld.8x128 v2, [vmem:0x8] }  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:37 [get; LLO 19]
+{ va0: vmul.8x128.f32 v3, 2.0, v2 ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:43 [mul; LLO 23]
+  vld: vld.8x128 v4, [vmem:0x10] }  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:37 [get; LLO 20]
+{ va0: vmul.8x128.f32 v5, 2.0, v4 ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:43 [mul; LLO 24]
+  vst: vst.8x128 [vmem:0x0], v1 ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:12-46:23 [swap; LLO 26]
+  vld: vld.8x128 v6, [vmem:0x18] ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:37 [get; LLO 21]
+  .encoding { vst.offset = imm2 } }
+{ va0: vmul.8x128.f32 v7, 2.0, v6 ;  # chapter02/01_megacore/03_pallas_split_chip.py:46:26-46:43 [mul; LLO 25]
+  vst: vst.8x128 [vmem:0x8], v3 }  # chapter02/01_megacore/03_pallas_split_chip.py:46:12-46:23 [swap; LLO 27]
+{ vst: vst.8x128 [vmem:0x10], v5 }  # chapter02/01_megacore/03_pallas_split_chip.py:46:12-46:23 [swap; LLO 28]
+{ vst: vst.8x128 [vmem:0x18], v7 }  # chapter02/01_megacore/03_pallas_split_chip.py:46:12-46:23 [swap; LLO 29]
+{ s0: dma.simple [hbm:s1], [vmem:s6], length=32, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 32 ;  # chapter02/01_megacore/03_pallas_split_chip.py:47:12-47:55 [dma_wait; LLO 44]
+  .encoding { misc.value = imm2 } }
+# exit bundle: %scale.2 = custom-call(%x_hbm.2)
+{ misc: vsyncadd.s32 [sflag:52], -32 ;  # chapter02/01_megacore/03_pallas_split_chip.py:47:12-47:55 [dma_wait; LLO 45]
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function scale/mpmd_map [symbol 4, scale.2]

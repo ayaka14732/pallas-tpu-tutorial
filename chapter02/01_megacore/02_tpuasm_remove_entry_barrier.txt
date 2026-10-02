@@ -1,0 +1,10 @@
+bundle 514：misc: vsyncadd.remote.s32 [sflag:s17], 1 → vnop
+bundle 515：misc: vwait.ge [sflag:45], 1 → vnop
+bundle 516：misc: vsyncadd.s32 [sflag:45], -1 → vnop
+去掉入口汇合后连续运行 100 次，数值检查全部通过；剩余 vsyncadd.remote 1 条（kernel 出口）
+{ misc: vnop }
+{ misc: vnop }
+  misc: vnop }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 }
+{ misc: vsyncadd.s32 [sflag:45], -1 }

@@ -4,8 +4,10 @@
 """
 import os
 
-def initialise_one_chip(chip: int = 0) -> None:
-    """只打开本 host 的第 chip 颗芯片（0–3）；不同 chip 的进程可以同时运行。"""
+def initialise_one_chip(chip: int | None = None) -> None:
+    """只打开本 host 的第 chip 颗芯片（0–3）；不同 chip 的进程可以同时运行。省略 chip 时读环境变量 TPU_TUTORIAL_CHIP，默认 0。"""
+    if chip is None:
+        chip = int(os.environ.get('TPU_TUTORIAL_CHIP', '0'))
     os.environ['TPU_CHIPS_PER_PROCESS_BOUNDS'] = '1,1,1'
     os.environ['TPU_PROCESS_BOUNDS'] = '1,1,1'
     os.environ['TPU_VISIBLE_CHIPS'] = str(chip)

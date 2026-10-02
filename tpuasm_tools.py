@@ -91,11 +91,58 @@ def print_mnemonic_counts(listing: str) -> None:
     for mnemonic in sorted(counts):
         print(f'{mnemonic}: {counts[mnemonic]}')
 
-def replace_listing(serialized: bytes, edit: Callable[[str], str]) -> bytes:
-    """对完整清单做文本改写后重新汇编，替换原程序映像（新旧映像长度必须相同）。"""
+def replace_listing(serialized: bytes, edit: Callable[[str], str], *, encoding: str = 'exact') -> bytes:
+    """对完整清单做文本改写后重新汇编，替换原程序映像（新旧映像长度必须相同）。
+
+    encoding='exact' 的清单带有逐字节还原所需的 `.encoding` 约束，适合只改操作数的数值；把一条指令换成另一条时，原指令的约束可能不再适用，此时用 encoding='canonical'，由汇编器重新选择编码。
+    """
     (record, index, image), = executable_programs(serialized)
-    source = format_assembly(image, target=TARGET)
+    source = format_assembly(image, target=TARGET, encoding=encoding)
     return replace_executable_programs(serialized, {(record, index): assemble_listing(edit(source))})
+
+def _bundle_spans(lines: list[str]) -> list[tuple[int, int]]:
+    """清单中每个 bundle 占据的行区间（含两端）；bundle 从行首的 `{` 开始，到以 `}` 结尾的行结束。"""
+    spans = []
+    start = None
+    for number, line in enumerate(lines):
+        if start is None and line.startswith('{'):
+            start = number
+        if start is not None and line.rstrip().endswith('}'):
+            spans.append((start, number))
+            start = None
+    return spans
+
+def pallas_bundles(serialized: bytes) -> list[int]:
+    """编译器归属到 Pallas kernel 的全部 bundle 编号。"""
+    source_map, = executable_source_maps(serialized)
+    return sorted({pc for function in source_map.functions for span in function.ranges for pc in range(span.image_start, span.image_limit)})
+
+def bundle_text(serialized: bytes, pc: int, *, encoding: str = 'canonical') -> str:
+    """第 pc 个 bundle 的清单文本。"""
+    (_, _, image), = executable_programs(serialized)
+    lines = format_assembly(image, target=TARGET, encoding=encoding).splitlines()
+    start, end = _bundle_spans(lines)[pc]
+    return '\n'.join(lines[start:end + 1])
+
+def find_bundles(serialized: bytes, text: str, *, encoding: str = 'canonical') -> list[int]:
+    """Pallas kernel 中文本包含 text 的 bundle 编号，按顺序排列。"""
+    (_, _, image), = executable_programs(serialized)
+    lines = format_assembly(image, target=TARGET, encoding=encoding).splitlines()
+    spans = _bundle_spans(lines)
+    return [pc for pc in pallas_bundles(serialized) if text in '\n'.join(lines[spans[pc][0]:spans[pc][1] + 1])]
+
+def edit_bundles(serialized: bytes, edits: dict[int, tuple[str, str]], *, encoding: str = 'canonical') -> bytes:
+    """只在指定编号的 bundle 内做文本替换：edits[pc] = (原文本, 新文本)，原文本在该 bundle 中必须恰好出现一次。"""
+    (record, index, image), = executable_programs(serialized)
+    lines = format_assembly(image, target=TARGET, encoding=encoding).splitlines()
+    spans = _bundle_spans(lines)
+    # 从后往前改，前面 bundle 的行号不受影响。
+    for pc, (old, new) in sorted(edits.items(), reverse=True):
+        start, end = spans[pc]
+        bundle = '\n'.join(lines[start:end + 1])
+        assert bundle.count(old) == 1, (pc, bundle)
+        lines[start:end + 1] = bundle.replace(old, new).split('\n')
+    return replace_executable_programs(serialized, {(record, index): assemble_listing('\n'.join(lines))})
 
 def insert_bundles(serialized: bytes, insertions: dict[int, str]) -> bytes:
     """在原 bundle 编号 pc 之前插入一段清单（不含 `.target` 行），分支与元数据由 tpuasm 重定位。"""
