@@ -1,0 +1,215 @@
+## vrng → 均匀分布（stateful_uniform），每次 64 行
+  循环体 54 个 bundle，生成 8 个 TC VREG；vrng 在第 [5, 11, 17, 23, 29, 35, 41, 47] 个 bundle，相邻两条相隔 [6, 6, 6, 6, 6, 6, 6]
+  LCC 实测：循环体重复 4 次，R1 − R0 = 263，每次 65.8 个周期，每个 TC VREG 8.22 个周期
+  发射模型：不考虑 vrng 的间隔 6.78，考虑 8 个周期的间隔 8.09
+  循环体：
+    [ 0] { vld: vld.8x128 v26, [vmem:0x0] }
+    [ 1] { vld: vld.8x128 v1, [vmem:0x8] }
+    [ 2] { vld: vld.8x128 v8, [vmem:0x10] }
+    [ 3] { vld: vld.8x128 v15, [vmem:0x18] }
+    [ 4] { vld: vld.8x128 v22, [vmem:0x20] }
+    [ 5] { va0: vrng.8x128.u32 v23 }
+    [ 6] { va1: vshrl.8x128.s32 v24, v23, 0x9 }
+    [ 7] { va0: vor.8x128.u32 v25, 0x3f800000, v24 }
+    [ 8] { va1: vadd.8x128.f32 v27, -1.0, v25 }
+    [ 9] { va0: vmax.8x128.f32 v28, v27, 0.0 }
+    [10] { va0: vxor.8x128.u32 v29, v28, v26 }
+    [11] { va0: vrng.8x128.u32 v30 ; vst: vst.8x128 [vmem:0x0], v29 ; vld: vld.8x128 v29, [vmem:0x28] }
+    [12] { va1: vshrl.8x128.s32 v31, v30, 0x9 }
+    [13] { va0: vor.8x128.u32 v0, 0x3f800000, v31 }
+    [14] { va1: vadd.8x128.f32 v2, -1.0, v0 }
+    [15] { va0: vmax.8x128.f32 v3, v2, 0.0 }
+    [16] { va0: vxor.8x128.u32 v4, v3, v1 }
+    [17] { va0: vrng.8x128.u32 v5 ; vst: vst.8x128 [vmem:0x8], v4 ; vld: vld.8x128 v4, [vmem:0x30] }
+    [18] { va1: vshrl.8x128.s32 v6, v5, 0x9 }
+    [19] { va0: vor.8x128.u32 v7, 0x3f800000, v6 }
+    [20] { va1: vadd.8x128.f32 v9, -1.0, v7 }
+    [21] { va0: vmax.8x128.f32 v10, v9, 0.0 }
+    [22] { va0: vxor.8x128.u32 v11, v10, v8 }
+    [23] { va0: vrng.8x128.u32 v12 ; vst: vst.8x128 [vmem:0x10], v11 ; vld: vld.8x128 v11, [vmem:0x38] }
+    [24] { va1: vshrl.8x128.s32 v13, v12, 0x9 }
+    [25] { va0: vor.8x128.u32 v14, 0x3f800000, v13 }
+    [26] { va1: vadd.8x128.f32 v16, -1.0, v14 }
+    [27] { va0: vmax.8x128.f32 v17, v16, 0.0 }
+    [28] { va0: vxor.8x128.u32 v18, v17, v15 }
+    [29] { va0: vrng.8x128.u32 v19 ; vst: vst.8x128 [vmem:0x18], v18 }
+    [30] { va1: vshrl.8x128.s32 v20, v19, 0x9 }
+    [31] { va0: vor.8x128.u32 v21, 0x3f800000, v20 }
+    [32] { va1: vadd.8x128.f32 v23, -1.0, v21 }
+    [33] { va0: vmax.8x128.f32 v24, v23, 0.0 }
+    [34] { va0: vxor.8x128.u32 v25, v24, v22 }
+    [35] { va0: vrng.8x128.u32 v26 ; vst: vst.8x128 [vmem:0x20], v25 }
+    [36] { va1: vshrl.8x128.s32 v27, v26, 0x9 }
+    [37] { va0: vor.8x128.u32 v28, 0x3f800000, v27 }
+    [38] { va1: vadd.8x128.f32 v30, -1.0, v28 }
+    [39] { va0: vmax.8x128.f32 v31, v30, 0.0 }
+    [40] { va0: vxor.8x128.u32 v0, v31, v29 }
+    [41] { va0: vrng.8x128.u32 v1 ; vst: vst.8x128 [vmem:0x28], v0 }
+    [42] { va1: vshrl.8x128.s32 v2, v1, 0x9 }
+    [43] { va0: vor.8x128.u32 v3, 0x3f800000, v2 }
+    [44] { va1: vadd.8x128.f32 v5, -1.0, v3 }
+    [45] { va0: vmax.8x128.f32 v6, v5, 0.0 }
+    [46] { va0: vxor.8x128.u32 v7, v6, v4 }
+    [47] { va0: vrng.8x128.u32 v8 ; vst: vst.8x128 [vmem:0x30], v7 }
+    [48] { va1: vshrl.8x128.s32 v9, v8, 0x9 }
+    [49] { va0: vor.8x128.u32 v10, 0x3f800000, v9 }
+    [50] { va1: vadd.8x128.f32 v12, -1.0, v10 }
+    [51] { va0: vmax.8x128.f32 v13, v12, 0.0 }
+    [52] { va0: vxor.8x128.u32 v14, v13, v11 }
+    [53] { vst: vst.8x128 [vmem:0x38], v14 }
+## vrng → 指数分布，每次 64 行
+  循环体 65 个 bundle，生成 8 个 TC VREG；vrng 在第 [3, 8, 13, 20, 27, 34, 41, 48] 个 bundle，相邻两条相隔 [5, 5, 7, 7, 7, 7, 7]
+  LCC 实测：循环体重复 4 次，R1 − R0 = 307，每次 76.8 个周期，每个 TC VREG 9.59 个周期
+  发射模型：不考虑 vrng 的间隔 8.44，考虑 8 个周期的间隔 9.50
+  循环体：
+    [ 0] { vld: vld.8x128 v5, [vmem:0x0] }
+    [ 1] { vld: vld.8x128 v14, [vmem:0x8] }
+    [ 2] {  }
+    [ 3] { va0: vrng.8x128.u32 v23 }
+    [ 4] { va1: vshrl.8x128.s32 v24, v23, 0x9 }
+    [ 5] { va0: vor.8x128.u32 v25, 0x3f800000, v24 }
+    [ 6] { va1: vadd.8x128.f32 v26, -1.0, v25 }
+    [ 7] { va1: vsub.8x128.f32 v27, 1.0, v26 ; vld: vld.8x128 v26, [vmem:0x10] }
+    [ 8] { va0: vlog2.8x128.f32 erf, v27 ; va1: vrng.8x128.u32 v28 }
+    [ 9] { va1: vshrl.8x128.s32 v29, v28, 0x9 }
+    [10] { va0: vor.8x128.u32 v30, 0x3f800000, v29 }
+    [11] { va1: vadd.8x128.f32 v31, -1.0, v30 }
+    [12] { va1: vsub.8x128.f32 v0, 1.0, v31 }
+    [13] { va0: vlog2.8x128.f32 erf, v0 ; va1: vrng.8x128.u32 v2 ; vr0: vpop.8x128 v1, erf }
+    [14] { va0: vmul.8x128.f32 v3, 0.6931471824645996, v1 ; va1: vshrl.8x128.s32 v4, v2, 0x9 }
+    [15] { va0: vor.8x128.u32 v6, 0x3f800000, v4 ; vld: vld.8x128 v4, [vmem:0x18] }
+    [16] { va1: vsub.8x128.f32 v7, 0.0, v3 }
+    [17] { va1: vadd.8x128.f32 v8, -1.0, v6 }
+    [18] { va0: vxor.8x128.u32 v9, v7, v5 }
+    [19] { va1: vsub.8x128.f32 v10, 1.0, v8 ; vst: vst.8x128 [vmem:0x0], v9 }
+    [20] { va0: vrng.8x128.u32 v12 ; vr0: vpop.8x128 v11, erf }
+    [21] { va0: vmul.8x128.f32 v13, 0.6931471824645996, v11 ; va1: vlog2.8x128.f32 erf, v10 }
+    [22] { va1: vshrl.8x128.s32 v15, v12, 0x9 }
+    [23] { va0: vor.8x128.u32 v17, 0x3f800000, v15 ; va1: vsub.8x128.f32 v16, 0.0, v13 ; vld: vld.8x128 v13, [vmem:0x20] }
+    [24] { va1: vadd.8x128.f32 v18, -1.0, v17 }
+    [25] { va0: vxor.8x128.u32 v19, v16, v14 }
+    [26] { va1: vsub.8x128.f32 v20, 1.0, v18 ; vst: vst.8x128 [vmem:0x8], v19 }
+    [27] { va0: vrng.8x128.u32 v21 }
+    [28] { va0: vlog2.8x128.f32 erf, v20 ; va1: vshrl.8x128.s32 v23, v21, 0x9 ; vr0: vpop.8x128 v22, erf }
+    [29] { va0: vmul.8x128.f32 v24, 0.6931471824645996, v22 ; va1: vor.8x128.u32 v25, 0x3f800000, v23 ; vld: vld.8x128 v22, [vmem:0x28] }
+    [30] { va1: vadd.8x128.f32 v27, -1.0, v25 }
+    [31] { va1: vsub.8x128.f32 v28, 0.0, v24 }
+    [32] { va1: vsub.8x128.f32 v29, 1.0, v27 }
+    [33] { va0: vxor.8x128.u32 v30, v28, v26 }
+    [34] { va0: vlog2.8x128.f32 erf, v29 ; va1: vrng.8x128.u32 v31 ; vst: vst.8x128 [vmem:0x10], v30 }
+    [35] { va1: vshrl.8x128.s32 v1, v31, 0x9 ; vld: vld.8x128 v31, [vmem:0x30] ; vr0: vpop.8x128 v0, erf }
+    [36] { va0: vmul.8x128.f32 v2, 0.6931471824645996, v0 ; va1: vor.8x128.u32 v3, 0x3f800000, v1 }
+    [37] { va1: vadd.8x128.f32 v5, -1.0, v3 }
+    [38] { va1: vsub.8x128.f32 v6, 0.0, v2 }
+    [39] { va1: vsub.8x128.f32 v7, 1.0, v5 }
+    [40] { va0: vxor.8x128.u32 v8, v6, v4 ; vld: vld.8x128 v4, [vmem:0x38] }
+    [41] { va0: vlog2.8x128.f32 erf, v7 ; va1: vrng.8x128.u32 v10 ; vst: vst.8x128 [vmem:0x18], v8 ; vr0: vpop.8x128 v9, erf }
+    [42] { va0: vmul.8x128.f32 v11, 0.6931471824645996, v9 ; va1: vshrl.8x128.s32 v12, v10, 0x9 }
+    [43] { va0: vor.8x128.u32 v14, 0x3f800000, v12 }
+    [44] { va1: vsub.8x128.f32 v15, 0.0, v11 }
+    [45] { va1: vadd.8x128.f32 v16, -1.0, v14 }
+    [46] { va0: vxor.8x128.u32 v17, v15, v13 }
+    [47] { va1: vsub.8x128.f32 v18, 1.0, v16 ; vst: vst.8x128 [vmem:0x20], v17 }
+    [48] { va0: vrng.8x128.u32 v20 ; vr0: vpop.8x128 v19, erf }
+    [49] { va0: vmul.8x128.f32 v21, 0.6931471824645996, v19 ; va1: vlog2.8x128.f32 erf, v18 }
+    [50] { va1: vshrl.8x128.s32 v23, v20, 0x9 }
+    [51] { va0: vor.8x128.u32 v25, 0x3f800000, v23 ; va1: vsub.8x128.f32 v24, 0.0, v21 }
+    [52] { va1: vadd.8x128.f32 v26, -1.0, v25 }
+    [53] { va0: vxor.8x128.u32 v27, v24, v22 }
+    [54] { va1: vsub.8x128.f32 v28, 1.0, v26 ; vst: vst.8x128 [vmem:0x28], v27 }
+    [55] { va0: vlog2.8x128.f32 erf, v28 ; vr0: vpop.8x128 v29, erf }
+    [56] { va0: vmul.8x128.f32 v30, 0.6931471824645996, v29 }
+    [57] { va1: vsub.8x128.f32 v0, 0.0, v30 }
+    [58] { va0: vxor.8x128.u32 v1, v0, v31 }
+    [59] { vst: vst.8x128 [vmem:0x30], v1 }
+    [60] { vr0: vpop.8x128 v2, erf }
+    [61] { va0: vmul.8x128.f32 v3, 0.6931471824645996, v2 }
+    [62] { va1: vsub.8x128.f32 v5, 0.0, v3 }
+    [63] { va0: vxor.8x128.u32 v6, v5, v4 }
+    [64] { vst: vst.8x128 [vmem:0x38], v6 }
+## vrng → Gumbel 分布，每次 64 行
+  循环体 77 个 bundle，生成 8 个 TC VREG；vrng 在第 [3, 8, 13, 20, 27, 34, 42, 49] 个 bundle，相邻两条相隔 [5, 5, 7, 7, 7, 8, 7]
+  LCC 实测：循环体重复 4 次，R1 − R0 = 356，每次 89.0 个周期，每个 TC VREG 11.12 个周期
+  发射模型：不考虑 vrng 的间隔 10.03，考虑 8 个周期的间隔 11.03
+  循环体：
+    [ 0] { vld: vld.8x128 v19, [vmem:0x0] }
+    [ 1] {  }
+    [ 2] {  }
+    [ 3] { va0: vrng.8x128.u32 v23 }
+    [ 4] { va1: vshrl.8x128.s32 v24, v23, 0x9 }
+    [ 5] { va0: vor.8x128.u32 v25, 0x3f800000, v24 }
+    [ 6] { va1: vadd.8x128.f32 v26, -1.0, v25 }
+    [ 7] { va1: vsub.8x128.f32 v27, 1.0, v26 }
+    [ 8] { va0: vlog2.8x128.f32 erf, v27 ; va1: vrng.8x128.u32 v28 }
+    [ 9] { va1: vshrl.8x128.s32 v29, v28, 0x9 }
+    [10] { va0: vor.8x128.u32 v30, 0x3f800000, v29 }
+    [11] { va1: vadd.8x128.f32 v31, -1.0, v30 }
+    [12] { va1: vsub.8x128.f32 v0, 1.0, v31 ; vld: vld.8x128 v31, [vmem:0x8] }
+    [13] { va0: vlog2.8x128.f32 erf, v0 ; va1: vrng.8x128.u32 v2 ; vr0: vpop.8x128 v1, erf }
+    [14] { va0: vmul.8x128.f32 v3, 0.6931471824645996, v1 ; va1: vshrl.8x128.s32 v4, v2, 0x9 }
+    [15] { va0: vor.8x128.u32 v5, 0x3f800000, v4 }
+    [16] { va1: vsub.8x128.f32 v6, 0.0, v3 }
+    [17] { va1: vadd.8x128.f32 v7, -1.0, v5 }
+    [18] { va0: vlog2.8x128.f32 erf, v6 }
+    [19] { va1: vsub.8x128.f32 v8, 1.0, v7 }
+    [20] { va0: vrng.8x128.u32 v10 ; vr0: vpop.8x128 v9, erf }
+    [21] { va0: vmul.8x128.f32 v11, 0.6931471824645996, v9 ; va1: vlog2.8x128.f32 erf, v8 }
+    [22] { va1: vshrl.8x128.s32 v12, v10, 0x9 }
+    [23] { va0: vor.8x128.u32 v14, 0x3f800000, v12 ; va1: vsub.8x128.f32 v13, 0.0, v11 }
+    [24] { va1: vadd.8x128.f32 v15, -1.0, v14 }
+    [25] { va0: vlog2.8x128.f32 erf, v13 ; vld: vld.8x128 v13, [vmem:0x10] ; vr0: vpop.8x128 v16, erf }
+    [26] { va0: vmul.8x128.f32 v17, 0.6931471824645996, v16 ; va1: vsub.8x128.f32 v18, 1.0, v15 }
+    [27] { va0: vrng.8x128.u32 v20 }
+    [28] { va0: vlog2.8x128.f32 erf, v18 ; va1: vsub.8x128.f32 v22, 0.0, v17 ; vr0: vpop.8x128 v21, erf }
+    [29] { va0: vmul.8x128.f32 v23, 0.6931471824645996, v21 ; va1: vshrl.8x128.s32 v24, v20, 0x9 }
+    [30] { va0: vxor.8x128.u32 v25, v22, v19 ; va1: vor.8x128.u32 v26, 0x3f800000, v24 }
+    [31] { va1: vsub.8x128.f32 v27, 0.0, v23 ; vst: vst.8x128 [vmem:0x0], v25 ; vld: vld.8x128 v25, [vmem:0x18] }
+    [32] { va1: vadd.8x128.f32 v29, -1.0, v26 ; vr0: vpop.8x128 v28, erf }
+    [33] { va0: vmul.8x128.f32 v30, 0.6931471824645996, v28 ; va1: vlog2.8x128.f32 erf, v27 }
+    [34] { va0: vrng.8x128.u32 v1 ; va1: vsub.8x128.f32 v0, 1.0, v29 }
+    [35] { va1: vsub.8x128.f32 v3, 0.0, v30 ; vr0: vpop.8x128 v2, erf }
+    [36] { va0: vmul.8x128.f32 v4, 0.6931471824645996, v2 ; va1: vlog2.8x128.f32 erf, v0 }
+    [37] { va0: vxor.8x128.u32 v5, v3, v31 ; va1: vshrl.8x128.s32 v6, v1, 0x9 }
+    [38] { va0: vor.8x128.u32 v8, 0x3f800000, v6 ; va1: vsub.8x128.f32 v7, 0.0, v4 ; vst: vst.8x128 [vmem:0x8], v5 }
+    [39] { va1: vadd.8x128.f32 v9, -1.0, v8 }
+    [40] { va0: vlog2.8x128.f32 erf, v7 ; vld: vld.8x128 v7, [vmem:0x20] ; vr0: vpop.8x128 v10, erf }
+    [41] { va0: vmul.8x128.f32 v11, 0.6931471824645996, v10 ; va1: vsub.8x128.f32 v12, 1.0, v9 }
+    [42] { va0: vrng.8x128.u32 v14 }
+    [43] { va0: vlog2.8x128.f32 erf, v12 ; va1: vsub.8x128.f32 v16, 0.0, v11 ; vr0: vpop.8x128 v15, erf }
+    [44] { va0: vmul.8x128.f32 v17, 0.6931471824645996, v15 ; va1: vshrl.8x128.s32 v18, v14, 0x9 ; vld: vld.8x128 v15, [vmem:0x28] }
+    [45] { va0: vxor.8x128.u32 v19, v16, v13 ; va1: vor.8x128.u32 v20, 0x3f800000, v18 }
+    [46] { va1: vsub.8x128.f32 v21, 0.0, v17 ; vst: vst.8x128 [vmem:0x10], v19 }
+    [47] { va1: vadd.8x128.f32 v23, -1.0, v20 ; vr0: vpop.8x128 v22, erf }
+    [48] { va0: vmul.8x128.f32 v24, 0.6931471824645996, v22 ; va1: vlog2.8x128.f32 erf, v21 }
+    [49] { va0: vrng.8x128.u32 v27 ; va1: vsub.8x128.f32 v26, 1.0, v23 ; vld: vld.8x128 v23, [vmem:0x30] }
+    [50] { va1: vsub.8x128.f32 v29, 0.0, v24 ; vr0: vpop.8x128 v28, erf }
+    [51] { va0: vmul.8x128.f32 v30, 0.6931471824645996, v28 ; va1: vlog2.8x128.f32 erf, v26 ; vld: vld.8x128 v28, [vmem:0x38] }
+    [52] { va0: vxor.8x128.u32 v31, v29, v25 ; va1: vshrl.8x128.s32 v0, v27, 0x9 }
+    [53] { va0: vor.8x128.u32 v2, 0x3f800000, v0 ; va1: vsub.8x128.f32 v1, 0.0, v30 ; vst: vst.8x128 [vmem:0x18], v31 }
+    [54] { va1: vadd.8x128.f32 v3, -1.0, v2 }
+    [55] { va0: vlog2.8x128.f32 erf, v1 ; vr0: vpop.8x128 v4, erf }
+    [56] { va0: vmul.8x128.f32 v5, 0.6931471824645996, v4 ; va1: vsub.8x128.f32 v6, 1.0, v3 }
+    [57] { va0: vlog2.8x128.f32 erf, v6 ; va1: vsub.8x128.f32 v9, 0.0, v5 ; vr0: vpop.8x128 v8, erf }
+    [58] { va0: vmul.8x128.f32 v10, 0.6931471824645996, v8 }
+    [59] { va0: vxor.8x128.u32 v11, v9, v7 }
+    [60] { va1: vsub.8x128.f32 v12, 0.0, v10 ; vst: vst.8x128 [vmem:0x20], v11 }
+    [61] { vr0: vpop.8x128 v13, erf }
+    [62] { va0: vmul.8x128.f32 v14, 0.6931471824645996, v13 ; va1: vlog2.8x128.f32 erf, v12 }
+    [63] { va1: vsub.8x128.f32 v17, 0.0, v14 ; vr0: vpop.8x128 v16, erf }
+    [64] { va0: vmul.8x128.f32 v18, 0.6931471824645996, v16 }
+    [65] { va0: vxor.8x128.u32 v19, v17, v15 }
+    [66] { va1: vsub.8x128.f32 v20, 0.0, v18 ; vst: vst.8x128 [vmem:0x28], v19 }
+    [67] { va0: vlog2.8x128.f32 erf, v20 ; vr0: vpop.8x128 v21, erf }
+    [68] { va0: vmul.8x128.f32 v22, 0.6931471824645996, v21 }
+    [69] { va1: vsub.8x128.f32 v24, 0.0, v22 }
+    [70] { va0: vxor.8x128.u32 v25, v24, v23 }
+    [71] { vst: vst.8x128 [vmem:0x30], v25 }
+    [72] { vr0: vpop.8x128 v26, erf }
+    [73] { va0: vmul.8x128.f32 v27, 0.6931471824645996, v26 }
+    [74] { va1: vsub.8x128.f32 v29, 0.0, v27 }
+    [75] { va0: vxor.8x128.u32 v30, v29, v28 }
+    [76] { vst: vst.8x128 [vmem:0x38], v30 }
+## vrng → 指数分布，每次 256 行
+  循环体 233 个 bundle，生成 32 个 TC VREG；vrng 在第 [3, 8, 13, 20, 27, 34, 41, 48, 55, 62, 69, 76, 83, 90, 97, 104, 111, 118, 125, 132, 139, 146, 153, 160, 167, 174, 181, 188, 195, 202, 209, 216] 个 bundle，相邻两条相隔 [5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]
+  LCC 实测：循环体重复 4 次，R1 − R0 = 1075，每次 268.8 个周期，每个 TC VREG 8.40 个周期
+  发射模型：不考虑 vrng 的间隔 7.36，考虑 8 个周期的间隔 8.38

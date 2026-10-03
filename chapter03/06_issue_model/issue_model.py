@@ -14,6 +14,8 @@ PUSH_LATENCY = {'erf': 7, 'mrf': 83, 'trf': 6, 'crf': 53, 'v2sf': 42}
 XLU_LATENCY = {'vadd.xlane': 79, 'vmax.xlane': 79, 'vrot.': 69, 'vperm.': 69}
 # 同一个队列上，相邻两次提交（push）或取回（pop）之间的最小间隔，未列出的为 1。
 INTERVAL = {'push erf': 2, 'push mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
+# 同一单元上相邻两条指令的最小间隔，按助记符前缀匹配：vrng 每条让生成器走 8 步（第四章第 6 节）。
+UNIT_INTERVAL = {'vrng': 8}
 SLD_INTERVAL = 4  # 相邻两条 sld 至少相隔 4 个周期（第 4 节）。
 SLD_LATENCY = 4  # sld 的结果 4 个周期后才能被标量指令使用（第 4 节）。
 
@@ -68,7 +70,7 @@ def replay(program: list[list[str]]) -> dict[int, int]:
         if not vector and not fence:
             scalar += 1
             continue
-        events = []  # (提交或取回, 队列)
+        events = []  # (提交、取回或单元, 队列或单元名)
         issue = max(vector_free, scalar + 1 + any(decode(item)[0].startswith(MEMORY) for item in vector))
         for item in vector:
             mnemonic, operands = decode(item)
@@ -77,9 +79,12 @@ def replay(program: list[list[str]]) -> dict[int, int]:
                 issue = max(issue, queues[operands[1]][0])
             elif operands and kind(operands[0]) in PUSH_LATENCY:
                 events.append(('push', operands[0]))
+            unit = next((prefix for prefix in UNIT_INTERVAL if mnemonic.startswith(prefix)), None)
+            if unit:
+                events.append(('unit', unit))
             issue = max([issue, *(ready.get(source, 0) for source in operands[1:])])
         for event, queue in events:
-            issue = max(issue, last.get(f'{event} {queue}', -99) + INTERVAL.get(f'{event} {kind(queue)}', 1))
+            issue = max(issue, last.get(f'{event} {queue}', -99) + (UNIT_INTERVAL[queue] if event == 'unit' else INTERVAL.get(f'{event} {kind(queue)}', 1)))
         for item in vector:
             mnemonic, operands = decode(item)
             if mnemonic.startswith('vpop'):
