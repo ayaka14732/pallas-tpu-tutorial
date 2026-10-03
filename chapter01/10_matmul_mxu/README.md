@@ -32,9 +32,16 @@ o_vmem[...] = jnp.dot(lhs_vmem[...], rhs_vmem[...], preferred_element_type=jnp.f
 - RHS（`128×128`）先成为 MXU 的一部分状态。8 次 push 把它送进暂存区，`vdwg` 再把整块装入 gains 寄存器 GMR。只有装入之后，MXU 才用它计算。
 - LHS 一个 TC VREG 一次：每条 `vmatmul` 用当前 GMR 中的 RHS 乘一个 LHS TC VREG，结果进入队列 MRF，再由 `vpop` 取回。
 
+几个细节：
+
+- **一次 push 一个打包的 TC VREG。** bf16 的 RHS `128×128` 是 8 个打包的 TC VREG，每个 16 行，所以要 8 次 `vmatpush.packed`。`gsfn0` 是 MXU0 的暂存区，push 的顺序就是 RHS 的行序（K 方向）。
+- **`vdwg` 一次装入整块。** 暂存区收齐 128 行之后，`vdwg` 把它整块装进 MXU0 的 gains 寄存器 `gmr0`。暂存区与 gains 分开，意味着可以在 MXU 用旧 gains 计算的同时，把下一份 RHS push 进暂存区。
+- **一次 `vmatmul` 乘一个 LHS TC VREG。** `vmatmul.packed` 送入一个打包的 LHS TC VREG（16 行 × 128 列），与 gains 中的 `128×128` 相乘，得到 16 行 × 128 列的 f32 结果。f32 的 TC VREG 只能放 8 行，所以结果分两次 `vpop` 取回。
+- **结果是 f32。** MXU 内部按 f32 累加 128 个乘积，`preferred_element_type=jnp.float32` 时直接取回 f32；不写时编译器还要多一次舍入把结果变回 bf16。
+
 由此可见 MXU 适合的使用方式：一份 RHS 装入一次，然后连续乘很多块 LHS。装入 RHS 要 8 次 push 加 1 次 `vdwg`，而每多一块 LHS 只要 1 次 `vmatmul` 和 2 次 `vpop`。
 
-> 暂且可以理解为：`vmatmul` 之后要过约 80–100 个周期，第一条依赖它的 `vpop` 才能发射；期间可以继续发射其他 `vmatmul`。第三章第 6 节详细介绍这类延迟，[研究报告 55](../../../pallas-tpu-readings-dev/research_reports/55_tpu_v4_mrf_latency.md) 给出了四个 MXU 各自的实测值。
+> 暂且可以理解为：`vmatmul` 之后要过一段时间，第一条依赖它的 `vpop` 才能发射；期间可以继续发射其他 `vmatmul`。第三章第 6 节测得：MXU0、MXU1 是 83 个周期（[研究报告 55](../../../pallas-tpu-readings-dev/research_reports/55_tpu_v4_mrf_latency.md) 测得 MXU2、MXU3 是 101 个周期）；同一个 MXU 每 8 个周期接收一个 8 行的 LHS TC VREG，即每周期一行。按这个速率，一个 TensorCore 的 4 个 MXU 每周期完成 4 × 128 × 128 = 65536 次乘加。
 
 ## 只改 RHS 方向：push 时转置
 
@@ -80,7 +87,7 @@ int8 的矩阵乘法无法编译：`Unsupported matmul RHS type on target: vecto
 一个 TensorCore 有 4 个 MXU（`gmr0`–`gmr3`、`mrf0`–`mrf3`）：
 
 - M 增大（16 → 128 行）：同一份 RHS 被分别 push 进 4 个 MXU，每个 MXU 处理 2 块 LHS。RHS 的装入次数随 MXU 数增加，所以只有 LHS 足够多时，占满 4 个 MXU 才划算。
-- K 增大（128 → 256）：RHS 的两半 `[0:128, :]` 和 `[128:256, :]` 分别装入两个 MXU，两个部分积在 MRF 取回后由 2 次 `vadd.f32` 相加。K 方向的累加由向量单元完成。
+- K 增大（128 → 256）：RHS 的两半 `[0:128, :]` 和 `[128:256, :]` 分别装入两个 MXU，两个部分积在 MRF 取回后由 2 次 `vadd.f32` 相加（结果 16 行，即 2 个 f32 TC VREG，各加一次）。K 方向的累加由向量单元完成：TPU v4 的 MXU 不在内部累加不同 RHS 块的结果，`pltpu.get_tpu_info()` 报告的 `num_accumulators` 为 0。K 每多 128，就多一次部分积的取回和一次向量加法。
 - N 增大（128 → 256）：RHS 的左右两半装入两个 MXU，两个结果分别是输出的左右两半，不需要相加。清单中多出的 16 次 unpack 和 pack 用于把 `bf16[128,256]` 的 RHS 重新打包成两个 `128×128` 块。
 
 所以 MXU 的基本单位是一个 `128×128` 的 RHS 块。更大的矩阵被切成这样的块，块的装入与复用方式就是矩阵乘法 kernel 的核心设计问题。

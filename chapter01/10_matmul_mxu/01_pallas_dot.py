@@ -3,6 +3,7 @@ import tpu_init
 tpu_init.initialise_one_chip()
 
 import jax
+from jax.experimental.pallas import tpu as pltpu
 import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
@@ -11,6 +12,8 @@ import mxu_common
 import tpuasm_tools
 
 def main() -> None:
+    info = pltpu.get_tpu_info()
+    print(f'pltpu.get_tpu_info()：num_mxus={info.num_mxus}，mxu_column_size={info.mxu_column_size}，num_accumulators={info.num_accumulators}')
     rng = np.random.default_rng(0)
     # (名称, M, K, N, 输入 dtype, RHS 是否以 (N,K) 存放, jnp.dot 的 precision)
     cases = (

@@ -1,3 +1,4 @@
+pltpu.get_tpu_info()：num_mxus=4，mxu_column_size=128，num_accumulators=0
 ## bf16[16,128] @ bf16[128,128]
   与精确结果逐元素一致：True
   vdwg.128x128.f16 gmr0 ← gsfn0：1
