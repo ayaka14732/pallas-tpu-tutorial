@@ -1,0 +1,17 @@
+## vmax.index.xlane、vmax.xlane 与 vmin.index.xlane 对同一个 TC VREG 的结果
+  全为 0：vmax.index 下标 127，vmax 位型 0x00000000，vmin.index 下标 127（各自所有 lane、所有 sublane 相同）
+  全为 -inf：vmax.index 下标 127，vmax 位型 0xff800000，vmin.index 下标 127（各自所有 lane、所有 sublane 相同）
+  lane & 15（最大值 15 在 lane 15、31、…、127）：vmax.index 下标 127，vmax 位型 0x41700000，vmin.index 下标 112（各自所有 lane、所有 sublane 相同）
+  −lane（最大值在 lane 0）：vmax.index 下标 0，vmax 位型 0x00000000，vmin.index 下标 127（各自所有 lane、所有 sublane 相同）
+  lane 5 与 lane 70 为 1，其余为 0：vmax.index 下标 70，vmax 位型 0x3f800000，vmin.index 下标 127（各自所有 lane、所有 sublane 相同）
+  lane 3 为 NaN，其余为 lane：vmax.index 下标 3，vmax 位型 0x7fc00000，vmin.index 下标 3（各自所有 lane、所有 sublane 相同）
+  lane 9 为 −0，其余为 +0：vmax.index 下标 127，vmax 位型 0x00000000，vmin.index 下标 127（各自所有 lane、所有 sublane 相同）
+## 提交之后紧接取回：R2 − R0 = 13 + 延迟
+  vmax.xlane：R2 − R0 = 92，延迟 79
+  vmax.index.xlane：R2 − R0 = 92，延迟 79
+  vmax.index.xlane（vx1、trf1）：R2 − R0 = 92，延迟 79
+  vmin.xlane：R2 − R0 = 92，延迟 79
+## 计算部分的周期数：LCC 实测与发射模型
+  argmax（max 与 argmax）：9 个 bundle，2 次 XLU 归约；实测 R2 − R0 = 103，模型 103
+  lax.top_k(x, 8, is_stable=False)：54 个 bundle，16 次 XLU 归约；实测 R2 − R0 = 671，模型 671
+  手写 top-8（掩码排除已选位置）：88 个 bundle，16 次 XLU 归约；实测 R2 − R0 = 1337，模型 1336

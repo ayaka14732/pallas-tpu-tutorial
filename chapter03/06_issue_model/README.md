@@ -45,7 +45,7 @@ for event, queue in events:
     issue = max(issue, last.get(f'{event} {queue}', -99) + (UNIT_INTERVAL[queue] if event == 'unit' else INTERVAL.get(f'{event} {kind(queue)}', 1)))   # 等单元
 ```
 
-`UNIT_INTERVAL` 记录不经过队列、但同一单元相邻两条有最小间隔的指令。目前只有一项：第四章第 6 节测得的 `vrng`，每 8 个周期一条；那一节用它解释了几种随机数分布的生成速度。
+XLU 的延迟表 `XLU_LATENCY` 中，`vmax.index.xlane` 与 `vmin.xlane` 两项由第一章第 14 节测得，都是 79 个周期；那一节用模型预测了 top-k 的时间。`UNIT_INTERVAL` 记录不经过队列、但同一单元相邻两条有最小间隔的指令。目前只有一项：第四章第 6 节测得的 `vrng`，每 8 个周期一条；那一节用它解释了几种随机数分布的生成速度。
 
 模型的输入是**动态执行的** bundle 序列：循环要按实际迭代次数展开。模型不处理 DMA 和 `vwait`，它们的时间取决于数据通路，由第二章的代价模型给出。标量一侧加入了第 4 节测得的 `sld` 规则：
 

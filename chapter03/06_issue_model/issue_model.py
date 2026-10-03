@@ -11,7 +11,8 @@ RESULT_LATENCY = {'vmul.8x128.f32': 2, 'vrot.slane.down.8x128.u32': 2}  # 写 TC
 # 提交—取回通路：结果进入哪个队列、发射后多少周期可以取回。
 PUSH_LATENCY = {'erf': 7, 'mrf': 83, 'trf': 6, 'crf': 53, 'v2sf': 42}
 # XLU 的其他操作同样进入 trf 队列，但每次提交产生一个结果：跨 lane 归约 79 个周期、lane 循环移位与重排 69 个周期后可以取回。
-XLU_LATENCY = {'vadd.xlane': 79, 'vmax.xlane': 79, 'vrot.': 69, 'vperm.': 69}
+# vmax.index.xlane 与 vmin.xlane 由第一章第 14 节测得。
+XLU_LATENCY = {'vadd.xlane': 79, 'vmax.xlane': 79, 'vmax.index.xlane': 79, 'vmin.xlane': 79, 'vrot.': 69, 'vperm.': 69}
 # 同一个队列上，相邻两条提交（push）或取回（pop）指令的最小发射间隔，未列出的为 1。
 INTERVAL = {'push erf': 2, 'push mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
 # 同一单元上相邻两条指令的最小间隔，按助记符前缀匹配：vrng 每条让生成器走 8 步（第四章第 6 节）。

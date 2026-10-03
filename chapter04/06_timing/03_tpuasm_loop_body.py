@@ -16,9 +16,9 @@ import issue_model
 # (方法, 每次生成的行数)：前三个与第 2 个实验相同，最后一个只改每次的行数。
 CASES = (('vrng → 均匀分布（stateful_uniform）', 64), ('vrng → 指数分布', 64), ('vrng → Gumbel 分布', 64), ('vrng → 指数分布', 256))
 ITERATIONS = 4  # 循环体重复几次
-SAVED = range(20, 31)  # LccProbe 保存标量寄存器用的 v20–v30，循环体会改写它们
-SETUP = ''.join(bundle(f'vst: vst.8x128 [vmem:0x{0x80 + 8 * index:x}], v{register}') for index, register in enumerate(SAVED)) + bundle('va0: setrngseed v10') + bundle('misc: vnop') * 16
-RESTORE = ''.join(bundle(f'vld: vld.8x128 v{register}, [vmem:0x{0x80 + 8 * index:x}]') for index, register in enumerate(SAVED)) + bundle('misc: vnop') * 16
+# 循环体会改写 LccProbe 保存标量寄存器用的 v20–v30：setup 先把它们存进 TC VMEM，最后一次读数之后读回。
+SETUP = tpuasm_tools.spill_saved() + bundle('va0: setrngseed v10') + bundle('misc: vnop') * 16
+RESTORE = tpuasm_tools.reload_saved()
 END = read_lcc(21) + bundle('s0: sfence') + read_lcc(22)
 
 def loop_body(compiled) -> list[str]:

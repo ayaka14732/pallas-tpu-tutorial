@@ -178,10 +178,18 @@ def read_gtc(low: int) -> str:
 
 SAVED = range(20, 31)
 
+def spill_saved(address: int = 0x80) -> str:
+    """LccProbe 的 setup 用：把保存着载体标量寄存器的 v20–v30 写进 TC VMEM 从 address 起的 11 个 tile，供会改写这些 TC VREG 的片段使用。"""
+    return ''.join(bundle(f'vst: vst.8x128 [vmem:0x{address + 8 * index:x}], v{register}') for index, register in enumerate(SAVED))
+
+def reload_saved(address: int = 0x80) -> str:
+    """接在片段最后一次读数之后：从 TC VMEM 读回 spill_saved 写出的 v20–v30。"""
+    return ''.join(bundle(f'vld: vld.8x128 v{register}, [vmem:0x{address + 8 * index:x}]') for index, register in enumerate(SAVED)) + bundle('misc: vnop') * 16
+
 class LccProbe:
     """在一个载体 kernel 中插入手写片段，用 LCC（或 GTC）读数计时（参照 tpu-v4-latency-numbers 第 0 节）。
 
-    片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28；v20–v30 保存着载体的标量寄存器，片段若要改写，须自己先存起来、在最后一次读数之后恢复。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。
+    片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28；v20–v30 保存着载体的标量寄存器，片段若要改写，须在 setup 中用 spill_saved() 存起来、在最后一次读数之后用 reload_saved() 读回。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。
     """
 
     def __init__(self, num_cores: int = 1) -> None:

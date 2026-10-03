@@ -1,7 +1,10 @@
-/srv/workspace/pallas-ecosystem/pallas-tpu-tutorial/chapter01/14_top_k/01_pallas_top_k.py:99: DeprecationWarning: backend and device argument on jit is deprecated. You can use `jax.device_put(..., jax.local_devices(backend="cpu")[0])` on the inputs to the jitted function to get the same behavior.
-  expected_values, expected_indices = (np.asarray(array) for array in jax.jit(jax.lax.top_k, static_argnums=1, backend='cpu')(x, k))
 ## max 与 argmax，f32[8,128]
   值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.index.xlane.0.8x128.f32×1、vmax.xlane.2.8x128.f32×1、vpop.8x128×2
+
+## max 与 argmax，每行的最大值在 lane 15、31、…、127 并列
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：False
+  第 0 行下标：[127]；CPU：[15]
   计算指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.index.xlane.0.8x128.f32×1、vmax.xlane.2.8x128.f32×1、vpop.8x128×2
 
 ## lax.top_k(x, 1)，f32[8,128]：编译失败：is_stable=True is not supported in Pallas top_k. For efficiency, only is_stable=False is supported
