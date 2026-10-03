@@ -54,3 +54,7 @@ XLA 是通用编译器，它采用的算法未必最好；即便算法合适，�
 ```sh
 ./run_all.sh
 ```
+
+## 许可证
+
+本仓库的源代码与代码示例采用 [MPL-2.0](LICENSES/MPL-2.0.txt)，教程正文、图表等非代码内容采用 [CC BY-SA 4.0](LICENSES/CC-BY-SA-4.0.txt)，详细说明见 [LICENSE](LICENSE)。
