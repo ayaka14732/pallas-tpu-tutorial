@@ -27,3 +27,11 @@ def summary(listing: str) -> str:
             key = mnemonic
         counts[key] = counts.get(key, 0) + 1
     return '\n'.join(f'  {key}：{value}' for key, value in sorted(counts.items()))
+
+def submit_forms(listing: str) -> str:
+    """提交指令的各种写法及条数：源 TC VREG 编号统一写成 vN，便于看出操作数中不变的部分。"""
+    counts: dict[str, int] = {}
+    for match in re.finditer(r'(vx[01]): (?:@!?p[0-9]+ )?((?:vxpose|vsupp)[\w.]*) ([^;}#]*)', listing):
+        form = f'{match[1]}: {match[2]} ' + re.sub(r'\bv[0-9]+\b', 'vN', match[3].strip())
+        counts[form] = counts.get(form, 0) + 1
+    return '\n'.join(f'    {count} × {form}' for form, count in sorted(counts.items(), key=lambda item: -item[1]))

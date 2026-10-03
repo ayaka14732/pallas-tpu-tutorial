@@ -5,6 +5,10 @@
   提交到 trf0（vxpose.0.8x128）：14
   提交到 trf0（vxpose.0.end.8x128）：1
   提交到 trf0（vxpose.0.start.8x128）：1
+  提交指令的写法：
+    14 × vx0: vxpose.0.8x128 trf0, vN, 128
+    1 × vx0: vxpose.0.start.8x128 trf0, vN, 128
+    1 × vx0: vxpose.0.end.8x128 trf0, vN, 128
 # function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]; image bundles [503, 507)
 { misc: vtrace 0x80000000 }
 # entry bundle: %transpose.1 = custom-call(%refs_0_.1)
@@ -129,6 +133,15 @@
   提交到 trf1（vxpose.1.end.8x128）：1
   提交到 trf1（vxpose.3.8x128）：7
   提交到 trf1（vxpose.3.start.8x128）：1
+  提交指令的写法：
+    7 × vx0: vxpose.0.8x128 trf0, vN, 128
+    7 × vx0: vxpose.1.8x128 trf1, vN, 128
+    7 × vx0: vxpose.2.8x128 trf0, vN, 128
+    7 × vx0: vxpose.3.8x128 trf1, vN, 128
+    1 × vx0: vxpose.2.start.8x128 trf0, vN, 128
+    1 × vx0: vxpose.3.start.8x128 trf1, vN, 128
+    1 × vx0: vxpose.0.end.8x128 trf0, vN, 128
+    1 × vx0: vxpose.1.end.8x128 trf1, vN, 128
 
 ## 3 个 i32[128,128]：数值检查通过
   vld.8x128：48
@@ -143,6 +156,17 @@
   提交到 trf1（vxpose.1.end.8x128）：1
   提交到 trf1（vxpose.3.8x128）：7
   提交到 trf1（vxpose.3.start.8x128）：1
+  提交指令的写法：
+    14 × vx0: vxpose.0.8x128 trf0, vN, 128
+    14 × vx0: vxpose.2.8x128 trf0, vN, 128
+    4 × vx1: vxpose.1.8x128 trf1, vN, 128
+    4 × vx1: vxpose.3.8x128 trf1, vN, 128
+    3 × vx0: vxpose.1.8x128 trf1, vN, 128
+    3 × vx0: vxpose.3.8x128 trf1, vN, 128
+    2 × vx0: vxpose.2.start.8x128 trf0, vN, 128
+    2 × vx0: vxpose.0.end.8x128 trf0, vN, 128
+    1 × vx1: vxpose.3.start.8x128 trf1, vN, 128
+    1 × vx0: vxpose.1.end.8x128 trf1, vN, 128
 
 ## bf16[128,128]：数值检查通过
   vld.8x128：8
@@ -151,6 +175,88 @@
   提交到 trf0（vxpose.0.packed.8x128）：6
   提交到 trf0（vxpose.0.packed.end.8x128）：1
   提交到 trf0（vxpose.0.packed.start.8x128）：1
+  提交指令的写法：
+    6 × vx0: vxpose.0.packed.8x128 trf0, vN, 128
+    1 × vx0: vxpose.0.packed.start.8x128 trf0, vN, 128
+    1 × vx0: vxpose.0.packed.end.8x128 trf0, vN, 128
+# function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]; image bundles [503, 507)
+{ misc: vtrace 0x80000000 }
+# entry bundle: %transpose.1 = custom-call(%refs_0_.1)
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_0221 }
+# end function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]
+{}
+# function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]; image bundles [508, 545)
+{ s0: simm.s32 s7, 0 ;  # materialized constant
+  .encoding { s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:46:16-46:65 [dma_wait; LLO 325]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s0, 64 ;  # materialized constant
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 254] | Coalesced load.
+  misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:46:16-46:65 [dma_wait; LLO 326]
+  .encoding { misc.value = imm2 ; s0.y = lo(imm0) } }
+{ vld: vld.8x128 v1, [vmem:0x8] ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 309] | Coalesced load.
+  vx0: vxpose.0.packed.start.8x128 trf0, v0, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 121]
+{ vld: vld.8x128 v2, [vmem:0x10] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 310] | Coalesced load.
+{ vld: vld.8x128 v3, [vmem:0x18] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 311] | Coalesced load.
+{ vld: vld.8x128 v4, [vmem:0x20] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 312] | Coalesced load.
+{ vld: vld.8x128 v5, [vmem:0x28] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 313] | Coalesced load.
+{ vld: vld.8x128 v6, [vmem:0x30] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 314] | Coalesced load.
+{ vld: vld.8x128 v7, [vmem:0x38] }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:47 [get; LLO 315] | Coalesced load.
+{ vx0: vxpose.0.packed.8x128 trf0, v1, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 122]
+{ vx0: vxpose.0.packed.8x128 trf0, v2, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 123]
+{ vx0: vxpose.0.packed.8x128 trf0, v3, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 124]
+{ vx0: vxpose.0.packed.8x128 trf0, v4, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 125]
+{ vx0: vxpose.0.packed.8x128 trf0, v5, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 126]
+{ vx0: vxpose.0.packed.8x128 trf0, v6, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 127]
+{ vx0: vxpose.0.packed.end.8x128 trf0, v7, 128 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 128]
+{ vr0: vpop.8x128 v8, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 129]
+{ vst: vst.8x128 [vmem:0x40], v8 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 287] | Coalesced store.
+{ vr0: vpop.8x128 v9, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 130]
+{ vst: vst.8x128 [vmem:0x48], v9 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 316] | Coalesced store.
+{ vr0: vpop.8x128 v10, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 131]
+{ vst: vst.8x128 [vmem:0x50], v10 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 317] | Coalesced store.
+{ vr0: vpop.8x128 v11, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 132]
+{ vst: vst.8x128 [vmem:0x58], v11 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 318] | Coalesced store.
+{ vr0: vpop.8x128 v12, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 133]
+{ vst: vst.8x128 [vmem:0x60], v12 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 319] | Coalesced store.
+{ vr0: vpop.8x128 v13, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 134]
+{ vst: vst.8x128 [vmem:0x68], v13 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 320] | Coalesced store.
+{ vr0: vpop.8x128 v14, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 135]
+{ vst: vst.8x128 [vmem:0x70], v14 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 321] | Coalesced store.
+{ vr0: vpop.8x128 v15, trf0 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:33-48:49 [transpose; LLO 136]
+{ vst: vst.8x128 [vmem:0x78], v15 }  # chapter01/09_transpose_xlu/01_pallas_transpose.py:48:16-48:30 [swap; LLO 322] | Coalesced store.
+{ s0: dma.simple [hbm:s1], [vmem:s0], length=64, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 64 ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:50:16-50:65 [dma_wait; LLO 327]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -64 ;  # chapter01/09_transpose_xlu/01_pallas_transpose.py:50:16-50:65 [dma_wait; LLO 328]
+  .encoding { misc.value = imm2 } }
+# end function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]
+# exit bundle: %transpose.1 = custom-call(%refs_0_.1)
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]; image bundles [546, 562)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s30, 0x2d, s29 }
+{ s0: sor.u32 s2, s30, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s2], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(function)/transpose/mpmd_map [symbol 4, transpose.1]
 
 ## f32[256,256]：数值检查通过
   vld.8x128：64
@@ -165,6 +271,15 @@
   提交到 trf1（vxpose.1.end.8x128）：2
   提交到 trf1（vxpose.3.8x128）：14
   提交到 trf1（vxpose.3.start.8x128）：2
+  提交指令的写法：
+    14 × vx0: vxpose.1.8x128 trf1, vN, 128
+    14 × vx0: vxpose.0.8x128 trf0, vN, 128
+    14 × vx0: vxpose.3.8x128 trf1, vN, 128
+    14 × vx0: vxpose.2.8x128 trf0, vN, 128
+    2 × vx0: vxpose.3.start.8x128 trf1, vN, 128
+    2 × vx0: vxpose.2.start.8x128 trf0, vN, 128
+    2 × vx0: vxpose.1.end.8x128 trf1, vN, 128
+    2 × vx0: vxpose.0.end.8x128 trf0, vN, 128
 
 ## f32[129,129]：数值检查通过
   vand.8x128.u32：1
@@ -186,6 +301,17 @@
   提交到 trf1（vxpose.1.start.end.8x128）：1
   提交到 trf1（vxpose.3.8x128）：7
   提交到 trf1（vxpose.3.end.8x128）：1
+  提交指令的写法：
+    7 × vx0: vxpose.2.8x128 trf0, vN, 128
+    7 × vx0: vxpose.0.8x128 trf0, vN, 128
+    7 × vx0: vxpose.3.8x128 trf1, vN, 8
+    7 × vx0: vxpose.1.8x128 trf1, vN, 8
+    1 × vx0: vxpose.0.start.8x128 trf0, vN, 128
+    1 × vx0: vxpose.1.start.8x128 trf1, vN, 8
+    1 × vx0: vxpose.2.end.8x128 trf0, vN, 128
+    1 × vx0: vxpose.0.start.end.8x128 trf0, vN, 128
+    1 × vx0: vxpose.3.end.8x128 trf1, vN, 8
+    1 × vx0: vxpose.1.start.end.8x128 trf1, vN, 8
 
 ## bf16[129,129]：数值检查通过
   vand.8x128.u32：1
@@ -210,4 +336,13 @@
   提交到 trf0（vxpose.2.packed.start.8x128）：1
   提交到 trf1（vsupp.1.8x128）：1
   提交到 trf1（vxpose.1.packed.start.end.8x128）：1
+  提交指令的写法：
+    4 × vx0: vsupp.2.8x128 trf0, vN
+    4 × vx0: vsupp.0.8x128 trf0, vN
+    3 × vx1: vxpose.0.packed.8x128 trf0, vN, 128
+    3 × vx1: vxpose.2.packed.8x128 trf0, vN, 128
+    1 × vx0: vsupp.1.8x128 trf1, vN
+    1 × vx1: vxpose.1.packed.start.end.8x128 trf1, vN, 128
+    1 × vx1: vxpose.2.packed.start.8x128 trf0, vN, 128
+    1 × vx1: vxpose.0.packed.end.8x128 trf0, vN, 128
 

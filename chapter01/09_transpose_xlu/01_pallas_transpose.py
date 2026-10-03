@@ -11,7 +11,7 @@ from jax.sharding import PartitionSpec as P
 import numpy as np
 
 import tpuasm_tools
-from transpose_common import CASES, summary
+from transpose_common import CASES, submit_forms, summary
 
 def transpose_kernel(mesh: jax.sharding.Mesh, count: int):
     tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
@@ -65,7 +65,9 @@ def main() -> None:
         listing = tpuasm_tools.kernel_listing(compiled)
         print(f'## {name}：数值检查通过')
         print(summary(listing))
-        if count == 1 and name == 'i32[128,128]':
+        print('  提交指令的写法：')
+        print(submit_forms(listing))
+        if count == 1 and name in ('i32[128,128]', 'bf16[128,128]'):
             print(listing)
         print()
 

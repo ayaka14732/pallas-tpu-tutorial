@@ -58,6 +58,20 @@ def main() -> None:
     for count in (1, 2, 4, 8, 16):
         submit = ''.join(bundle(xpose(index)) for index in range(16)) + bundle('s0: sfence')
         show(probe, f'k = {count:2d}', submit + read_lcc(20) + POP_TRF * count + END + POP_TRF * (16 - count))
+    xlu_variants(probe)
+
+def xpose_variant(index: int, count: int, packed: str, width: int) -> str:
+    """count 次提交组成的一次转置中的第 index 次；packed 为 '.packed' 时输入是打包的 16 bit 数据，width 是转置后的行数。"""
+    suffix = '.start' if index == 0 else '.end' if index == count - 1 else ''
+    return bundle(f'vx0: vxpose.0{packed}{suffix}.8x128 trf0, v10, {width}')
+
+def xlu_variants(probe: tpuasm_tools.LccProbe) -> None:
+    print('## XLU：打包的 bf16 转置（8 次提交）与转置后只有 8 行的转置（16 次提交、宽度 8）')
+    packed = ''.join(xpose_variant(index, 8, '.packed', 128) for index in range(8))
+    show(probe, '8 次打包提交，读数之后才取回', read_lcc(20) + packed + END + POP_TRF * 8)
+    show(probe, '8 次打包提交 + 8 次取回', read_lcc(20) + packed + POP_TRF * 8 + END)
+    narrow = ''.join(xpose_variant(index, 16, '', 8) for index in range(16))
+    show(probe, '16 次宽度 8 的提交 + 1 次取回', read_lcc(20) + narrow + POP_TRF + END)
 
 if __name__ == '__main__':
     main()
