@@ -1,0 +1,8 @@
+## precision=None
+  −100 到 100 的整数：与 float64 cumsum 相比最大绝对误差 0，最大相对误差 0
+  [0, 1) 的随机浮点数：与 float64 cumsum 相比最大绝对误差 0.0174，最大相对误差 0.00283
+  计算指令：vadd.8x128.s32×15、vand.8x128.u32×1、vdwg.128x128.f16×1、vimm.8x128.s32×2、vlaneseq.8x128.u32×1、vle.8x128.s32×16、vmatmul.8x128.f32×1、vmatpush.packed.msk.8x128.f16×8、vpackc.8x128.f32.f16×8、vpop.8x128×1、vsel.8x128×16、vshrl.8x128.s32×1、vsmask×8
+## precision=HIGHEST
+  −100 到 100 的整数：与 float64 cumsum 相比最大绝对误差 0，最大相对误差 0
+  [0, 1) 的随机浮点数：与 float64 cumsum 相比最大绝对误差 3.22e-06，最大相对误差 7.55e-08
+  计算指令：vadd.8x128.f32×5、vadd.8x128.s32×15、vand.8x128.u32×19、vdwg.128x128.f16×4、vimm.8x128.s32×10、vlaneseq.8x128.u32×1、vle.8x128.s32×16、vmatmul.hi.8x128.f32×3、vmatmul.hi.dwg.8x128.f32×2、vmatmul.low.8x128.f32×1、vmatpush.hi.8x128.f32×32、vmatpush.hi.msk.8x128.f32×48、vmatpush.low.msk.8x128.f32×16、vpop.8x128×6、vsel.8x128×24、vshrl.8x128.s32×1、vsmask×8、vsub.8x128.f32×34

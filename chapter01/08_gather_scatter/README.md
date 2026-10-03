@@ -28,7 +28,7 @@ f = lambda x, i: jnp.take_along_axis(x, i, axis=1)   # y[s,l] = x[s, i[s,l]]
 { vr0: vpop.8x128 v4, trf0 }                 # 取回结果
 ```
 
-重排由跨 lane 单元完成，本教程称为 XLU。它与上一节的 EUP 一样是“提交—取回”的形式：`vsetperm` 把索引装进重排控制寄存器 `pcr0`，`vperm` 把数据送入 XLU，结果进入队列 `trf0`，再由 `vpop` 取回。一次 gather 处理一整个 TC VREG：8 行各自按自己的 128 个索引重排。
+重排由跨 lane 单元完成，本教程称为 XLU。它与上一节的 EUP 一样是“提交—取回”的形式：`vsetperm` 把索引装进重排控制寄存器 `pcr0`，`vperm` 把数据送入 XLU，结果进入队列 `trf0`，再由 `vpop` 取回。一次 gather 处理一整个 TC VREG：8 行各自按自己的 128 个索引重排。`vsetperm` 的 `.all` 表示把整个 TC VREG 的索引都装进去；`u8` 说明每个索引按 8 位存放，足以表示 0–127。第三章第 6 节测得，`vperm` 提交之后 69 个周期才能取回，连续提交每 8 个周期一次：单次 gather 的等待很长，但许多个 TC VREG 一起重排时，XLU 每 8 个周期就能完成一个。
 
 前三条指令处理负索引：`take_along_axis` 允许 `-1` 表示最后一列，编译器先把负数加 128。实验的索引都非负，但编译器无法知道，这几条指令照样存在。
 

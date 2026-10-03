@@ -27,6 +27,10 @@ PATHS = {
     # 转置的结果有 16 个，其余 15 个在读数之后取回，否则 kernel 结束时队列不空，TensorCore 会停机。
     'XLU 最后一次 vxpose → 第一次 vpop trf0': (XLU_SETUP, xpose(15), 'vr0: vpop.8x128 v11, trf0', POP_TRF * 15),
     'XLU vadd.xlane → vpop trf0': ('', 'vx0: vadd.xlane.0.8x128.f32 trf0, v10', 'vr0: vpop.8x128 v11, trf0', ''),
+    # lane 循环移位：位移量 5 放在 s23 中。
+    'XLU vrot（lane 循环移位）→ vpop trf0': (bundle('s0: simm.s32 s23, 5'), 'vx0: vrot.0.8x128 trf0, v10, s23', 'vr0: vpop.8x128 v11, trf0', ''),
+    # lane 重排：重排模式事先用 vsetperm 装好。
+    'XLU vperm（lane 重排）→ vpop trf0': (bundle('vx0: vsetperm.2.all.u8 pcr0, v10') + bundle('misc: vnop') * 16, 'vx0: vperm.0.8x128 trf0, v10', 'vr0: vpop.8x128 v11, trf0', ''),
 }
 
 def show(probe: tpuasm_tools.LccProbe, label: str, body: str, setup: str = '') -> None:
@@ -60,9 +64,14 @@ def main() -> None:
         submit = ''.join(bundle(xpose(index)) for index in range(16)) + bundle('s0: sfence')
         show(probe, f'k = {count:2d}', submit + read_lcc(20) + POP_TRF * count + END + POP_TRF * (16 - count))
     xlu_variants(probe)
-    print('## XLU：连续 k 次 vadd.xlane，再连续取回 k 次')
-    for count in (1, 2, 4, 8):
-        show(probe, f'k = {count}', read_lcc(20) + bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10') * count + POP_TRF * count + END)
+    for name, instruction, setup in (
+        ('vadd.xlane', 'vx0: vadd.xlane.0.8x128.f32 trf0, v10', ''),
+        ('vrot', 'vx0: vrot.0.8x128 trf0, v10, s23', bundle('s0: simm.s32 s23, 5')),
+        ('vperm', 'vx0: vperm.0.8x128 trf0, v10', bundle('vx0: vsetperm.2.all.u8 pcr0, v10') + bundle('misc: vnop') * 16),
+    ):
+        print(f'## XLU：连续 k 次 {name}，再连续取回 k 次')
+        for count in (1, 2, 4, 8):
+            show(probe, f'k = {count}', read_lcc(20) + bundle(instruction) * count + POP_TRF * count + END, setup)
     print('## N 条相互依赖的 vrot.slane.down（sublane 循环移位，在向量 ALU 中执行）')
     for count in (1, 4, 7, 16):
         show(probe, f'N = {count:2d}', read_lcc(20) + bundle('va0: vrot.slane.down.8x128.u32 v11, v10') + bundle('va0: vrot.slane.down.8x128.u32 v11, v11') * (count - 1) + END)

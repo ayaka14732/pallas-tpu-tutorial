@@ -62,6 +62,8 @@ def cases() -> list[tuple[str, str, str, str]]:
     xlane, pop_trf = bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10'), bundle('vr0: vpop.8x128 v11, trf0')
     add('vadd.xlane → vpop', xlane + pop_trf)
     add('8 条 vadd.xlane → 8 条 vpop', xlane * 8 + pop_trf * 8)
+    add('lane 循环移位 vrot → vpop', bundle('vx0: vrot.0.8x128 trf0, v10, s23') + pop_trf, bundle('s0: simm.s32 s23, 5'))
+    add('4 次 lane 循环移位，每次移位前一次的结果', ''.join(bundle(f'vx0: vrot.0.8x128 trf0, {source}, s23') + bundle('vr0: vpop.8x128 v11, trf0') for source in ('v10', 'v11', 'v11', 'v11')), bundle('s0: simm.s32 s23, 5'))
     add('7 条相互依赖的 vrot.slane.down', bundle('va0: vrot.slane.down.8x128.u32 v11, v10') + bundle('va0: vrot.slane.down.8x128.u32 v11, v11') * 6)
     for count in (1, 16, 64):
         listing, trace = loop(count)
