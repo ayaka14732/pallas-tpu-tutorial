@@ -1,65 +1,65 @@
 ## bf16[16,128] → f32：与 XLA 的 astype 逐元素一致：True
 向量指令： {'vld.8x128': 1, 'vst.8x128': 2, 'vunpackl.8x128.f16.f32': 1, 'vunpacku.8x128.f16.f32': 1}
-  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 45] | Coalesced load.
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 45] | Coalesced load.
 { va0: vunpackl.8x128.f16.f32 v1, v0 ;
   va1: vunpacku.8x128.f16.f32 v2, v0 }
-{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 29]
-{ vst: vst.8x128 [vmem:0x10], v2 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 30]
+{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 29]
+{ vst: vst.8x128 [vmem:0x10], v2 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 30]
 
 ## f32[16,128] → bf16：与 XLA 的 astype 逐元素一致：True
 向量指令： {'vld.8x128': 2, 'vpackc.8x128.f32.f16': 1, 'vst.8x128': 1}
-  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 25]
-{ vld: vld.8x128 v1, [vmem:0x8] }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 26]
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 25]
+{ vld: vld.8x128 v1, [vmem:0x8] }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 26]
 { va0: vpackc.8x128.f32.f16 v2, v1, v0 }
-{ vst: vst.8x128 [vmem:0x10], v2 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 48] | Coalesced store.
+{ vst: vst.8x128 [vmem:0x10], v2 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 48] | Coalesced store.
 
 ## f32[8,128] → int32：与 XLA 的 astype 逐元素一致：True
 f32 输入： [0.5, 1.5, 2.5, -0.5, -1.5, -2.5, 2.700000047683716, -2.700000047683716] → int32： [0, 1, 2, 0, -1, -2, 2, -2]
 向量指令： {'vcvt.8x128.f32.s32': 1, 'vld.8x128': 1, 'vst.8x128': 1}
-  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 25]
-{ va0: vcvt.8x128.f32.s32 v1, v0, 0xffffffff }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 27]
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 25]
+{ va0: vcvt.8x128.f32.s32 v1, v0, 0xffffffff }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 27]
 
 ## int32[8,128] → f32：与 XLA 的 astype 逐元素一致：True
 向量指令： {'vcvt.8x128.s32.f32': 1, 'vld.8x128': 1, 'vst.8x128': 1}
-  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 25]
-{ va0: vcvt.8x128.s32.f32 v1, v0 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 26]
-{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 27]
+  vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 25]
+{ va0: vcvt.8x128.s32.f32 v1, v0 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 26]
+{ vst: vst.8x128 [vmem:0x8], v1 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 27]
 
 ## int8[32,128] → int32：与 XLA 的 astype 逐元素一致：True
 向量指令： {'vand.8x128.u32': 1, 'vlaneseq.8x128.u32': 1, 'vld.8x128': 1, 'vld.sshfl.8x128': 4, 'vshll.8x128.s32': 4, 'vshra.8x128.s32': 4, 'vshrl.8x128.s32': 1, 'vst.8x128': 8, 'vsub.8x128.s32': 1}
-{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 25]
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 25]
 { va0: vlaneseq.8x128.u32 v1 ;
-  vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 26]
+  vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 26]
 { va1: vshrl.8x128.s32 v2, v1, 0x4 }
 { va0: vand.8x128.u32 v3, 0x18, v2 }
 { va0: vsub.8x128.s32 v4, 24, v3 }
-{ vld: vld.sshfl.8x128 v5, [vmem:0x28], 0x11110000 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 27]
+{ vld: vld.sshfl.8x128 v5, [vmem:0x28], 0x11110000 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 27]
 { va1: vshll.8x128.s32 v6, v5, v4 }
-{ va1: vshra.8x128.s32 v7, v6, 0x18 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-{ vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 29]
-{ vld: vld.sshfl.8x128 v8, [vmem:0x2a], 0x11110000 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 31]
+{ va1: vshra.8x128.s32 v7, v6, 0x18 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+{ vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 29]
+{ vld: vld.sshfl.8x128 v8, [vmem:0x2a], 0x11110000 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 31]
 { va1: vshll.8x128.s32 v9, v8, v4 }
-{ va1: vshra.8x128.s32 v10, v9, 0x18 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-{ vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 33]
-{ vld: vld.sshfl.8x128 v11, [vmem:0x2c], 0x11110000 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 35]
+{ va1: vshra.8x128.s32 v10, v9, 0x18 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+{ vst: vst.8x128 [vmem:0x28], v0 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 33]
+{ vld: vld.sshfl.8x128 v11, [vmem:0x2c], 0x11110000 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 35]
 { va1: vshll.8x128.s32 v12, v11, v4 }
-{ va1: vshra.8x128.s32 v13, v12, 0x18 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-  vst: vst.8x128 [vmem:0x28], v0 ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 37]
-{ vst: vst.8x128 [vmem:0x8], v7 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 41]
-{ vst: vst.8x128 [vmem:0x10], v10 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 42]
-{ vst: vst.8x128 [vmem:0x18], v13 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 43]
-{ vld: vld.sshfl.8x128 v14, [vmem:0x2e], 0x11110000 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 39]
+{ va1: vshra.8x128.s32 v13, v12, 0x18 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+  vst: vst.8x128 [vmem:0x28], v0 ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 37]
+{ vst: vst.8x128 [vmem:0x8], v7 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 41]
+{ vst: vst.8x128 [vmem:0x10], v10 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 42]
+{ vst: vst.8x128 [vmem:0x18], v13 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 43]
+{ vld: vld.sshfl.8x128 v14, [vmem:0x2e], 0x11110000 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 39]
 { va1: vshll.8x128.s32 v15, v14, v4 }
-{ va1: vshra.8x128.s32 v16, v15, 0x18 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-{ vst: vst.8x128 [vmem:0x20], v16 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 44]
+{ va1: vshra.8x128.s32 v16, v15, 0x18 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+{ vst: vst.8x128 [vmem:0x20], v16 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 44]
 
 ## int32[32,128] → int8：与 XLA 的 astype 逐元素一致：True
 向量指令： {'vand.8x128.u32': 8, 'vld.8x128': 5, 'vor.8x128.u32': 4, 'vpackc.8x128.f32.f16': 8, 'vshll.8x128.s32': 8, 'vst.8x128': 5}
-{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 25]
-{ vld: vld.8x128 v1, [vmem:0x8] }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 26]
-{ vld: vld.8x128 v2, [vmem:0x10] }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 27]
-{ vld: vld.8x128 v3, [vmem:0x18] }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:37 [get; LLO 28]
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 25]
+{ vld: vld.8x128 v1, [vmem:0x8] }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 26]
+{ vld: vld.8x128 v2, [vmem:0x10] }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 27]
+{ vld: vld.8x128 v3, [vmem:0x18] }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:37 [get; LLO 28]
   va1: vshll.8x128.s32 v4, v0, 0x18 ;
 { va0: vpackc.8x128.f32.f16 v5, 0.0, v4 ;
   va1: vshll.8x128.s32 v6, v1, 0x18 }
@@ -71,27 +71,27 @@ f32 输入： [0.5, 1.5, 2.5, -0.5, -1.5, -2.5, 2.700000047683716, -2.7000000476
   va1: vshll.8x128.s32 v11, v9, 0x8 }
 { va0: vor.8x128.u32 v13, v10, v11 ;
   va1: vshll.8x128.s32 v14, v12, 0x8 }
-{ va0: vpackc.8x128.f32.f16 v15, 0.0, v13 ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
+{ va0: vpackc.8x128.f32.f16 v15, 0.0, v13 ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
   va1: vand.8x128.u32 v16, 0xff000000, v7 }
 { va0: vor.8x128.u32 v17, v16, v14 ;
   va1: vpackc.8x128.f32.f16 v18, 0.0, v8 }
-{ va0: vpackc.8x128.f32.f16 v19, 0.0, v17 ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
+{ va0: vpackc.8x128.f32.f16 v19, 0.0, v17 ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
   va1: vshll.8x128.s32 v20, v3, 0x18 ;
-  vst: vst.8x128 [vmem:0x28, sm=3], v15 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 32]
+  vst: vst.8x128 [vmem:0x28, sm=3], v15 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 32]
 { va0: vand.8x128.u32 v21, 0xff00, v18 ;
   va1: vand.8x128.u32 v22, 0xff000000, v18 }
 { va0: vpackc.8x128.f32.f16 v24, 0.0, v20 ;
   va1: vshll.8x128.s32 v23, v21, 0x8 ;
-  vst: vst.8x128 [vmem:0x2a, sm=3], v19 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 37]
+  vst: vst.8x128 [vmem:0x2a, sm=3], v19 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 37]
 { va0: vor.8x128.u32 v25, v22, v23 }
-{ va0: vpackc.8x128.f32.f16 v26, 0.0, v25 ;  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
+{ va0: vpackc.8x128.f32.f16 v26, 0.0, v25 ;  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
   va1: vand.8x128.u32 v27, 0xff00, v24 }
 { va0: vand.8x128.u32 v29, 0xff000000, v24 ;
   va1: vshll.8x128.s32 v28, v27, 0x8 }
 { va0: vor.8x128.u32 v30, v29, v28 ;
-  vst: vst.8x128 [vmem:0x2c, sm=3], v26 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 42]
-{ va0: vpackc.8x128.f32.f16 v31, 0.0, v30 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51
-{ vst: vst.8x128 [vmem:0x2e, sm=3], v31 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 47]
-{ vld: vld.8x128 v0, [vmem:0x28] }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:26-38:51 [convert_element_type; LLO 48]
-{ vst: vst.8x128 [vmem:0x20], v0 }  # chapter01/05_dtype_conversion/01_pallas_conversions.py:38:12-38:23 [swap; LLO 49]
+  vst: vst.8x128 [vmem:0x2c, sm=3], v26 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 42]
+{ va0: vpackc.8x128.f32.f16 v31, 0.0, v30 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51
+{ vst: vst.8x128 [vmem:0x2e, sm=3], v31 }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 47]
+{ vld: vld.8x128 v0, [vmem:0x28] }  # chapter01/05_dtype_conversion/conversion_common.py:33:26-33:51 [convert_element_type; LLO 48]
+{ vst: vst.8x128 [vmem:0x20], v0 }  # chapter01/05_dtype_conversion/conversion_common.py:33:12-33:23 [swap; LLO 49]
 
