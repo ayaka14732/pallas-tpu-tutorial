@@ -41,7 +41,7 @@ bundle 455：va0: setrngseed v13；bundle 456：va0: vrng.8x128.u32 v17
 所以程序每次启动时，前导用 runtime 写入的值、芯片、TensorCore 和生成器的编号算出 64 个各不相同的状态，`setrngseed` 装入，再空转一次 `vrng`。实验读出连续 4 次调用中 runtime 写入的值：
 
 ```text
-连续 4 次调用中 [smem:0x3ffe0] 的值：0xc650c698、0x0cfb5ae9、0x4d9456c9、0x9d6f3188
+连续 4 次调用中 [smem:0x3ffe0] 的值：0x208e3da4、0xa93e8cd2、0x135d7960、0x0bf19785
 连续两次调用读出的状态相同：False
 同一次调用中两个 TensorCore 读出的状态相同：False
 ```
