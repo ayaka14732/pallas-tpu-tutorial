@@ -1,0 +1,5 @@
+Pallas key 的数据：shape (1, 2)，dtype uint32
+## 同一个 key 采样两次，再分别 fold_in(key, 1)、fold_in(key, 2)：setrngseed 4 条，vrng 16 条
+  两次采样相同：True；fold_in 1 与原 key 不同：True；fold_in 1 与 2 不同：True
+## split：NotImplementedError：Cannot split a Pallas key. Use fold_in instead to generate new keys.
+## sample_block：整块与 [8,128] 分块相同 True；整块与 [16,128] 分块相同 True

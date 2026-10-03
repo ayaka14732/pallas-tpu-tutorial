@@ -40,7 +40,7 @@ def kernel(x_hbm: Ref, s_hbm: Ref, o_hbm: Ref, x_vmem: Ref, s_smem: Ref, sem: Re
 - `sld` 从 SMEM 读一个 32 bit 数到标量寄存器，只能在 `s1` 槽。`s_smem[0]` 和 `s_smem[1]` 的地址是 `0x3e` 和 `0x3f`：SMEM 的地址以 32 bit 为单位。
 - 等待 SMEM 的 DMA 之后，编译器插入了一条 `sfence`，然后才 `sld`。等待向量数据时没有这条指令。
 
-> 暂且可以理解为：`sfence` 让后面的标量指令等到此前发出的指令全部完成才发射，保证 `sld` 读到的是 DMA 写入后的值。第三章第 5 节详细介绍 `sfence` 的确切语义，以及它在计时中的作用。
+> 暂且可以理解为：`vwait` 只挡住向量指令，标量指令可以越过它先执行；`sfence` 让后面的标量指令等到此前的指令（包括 `vwait`）都已发出才执行，保证 `sld` 读到的是 DMA 写入后的值。第三章第 5 节详细介绍 `sfence` 的确切语义，并演示去掉这条 `sfence` 的后果。
 
 - 标量参与向量运算前，要先用 `vmov` 把它广播成一个 TC VREG（`vmov.8x128 v2, s16`），再做向量乘法。与之对照，常数 2.0 可以直接写成 `vmul` 的立即数操作数，不需要广播。
 

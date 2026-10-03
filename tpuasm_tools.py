@@ -129,12 +129,14 @@ def bundle_text(serialized: bytes, pc: int, *, encoding: str = 'canonical') -> s
     start, end = _bundle_spans(lines)[pc]
     return '\n'.join(lines[start:end + 1])
 
-def find_bundles(serialized: bytes, text: str, *, encoding: str = 'canonical') -> list[int]:
-    """Pallas kernel 中文本包含 text 的 bundle 编号，按顺序排列。"""
+def find_bundles(serialized: bytes, text: str, *, encoding: str = 'canonical', whole_program: bool = False) -> list[int]:
+    """文本包含 text 的 bundle 编号，按顺序排列；默认只在 Pallas kernel 中查找，whole_program=True 时在整个程序（包括 runtime 代码）中查找。"""
     (_, _, image), = executable_programs(serialized)
     lines = format_assembly(image, target=TARGET, encoding=encoding).splitlines()
     spans = _bundle_spans(lines)
-    return [pc for pc in pallas_bundles(serialized) if text in '\n'.join(lines[spans[pc][0]:spans[pc][1] + 1])]
+    candidates = range(len(spans)) if whole_program else pallas_bundles(serialized)
+    # 只在指令文本中查找，不匹配行尾的源码注释。
+    return [pc for pc in candidates if text in '\n'.join(line.split('#')[0] for line in lines[spans[pc][0]:spans[pc][1] + 1])]
 
 def edit_bundles(serialized: bytes, edits: dict[int, tuple[str, str]]) -> bytes:
     """只在指定编号的 bundle 内做文本替换：edits[pc] = (原文本, 新文本)，原文本在该 bundle 中必须恰好出现一次。
@@ -225,8 +227,8 @@ class LccProbe:
         self.serialized = edit_bundles(serialized, {marker: (instruction, f'{instruction.split(":")[0]}: vmov.8x128 {destination}, v10')})
         self.marker = marker
 
-    def run_raw(self, body: str, reads: int, repeats: int = 8, setup: str = '') -> np.ndarray:
-        """返回 (repeats, num_cores, reads) 的 64 位读数。"""
+    def _load(self, body: str, reads: int, setup: str) -> Callable[[jax.Array], jax.Array]:
+        """把 setup、片段和写回读数的后缀插入载体，返回可调用的 executable。"""
         # 载体在插入点之后还要用到的标量寄存器可能落在 s20–s30 中：先广播进 v20–v30 保存，最后经 vpush/spop 恢复。
         save = ''.join(bundle(f'va0: vmov.8x128 v{register}, s{register}') for register in SAVED) + bundle('s0: sfence')
         restore = ''.join(bundle(f'vst: vpush v2sf, v{register}') + bundle(f's0: spop s{register}, v2sf') for register in SAVED)
@@ -236,13 +238,22 @@ class LccProbe:
         for tile, register in enumerate(registers, 1):
             suffix += bundle(f'va0: vmov.8x128 v12, s{register}') + bundle('misc: vnop') * 8 + bundle(f'vst: vst.8x128 [vmem:0x{tile * 8:x}], v12')
         suffix += bundle('misc: vnop') * 16 + bundle('s0: sfence') + restore + bundle('s0: sfence')
-        function = load(insert_bundles(self.serialized, {self.marker: prefix + body + suffix}), self.compiled)
+        return load(insert_bundles(self.serialized, {self.marker: prefix + body + suffix}), self.compiled)
+
+    def run_raw(self, body: str, reads: int, repeats: int = 8, setup: str = '') -> np.ndarray:
+        """返回 (repeats, num_cores, reads) 的 64 位读数。"""
+        function = self._load(body, reads, setup)
         rows = [core * 72 + tile * 8 for core in range(self.num_cores) for tile in range(1, 2 * reads + 1)]
         samples = []
         for _ in range(repeats):
             halves = np.asarray(function(self.x))[rows, 0].astype(np.uint64).reshape(self.num_cores, 2, reads)
             samples.append(halves[:, 0] | (halves[:, 1] << np.uint64(32)))
         return np.array(samples)
+
+    def run_tiles(self, body: str, repeats: int = 1, setup: str = '') -> np.ndarray:
+        """片段自己用 vst 把结果写进 TC VMEM 的第 1–8 个 tile（地址 0x8 到 0x40）；返回 (repeats, num_cores, 8, 8, 128) 的 u32 数组。"""
+        function = self._load(body, 0, setup)
+        return np.array([np.asarray(function(self.x)).reshape(self.num_cores, 9, 8, 128)[:, 1:] for _ in range(repeats)])
 
     def run(self, body: str, repeats: int = 8, setup: str = '') -> np.ndarray:
         """返回 (repeats, 2) 的数组：每次运行的 R1 − R0 与 R2 − R0（R0、R1、R2 是第 0、1、2 次读数）。"""

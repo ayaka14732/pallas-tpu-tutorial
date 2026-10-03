@@ -1,0 +1,8 @@
+## prng_seed(7) + prng_random_bits((8, 128))：kernel 段 119 个 bundle，setrngseed 之前 97 个
+  setrngseed 之前的指令：vadd.8x128.s32 36，vxor.8x128.u32 21，vshll.8x128.s32 20，vshrl.8x128.s32 20，vor.8x128.u32 20，vtrace 1，sld 1，sne.s32 1，sbr.rel 1，simm.s32 1，vlaneseq.8x128.u32 1
+  { va0: setrngseed v21 }；{ va0: vrng.8x128.u32 v22 }
+  读回的状态经 xorshift128+ 模型得到的 tile 与 kernel 的输出一致：True
+## prng_seed(0)：输出中 0 的个数 0 / 1024
+## prng_seed(1)：输出中 0 的个数 0 / 1024
+## prng_random_bits((64, 128))：vrng 8 条，setrngseed 1 条
+## 两个 TensorCore 都 prng_seed(7)：两个 TensorCore 的输出相同 True

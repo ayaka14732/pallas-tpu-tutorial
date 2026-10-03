@@ -1,0 +1,14 @@
+## threefry2x32，u32[8,128]（1 个 TC VREG）：kernel 段 240 个 bundle，向量运算 267 条，平均每个 TC VREG 267.0 条
+  vadd.8x128.s32 74，vshll.8x128.s32 41，vshrl.8x128.s32 41，vxor.8x128.u32 41，vor.8x128.u32 40，vmov.8x128 10，sld 5，vpop.8x128 5
+  与 kernel 外的 jax.random.bits 逐位相同：True
+## philox4x32，u32[8,128]（1 个 TC VREG）：kernel 段 623 个 bundle，向量运算 1162 条，平均每个 TC VREG 1162.0 条
+  vshll.8x128.s32 363，vadd.8x128.s32 329，vsub.8x128.s32 222，vshrl.8x128.s32 96，vand.8x128.u32 77，vxor.8x128.u32 36，vst.8x128 24，vld.8x128 23
+## 硬件 vrng，u32[8,128]（1 个 TC VREG）：kernel 段 126 个 bundle，向量运算 124 条，平均每个 TC VREG 124.0 条
+  vadd.8x128.s32 37，vxor.8x128.u32 23，vshll.8x128.s32 20，vshrl.8x128.s32 20，vor.8x128.u32 20，sld 5，vwait.ge 3，vsyncadd.s32 3
+## threefry2x32，u32[64,128]（8 个 TC VREG）：kernel 段 626 个 bundle，向量运算 1107 条，平均每个 TC VREG 138.4 条
+  vadd.8x128.s32 340，vshll.8x128.s32 188，vxor.8x128.u32 188，vshrl.8x128.s32 181，vor.8x128.u32 180，vld.8x128 136，vst.8x128 134，vmov.8x128 10
+  与 kernel 外的 jax.random.bits 逐位相同：True
+## philox4x32，u32[64,128]（8 个 TC VREG）：kernel 段 1163 个 bundle，向量运算 2214 条，平均每个 TC VREG 276.8 条
+  vshll.8x128.s32 705，vadd.8x128.s32 637，vsub.8x128.s32 438，vshrl.8x128.s32 186，vand.8x128.u32 149，vxor.8x128.u32 72，vst.8x128 68，vld.8x128 62
+## 硬件 vrng，u32[64,128]（8 个 TC VREG）：kernel 段 140 个 bundle，向量运算 131 条，平均每个 TC VREG 16.4 条
+  vadd.8x128.s32 37，vxor.8x128.u32 23，vshll.8x128.s32 20，vshrl.8x128.s32 20，vor.8x128.u32 20，vrng.8x128.u32 8，vst.8x128 8，sld 5

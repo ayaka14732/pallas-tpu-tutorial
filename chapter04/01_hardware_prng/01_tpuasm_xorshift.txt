@@ -1,0 +1,21 @@
+## va0：状态取自输入的前两个 sublane
+  getrngseed：与模型一致的 word 1024 / 1024
+  第 1 条 vrng：与模型一致的 word 1024 / 1024
+  getrngseed：与模型一致的 word 1024 / 1024
+  第 2 条 vrng：与模型一致的 word 1024 / 1024
+  getrngseed：与模型一致的 word 1024 / 1024
+  两次运行逐位相同：True
+## va1：状态取自输入的前两个 sublane
+  getrngseed：与模型一致的 word 1024 / 1024
+  第 1 条 vrng：与模型一致的 word 1024 / 1024
+  getrngseed：与模型一致的 word 1024 / 1024
+  第 2 条 vrng：与模型一致的 word 1024 / 1024
+  getrngseed：与模型一致的 word 1024 / 1024
+  两次运行逐位相同：True
+## getrngseed 读回的状态：只有前两个 sublane 有效，读回时重复 4 次
+  读回的 sublane 0、1 与输入相同：True；sublane 2–7 是 0、1 的重复：True
+## 全零状态
+  两条 vrng 的输出全为 0：True
+## 第 1 条 vrng 的前 2 个 sublane、前 4 个 lane（同一个生成器的连续两步占同一对 lane）
+[[0x3c3adca8 0x07b1dae9 0x1550ec1c 0x6cb0bbec]
+ [0x15665f90 0xeed69cbe 0xbb1c9084 0xb7b688f4]]
