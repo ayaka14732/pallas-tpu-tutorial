@@ -27,7 +27,10 @@ def remove_prelude(probe: tpuasm_tools.LccProbe) -> list[str]:
 
 def main() -> None:
     probe = tpuasm_tools.LccProbe()
-    print('## 编译器加入的随机数前导')
+    print('## 编译器加入的随机数前导：读入 runtime 的值之后的 14 个 bundle')
+    start, = tpuasm_tools.find_bundles(probe.serialized, '[smem:0x3ffe0]', whole_program=True)
+    for pc in range(start, start + 14):
+        print(f'  {pc}: {" ".join(tpuasm_tools.bundle_text(probe.serialized, pc).split("#")[0].split())}')
     print('  ' + '；'.join(remove_prelude(probe)))
     programs = {
         '装入并生成': bundle('va0: setrngseed v10') + GAP + to_tile1('vrng.8x128.u32 v11'),

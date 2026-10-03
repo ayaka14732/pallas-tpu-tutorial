@@ -16,6 +16,13 @@
   读回的 sublane 0、1 与输入相同：True；sublane 2–7 是 0、1 的重复：True
 ## 全零状态
   两条 vrng 的输出全为 0：True
-## 第 1 条 vrng 的前 2 个 sublane、前 4 个 lane（同一个生成器的连续两步占同一对 lane）
-[[0x3c3adca8 0x07b1dae9 0x1550ec1c 0x6cb0bbec]
- [0x15665f90 0xeed69cbe 0xbb1c9084 0xb7b688f4]]
+## 只有第 5 个生成器的状态非零（lane 10、11 的 sublane 0、1）
+  第 1 条 vrng 输出中非零的 lane：[10, 11]；各 sublane 都非零：True
+  sublane 0：0x6aa1f3bb621e99e6，第 1 步 0x6aa1f3bb621e99e6
+  sublane 1：0x2ef54d94e9c25bcc，第 2 步 0x2ef54d94e9c25bcc
+  sublane 2：0xa09e2c3d5e0c5b73，第 3 步 0xa09e2c3d5e0c5b73
+  sublane 3：0x27ee0cbda589a6eb，第 4 步 0x27ee0cbda589a6eb
+  sublane 4：0x68c086ce0b4870c9，第 5 步 0x68c086ce0b4870c9
+  sublane 5：0xde7f01fea131db86，第 6 步 0xde7f01fea131db86
+  sublane 6：0x4cb507f6f4adf6df，第 7 步 0x4cb507f6f4adf6df
+  sublane 7：0x6d679074c74708f7，第 8 步 0x6d679074c74708f7

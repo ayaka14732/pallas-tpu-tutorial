@@ -16,7 +16,7 @@ def kernel(o_hbm: Ref, bits_vmem: Ref, sem: Ref) -> None:
     pltpu.async_copy(bits_vmem, o_hbm.at[pl.ds(core * rows, rows)], sem).wait()
 ```
 
-`pltpu.prng_seed` 接受一个或多个整数，`pltpu.prng_random_bits(shape)` 返回该形状的 32 位随机比特（类型为 int32，这里转成 uint32）。
+`pltpu.prng_seed` 接受一个或两个整数，可以是常数，也可以是运行时的标量（第 4 节的实验从 SMEM 读出种子）；`pltpu.prng_random_bits(shape)` 返回该形状的 32 位随机比特（类型为 int32，这里转成 uint32）。
 
 `prng_seed(7)` 与 `rows = 8` 的清单：
 
@@ -26,7 +26,17 @@ setrngseed 之前的指令：vadd.8x128.s32 36，vxor.8x128.u32 21，vshll.8x128
 { va0: setrngseed v21 }；{ va0: vrng.8x128.u32 v22 }
 ```
 
-`prng_seed` 不是把整数直接装进状态。编译器用 `vlaneseq` 得到每个 lane 的编号，与种子一起经过约 120 条加法、异或、移位组成的混合运算（移位与 `vor` 成对出现，是 32 位的循环移位），算出 64 个生成器各不相同的状态，再 `setrngseed`。之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
+`prng_seed` 不是把整数直接装进状态。编译器用 `vlaneseq` 得到每个元素的编号，与种子一起经过约 120 条向量运算的混合，算出 64 个生成器各不相同的状态，再 `setrngseed`。混合运算的组成很规整：20 组 `vshll`、`vshrl`、`vor`，即 20 次 32 位循环移位（第 4 节），加上约 20 条 `vxor` 和 36 条 `vadd`。这正是“加法—循环移位—异或”交替 20 轮的结构，与 threefry2x32 的一次 hash 相同；本节没有逐条核对它与 threefry2x32 的常数是否一致。之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
+
+种子的个数几乎不影响代价，但最多只能有两个：
+
+```text
+prng_seed(7,)：118 条，其中 vshll 20
+prng_seed(7, 1)：119 条，其中 vshll 20
+prng_seed(7, 1, 2)：编译失败：Setting seed with more than 2 values is not supported.
+```
+
+要把更多的坐标（例如请求编号、步数、核编号）混进种子，可以先在标量一侧把它们合成两个整数，或者改用下面的 Pallas key，用 `fold_in` 依次混入。
 
 为了确认输出就是第 1 节的生成器，实验把最后一条 `vrng` 换成 `getrngseed`，kernel 写出的就成了混合运算算出的状态；把这个状态交给主机模型：
 

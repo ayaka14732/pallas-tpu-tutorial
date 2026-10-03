@@ -30,5 +30,5 @@
 | 能否保存与恢复 | `getrngseed` 不改变状态，读出的状态用 `setrngseed` 装回可精确重放 | 第 2 节 |
 | `prng_seed` 是否区分 TensorCore | 不区分：必须把核、芯片编号写进种子 | 第 3 节 |
 | 计数器式生成器的代价 | threefry2x32 每个 TC VREG 约 138 条向量运算，Philox 约 277 条 | 第 4 节 |
-| 随机舍入 | `pltpu.stochastic_round` 在 TPU v4 上不能编译；用整数加法实现，3 条指令 | 第 5 节 |
-| 速度 | `vrng` 每 8 个周期一个 TC VREG（约 514 GB/s），threefry2x32 约 120 个周期 | 第 6 节 |
+| 从比特到分布 | 均匀、伯努利、随机舍入每个 TC VREG 3 条指令，可以藏在 `vrng` 的发射间隔里；正态分布约 77 条；`pltpu.stochastic_round` 在 TPU v4 上不能编译，用整数加法实现 | 第 5 节 |
+| 速度 | `vrng` 每 8 个周期一个 TC VREG（约 514 GB/s）；正态分布与 Philox 受向量 ALU 限制；threefry2x32 约 120 个周期，移位只能在 `va1` 发射 | 第 6 节 |

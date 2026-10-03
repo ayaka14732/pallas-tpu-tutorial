@@ -1,3 +1,5 @@
+/srv/workspace/pallas-ecosystem/pallas-tpu-tutorial/chapter01/14_top_k/01_pallas_top_k.py:99: DeprecationWarning: backend and device argument on jit is deprecated. You can use `jax.device_put(..., jax.local_devices(backend="cpu")[0])` on the inputs to the jitted function to get the same behavior.
+  expected_values, expected_indices = (np.asarray(array) for array in jax.jit(jax.lax.top_k, static_argnums=1, backend='cpu')(x, k))
 ## max 与 argmax，f32[8,128]
   值与 CPU 结果一致：True；下标与 CPU 结果一致：True
   计算指令：vand.8x128.u32×1、veq.8x128.s32×1、vlaneseq.8x128.u32×1、vmax.index.xlane.0.8x128.f32×1、vmax.xlane.2.8x128.f32×1、vpop.8x128×2
@@ -22,4 +24,12 @@
   值与 CPU 结果一致：True；下标与 CPU 结果一致：False
   第 0 行下标：[0, 2, 1, 127, 127, 127, 127, 127]；CPU：[0, 2, 1, 3, 4, 5, 6, 7]
   计算指令：vand.8x128.u32×1、veq.8x128.s32×8、vlaneseq.8x128.u32×1、vlt.8x128.s32×7、vmax.index.xlane.0.8x128.f32×2、vmax.index.xlane.1.8x128.f32×2、vmax.index.xlane.2.8x128.f32×2、vmax.index.xlane.3.8x128.f32×2、vmax.xlane.0.8x128.f32×2、vmax.xlane.1.8x128.f32×2、vmax.xlane.2.8x128.f32×2、vmax.xlane.3.8x128.f32×2、vpop.8x128×16、vsel.8x128×21
+
+## 手写 top-8，用掩码排除已选位置，f32[8,128]
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、vcvt.8x128.f32.s32×8、vcvt.8x128.s32.f32×1、veq.8x128.f32×15、veq.8x128.s32×3、vimm.8x128.s32×1、vlaneseq.8x128.u32×1、vlt.8x128.s32×10、vmax.xlane.0.8x128.f32×3、vmax.xlane.2.8x128.f32×4、vmax.xlane.3.8x128.f32×1、vmin.xlane.0.8x128.f32×1、vmin.xlane.1.8x128.f32×4、vmin.xlane.3.8x128.f32×3、vmor.8x128.u1×6、vmxor.8x128.u1×7、vpop.8x128×16、vsel.8x128×36
+
+## 手写 top-8，用掩码排除已选位置，每行只有 3 个有限值，其余为 -inf
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+  计算指令：vand.8x128.u32×1、vcvt.8x128.f32.s32×8、vcvt.8x128.s32.f32×1、veq.8x128.f32×15、veq.8x128.s32×3、vimm.8x128.s32×1、vlaneseq.8x128.u32×1、vlt.8x128.s32×10、vmax.xlane.0.8x128.f32×3、vmax.xlane.2.8x128.f32×4、vmax.xlane.3.8x128.f32×1、vmin.xlane.0.8x128.f32×1、vmin.xlane.1.8x128.f32×4、vmin.xlane.3.8x128.f32×3、vmor.8x128.u1×6、vmxor.8x128.u1×7、vpop.8x128×16、vsel.8x128×36
 

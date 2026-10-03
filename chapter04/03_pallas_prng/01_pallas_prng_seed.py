@@ -63,6 +63,19 @@ def main() -> None:
     state = np.asarray(tpuasm_tools.load(tpuasm_tools.edit_bundles(serialized, {pc: (instruction, instruction.replace('vrng.8x128.u32', 'getrngseed'))}), compiled)())
     expected, _, _ = rng_oracle.vrng(*rng_oracle.state_from_tile(state))
     print(f'  读回的状态经 xorshift128+ 模型得到的 tile 与 kernel 的输出一致：{bool(np.array_equal(expected, bits))}')
+    print('## 只改种子的个数：setrngseed 之前的向量运算')
+    for seeds in ((7,), (7, 1), (7, 1, 2)):
+        mesh, draw = build(8, seeds=lambda core: seeds)
+        try:
+            compiled = tpuasm_tools.compile(draw, mesh=mesh)
+        except Exception as error:
+            print(f'  prng_seed{seeds}：编译失败：{str(error).splitlines()[0].split(": ")[-1]}')
+            continue
+        lines = tpuasm_tools.kernel_listing(compiled, pallas_only=True).splitlines()
+        seed_line = next(index for index, line in enumerate(lines) if 'setrngseed' in line.split('#')[0])
+        counts = tpuasm_tools.count_mnemonics('\n'.join(lines[:seed_line]))
+        vector = sum(count for name, count in counts.items() if name.startswith('v') and not name.startswith(('vtrace', 'vld', 'vst')))
+        print(f'  prng_seed{seeds}：{vector} 条，其中 vshll {counts.get("vshll.8x128.s32", 0)}')
     for seed in (0, 1):
         mesh, draw = build(8, seeds=lambda core: (seed,))
         print(f'## prng_seed({seed})：输出中 0 的个数 {int(np.sum(np.asarray(tpuasm_tools.compile(draw, mesh=mesh)()) == 0))} / 1024')

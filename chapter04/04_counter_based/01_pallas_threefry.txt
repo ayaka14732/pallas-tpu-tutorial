@@ -1,14 +1,33 @@
-## threefry2x32，u32[8,128]（1 个 TC VREG）：kernel 段 240 个 bundle，向量运算 267 条，平均每个 TC VREG 267.0 条
-  vadd.8x128.s32 74，vshll.8x128.s32 41，vshrl.8x128.s32 41，vxor.8x128.u32 41，vor.8x128.u32 40，vmov.8x128 10，sld 5，vpop.8x128 5
-  与 kernel 外的 jax.random.bits 逐位相同：True
-## philox4x32，u32[8,128]（1 个 TC VREG）：kernel 段 623 个 bundle，向量运算 1162 条，平均每个 TC VREG 1162.0 条
-  vshll.8x128.s32 363，vadd.8x128.s32 329，vsub.8x128.s32 222，vshrl.8x128.s32 96，vand.8x128.u32 77，vxor.8x128.u32 36，vst.8x128 24，vld.8x128 23
-## 硬件 vrng，u32[8,128]（1 个 TC VREG）：kernel 段 126 个 bundle，向量运算 124 条，平均每个 TC VREG 124.0 条
-  vadd.8x128.s32 37，vxor.8x128.u32 23，vshll.8x128.s32 20，vshrl.8x128.s32 20，vor.8x128.u32 20，sld 5，vwait.ge 3，vsyncadd.s32 3
-## threefry2x32，u32[64,128]（8 个 TC VREG）：kernel 段 626 个 bundle，向量运算 1107 条，平均每个 TC VREG 138.4 条
-  vadd.8x128.s32 340，vshll.8x128.s32 188，vxor.8x128.u32 188，vshrl.8x128.s32 181，vor.8x128.u32 180，vld.8x128 136，vst.8x128 134，vmov.8x128 10
-  与 kernel 外的 jax.random.bits 逐位相同：True
-## philox4x32，u32[64,128]（8 个 TC VREG）：kernel 段 1163 个 bundle，向量运算 2214 条，平均每个 TC VREG 276.8 条
-  vshll.8x128.s32 705，vadd.8x128.s32 637，vsub.8x128.s32 438，vshrl.8x128.s32 186，vand.8x128.u32 149，vxor.8x128.u32 72，vst.8x128 68，vld.8x128 62
-## 硬件 vrng，u32[64,128]（8 个 TC VREG）：kernel 段 140 个 bundle，向量运算 131 条，平均每个 TC VREG 16.4 条
-  vadd.8x128.s32 37，vxor.8x128.u32 23，vshll.8x128.s32 20，vshrl.8x128.s32 20，vor.8x128.u32 20，vrng.8x128.u32 8，vst.8x128 8，sld 5
+jax_threefry_partitionable = True
+## 只改行数：计算指令的总数，以及每多一个 TC VREG 增加多少
+  threefry2x32，u32[8,128]：计算指令 267，vld + vst 1，与 kernel 外逐位相同 True
+  hash 中间一次循环移位附近的清单：
+  { va0: vor.8x128.u32 v11, v10, v8 }
+  { va0: vxor.8x128.u32 v12, v11, v7 }
+  { va0: vadd.8x128.s32 v13, v12, v7 ; va1: vshll.8x128.s32 v15, v12, 0x6 }
+  { va0: vadd.8x128.s32 v20, v13, v4 ; va1: vshrl.8x128.s32 v16, v12, 0x1a }
+  { va0: vor.8x128.u32 v9, v16, v15 }
+  { va0: vxor.8x128.u32 v17, v9, v13 }
+  { va0: vadd.8x128.s32 v18, v17, v14 ; va1: vadd.8x128.s32 v14, v26, v25 }
+  { va0: vadd.8x128.s32 v19, 5, v18 }
+  threefry2x32，u32[16,128]：计算指令 387，vld + vst 2，与 kernel 外逐位相同 True
+  threefry2x32，u32[32,128]：计算指令 627，vld + vst 15，与 kernel 外逐位相同 True
+  threefry2x32，u32[64,128]：计算指令 1107，vld + vst 270，与 kernel 外逐位相同 True
+  threefry2x32，u32[128,128]：计算指令 2191，vld + vst 1441，与 kernel 外逐位相同 True
+  threefry2x32：从 64 行到 128 行，每多一个 TC VREG 增加 135.5 条
+  philox4x32，u32[8,128]：计算指令 1162，vld + vst 47
+  philox4x32，u32[16,128]：计算指令 1154，vld + vst 46
+  philox4x32，u32[32,128]：计算指令 1143，vld + vst 40
+  philox4x32，u32[64,128]：计算指令 2214，vld + vst 130
+  philox4x32，u32[128,128]：计算指令 4363，vld + vst 271
+  philox4x32：从 64 行到 128 行，每多一个 TC VREG 增加 268.6 条
+  硬件 vrng，u32[8,128]：计算指令 124，vld + vst 1
+  硬件 vrng，u32[16,128]：计算指令 125，vld + vst 2
+  硬件 vrng，u32[32,128]：计算指令 127，vld + vst 4
+  硬件 vrng，u32[64,128]：计算指令 131，vld + vst 8
+  硬件 vrng，u32[128,128]：计算指令 139，vld + vst 16
+  硬件 vrng：从 64 行到 128 行，每多一个 TC VREG 增加 1.0 条
+## threefry2x32 的计数器就是元素在数组中按行优先的序号
+  bits((16,128)) 的前 8 行等于 bits((8,128))：True
+  bits((8,256)) 的前 128 列等于 bits((8,128))：False
+  bits((8,256)) 等于 bits((2048,)) 按行排成 [8,256]：True

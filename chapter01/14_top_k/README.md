@@ -74,7 +74,31 @@ CPU：        [0, 2, 1, 3, 4, 5, 6, 7]
 
 值是对的，但后 5 个下标全都是 127，重复了。`is_stable=False` 允许相等值以任意顺序出现，但不允许同一个下标出现多次。结果说明，去掉已选位置之后，它与原有的 `-inf` 无法区分，后面几轮反复选中了同一个位置。
 
-这类“有效值少于 k”的情况在实际中并不少见，例如对已经做过掩码的分数求 top-k。手写时，要么用比 `-inf` 更小的标记（例如单独的掩码）排除已选位置，要么在调用前保证有效值不少于 k 个。
+这类“有效值少于 k”的情况在实际中并不少见，例如对已经做过掩码的分数求 top-k。
+
+## 只改写法：用掩码排除已选位置
+
+问题出在“把已选位置的值改成 `-inf`”：改完之后，已选位置与原本就是 `-inf` 的位置无法区分。硬件有独立的掩码寄存器（第 6 节），可以把“是否已选”与值分开记录：
+
+```python
+def f(x):
+    lane = jax.lax.broadcasted_iota(jnp.int32, x.shape, 1).astype(jnp.float32)
+    taken = jnp.zeros(x.shape, jnp.bool_)
+    for _ in range(k):
+        best = jnp.max(jnp.where(taken, -jnp.inf, x), axis=1, keepdims=True)
+        index = jnp.min(jnp.where(~taken & (x == best), lane, float(x.shape[1])), axis=1, keepdims=True)
+        taken = taken | (lane == index)
+        ...
+```
+
+每一轮先求未选位置中的最大值，再在“未选且等于最大值”的位置中取最小的下标，最后把这个下标标为已选。下标用 f32 表示，以便用 `vmin.xlane` 在 lane 之间取最小。两组输入的结果都与 CPU 完全一致，包括只有 3 个有限值的一组：
+
+```text
+## 手写 top-8，用掩码排除已选位置，每行只有 3 个有限值，其余为 -inf
+  值与 CPU 结果一致：True；下标与 CPU 结果一致：True
+```
+
+“相等时取最小的下标”恰好就是稳定排序的顺序，所以这个写法还给出了 `is_stable=True` 的结果。代价与 `lax.top_k` 相当：每轮一次 `vmax.xlane` 和一次 `vmin.xlane`（共 16 次 XLU 归约、16 次 `vpop`），`taken` 的更新是掩码寄存器上的 `vmor`、`vmxor`，另有 36 条 `vsel`；`lax.top_k` 是每轮一次 `vmax.xlane` 和一次 `vmax.index.xlane`。
 
 ## 对照：原生 XLA
 

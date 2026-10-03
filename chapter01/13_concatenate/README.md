@@ -1,6 +1,6 @@
 # 拼接
 
-拼接不做任何算术，只决定数据放在哪里。所以它最能说明一个道理：数据的位置由谁来安排，向量单元、XLU 还是 DMA，代价差别很大。本节比较两种写法：在 TC VMEM 中对值做 `jnp.concatenate`，以及让 DMA 把两个输入直接写进输出的两个窗口。再只改 shape，看不对齐时会发生什么。
+拼接不做任何算术，只决定数据放在哪里。所以它最能说明一个道理：数据的位置由谁来安排，向量单元、XLU 还是 DMA，代价差别很大。本节比较两种写法：在 TC VMEM 中对值做 `jnp.concatenate`，以及让 DMA 把两个输入直接写进输出的两个窗口。再只改 shape，看不对齐时会发生什么；最后看在已有数组的运行时位置追加数据，怎样只付新数据的代价。
 
 ## 两种写法
 
@@ -52,6 +52,53 @@ for copy in copies:
 - DMA 写入窗口：编译失败，`Slice sizes along tiled dimensions must be aligned to tiles`。
 
 列方向上，一个 granule 是一个 sublane 的 128 个 lane。DMA 的地址和长度都以 granule 为单位（第 3 节），表达不了从某个 granule 中间开始的窗口，所以从第 129 列开始的窗口不能由 DMA 描述。这与行方向不同：行方向的最小单位是一个 granule（一行），列方向的最小单位是 128 列。所以不对齐的列只能交给 XLU 在 TC VREG 内移动。
+
+## 只改位置：在运行时位置追加
+
+本小节实验[源码](03_pallas_append_in_place.py)、[输出](03_pallas_append_in_place.txt)。
+
+上面的拼接都生成一个新数组。另一种常见的需要是：一个已有的大数组，每次在它的某个位置写入几行新数据，位置在运行时才知道，例如每次追加到上一次的末尾。如果每次都用 `jnp.concatenate` 或 `.at[].set()` 生成新数组，就要搬运整个数组；硬件上需要的只是一次写入目标窗口的 DMA。
+
+做法是把大数组作为 JAX 的 Ref 传给 kernel。`jax.new_ref(array)` 创建一个可修改的数组，kernel 收到它在 HBM 中的 Ref，写入它就是修改它，不需要输出：
+
+```python
+@pl.kernel(
+    out_type=(),
+    mesh=tc_mesh,
+    scratch_types=(pltpu.SMEM((1,), jnp.int32), pltpu.SemaphoreType.DMA),
+    ...
+)
+def kernel(rows_hbm: Ref, position_hbm: Ref, buffer_hbm: Ref, position_smem: Ref, sem: Ref) -> None:
+    pltpu.async_copy(position_hbm, position_smem, sem).wait()
+    # 写入的起始行在运行时才知道；数组只有一列 tile，任意行窗口都可以由一次 DMA 描述。
+    pltpu.async_copy(rows_hbm, buffer_hbm.at[pl.ds(position_smem[0], NEW)], sem).wait()
+
+buffer = jax.new_ref(jnp.zeros((ROWS, 128), jnp.float32))
+compiled(buffer, jnp.full((NEW, 128), step + 1.0), jnp.array([start], jnp.int32))
+```
+
+与前两种写法相比，改了三处：`out_type=()`，kernel 没有输出；大数组 `buffer` 是 Ref，作为最后一个参数传入；写入位置从 SMEM 读出（第 7 节），作为 DMA 目标窗口的起点。`f32[64,128]` 只有一列 tile，运行时的行起点不需要对齐（第 3、7 节）。
+
+连续在第 5、8、11 行追加三次，每次 3 行：
+
+```text
+连续追加 3 次（起始行 5、8、11）后数值检查：True；前 16 行的第 0 列：[0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 0.0, 0.0]
+```
+
+编译后的 HLO 说明了为什么没有搬运整个数组：
+
+```text
+input_output_alias：{ {}: (0, {}, may-alias) }
+ROOT %append.1 = f32[64,128]{1,0:T(8,128)} custom-call(%args_0_.1, %copy.4.args_1_, %args_2_.1)
+```
+
+程序的结果与第 0 个参数（`buffer`）共用同一块内存（`input_output_alias`），kernel 的结果就是写回后的 `buffer`，没有任何 copy。清单中写入的只有一条 HBM → HBM 的 `dma.general`，长度 3 个 granule，目标地址在寄存器中：
+
+```text
+{ s0: dma.general [hbm:s20], [hbm:s0], length=3, ... }
+```
+
+每次追加的代价只取决于新数据的大小，与数组的大小无关。
 
 ## 对照：原生 XLA
 

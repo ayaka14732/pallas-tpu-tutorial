@@ -1,0 +1,6 @@
+## 不调用 prng_seed：kernel 段 setrngseed 0 条，vrng 1 条
+  连续两次调用，TensorCore 0 的输出相同：False
+  同一次调用，两个 TensorCore 的输出相同：False
+## prng_seed(7, core)：kernel 段 setrngseed 1 条，vrng 1 条
+  连续两次调用，TensorCore 0 的输出相同：True
+  同一次调用，两个 TensorCore 的输出相同：False

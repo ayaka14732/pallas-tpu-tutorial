@@ -2,6 +2,7 @@
 import tpu_init
 tpu_init.initialise_one_chip()
 
+import jax
 import numpy as np
 
 import rng_oracle
@@ -46,9 +47,24 @@ def main() -> None:
     zero = bundle('va0: vxor.8x128.u32 v15, v10, v10') + GAP
     tiles = probe.run_tiles(zero + body('va0', 'v15'))[0, 0]
     print(f'  两条 vrng 的输出全为 0：{bool(np.all(tiles[1] == 0) and np.all(tiles[3] == 0))}')
-    out, _, _ = rng_oracle.vrng(*rng_oracle.state_from_tile(seed))
-    print('## 第 1 条 vrng 的前 2 个 sublane、前 4 个 lane（同一个生成器的连续两步占同一对 lane）')
-    print(np.array2string(out[:2, :4], formatter={'int': lambda value: f'0x{value:08x}'}))
+    print('## 只有第 5 个生成器的状态非零（lane 10、11 的 sublane 0、1）')
+    host = np.zeros_like(probe.host)
+    host[:2, 10:12] = probe.host[:2, 10:12]
+    probe.x = jax.device_put(host, jax.local_devices()[0])
+    tiles = probe.run_tiles(body('va0', 'v10'))[0, 0]
+    nonzero = sorted(set(np.nonzero(tiles[1])[1].tolist()))
+    print(f'  第 1 条 vrng 输出中非零的 lane：{nonzero}；各 sublane 都非零：{bool(np.all(tiles[1][:, 10:12].any(axis=1)))}')
+    # 用主机模型逐步推进第 5 个生成器，第 i 步的 64 位输出应等于 sublane i 的两个 lane 拼成的数。
+    s0, s1 = rng_oracle.state_from_tile(host[:8])
+    steps = []
+    with np.errstate(over='ignore'):
+        x, y = s0[5], s1[5]
+        for _ in range(8):
+            x, y = y, (x ^ (x << np.uint64(23))) ^ y ^ ((x ^ (x << np.uint64(23))) >> np.uint64(17)) ^ (y >> np.uint64(26))
+            steps.append(int((y + x) & rng_oracle.MASK))
+    got = [int(tiles[1][sublane, 10]) | (int(tiles[1][sublane, 11]) << 32) for sublane in range(8)]
+    for sublane in range(8):
+        print(f'  sublane {sublane}：0x{got[sublane]:016x}，第 {sublane + 1} 步 0x{steps[sublane]:016x}')
 
 if __name__ == '__main__':
     main()

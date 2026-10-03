@@ -55,6 +55,22 @@ def run(f: Callable[[jax.Array], tuple[jax.Array, jax.Array]], x: np.ndarray) ->
 def argmax(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     return jnp.max(x, axis=1, keepdims=True), jnp.argmax(x, axis=1, keepdims=True).astype(jnp.int32)
 
+def top_k_by_hand(k: int) -> Callable[[jax.Array], tuple[jax.Array, jax.Array]]:
+    """每轮取未选位置中的最大值，再在等于它的未选位置中取最小的下标；已选位置用单独的掩码排除，不靠把值改成 -inf。"""
+    def f(x: jax.Array) -> tuple[jax.Array, jax.Array]:
+        lane = jax.lax.broadcasted_iota(jnp.int32, x.shape, 1).astype(jnp.float32)
+        taken = jnp.zeros(x.shape, jnp.bool_)
+        values, indices = [], []
+        for _ in range(k):
+            best = jnp.max(jnp.where(taken, -jnp.inf, x), axis=1, keepdims=True)
+            index = jnp.min(jnp.where(~taken & (x == best), lane, float(x.shape[1])), axis=1, keepdims=True)
+            taken = taken | (lane == index)
+            values.append(best)
+            indices.append(index.astype(jnp.int32))
+        return jnp.concatenate(values, axis=1), jnp.concatenate(indices, axis=1)
+
+    return f
+
 def main() -> None:
     rng = np.random.default_rng(0)
     # 每行是互不相同的值的随机排列，避免并列。
@@ -70,6 +86,8 @@ def main() -> None:
         ('lax.top_k(x, 8, is_stable=False)，f32[8,256]', lambda x: jax.lax.top_k(x, 8, is_stable=False), x256, 8),
         ('lax.top_k(x, 8, is_stable=False)，bf16[8,128]', lambda x: jax.lax.top_k(x, 8, is_stable=False), x128.astype(ml_dtypes.bfloat16), 8),
         ('lax.top_k(x, 8, is_stable=False)，每行只有 3 个有限值，其余为 -inf', lambda x: jax.lax.top_k(x, 8, is_stable=False), sparse, 8),
+        ('手写 top-8，用掩码排除已选位置，f32[8,128]', top_k_by_hand(8), x128, 8),
+        ('手写 top-8，用掩码排除已选位置，每行只有 3 个有限值，其余为 -inf', top_k_by_hand(8), sparse, 8),
     )
     for name, f, x, k in cases:
         try:

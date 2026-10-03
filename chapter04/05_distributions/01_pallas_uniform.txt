@@ -1,0 +1,42 @@
+## stateful_uniform
+  每个 TC VREG 的变换指令 4.0 条：vshrl.8x128.s32 1，vor.8x128.u32 1，vadd.8x128.f32 1，vmax.8x128.f32 1
+  最小 5.48362732e-06，最大 0.999987721，不同取值 65276 个 / 65536，均值 0.49821
+  全部是 2^-23 的整数倍：True；全部是 2^-24 的整数倍：True
+  { va0: vrng.8x128.u32 v22 }
+  { va1: vshrl.8x128.s32 v23, v22, 0x9 }
+  { va0: vor.8x128.u32 v24, 0x3f800000, v23 }
+  { va1: vadd.8x128.f32 v25, -1.0, v24 }
+  { va0: vmax.8x128.f32 v26, v25, 0.0 }
+  { vst: vst.8x128 [vmem:0x0], v26 ; .encoding { vst.opcode = s0 } }
+## 手写：尾数
+  每个 TC VREG 的变换指令 3.0 条：vshrl.8x128.s32 1，vor.8x128.u32 1，vadd.8x128.f32 1
+  最小 5.48362732e-06，最大 0.999987721，不同取值 65276 个 / 65536，均值 0.49821
+  全部是 2^-23 的整数倍：True；全部是 2^-24 的整数倍：True
+  { va0: vrng.8x128.u32 v22 }
+  { va1: vshrl.8x128.s32 v23, v22, 0x9 }
+  { va0: vor.8x128.u32 v24, 0x3f800000, v23 }
+  { va1: vadd.8x128.f32 v25, -1.0, v24 }
+  { vst: vst.8x128 [vmem:0x0], v25 ; .encoding { vst.opcode = s0 } }
+  { va0: vrng.8x128.u32 v26 }
+## 手写：整数转浮点
+  每个 TC VREG 的变换指令 3.0 条：vshrl.8x128.s32 1，vcvt.8x128.s32.f32 1，vmul.8x128.f32 1
+  最小 5.54323196e-06，最大 0.999987721，不同取值 65394 个 / 65536，均值 0.49821
+  全部是 2^-23 的整数倍：False；全部是 2^-24 的整数倍：True
+  { va0: vrng.8x128.u32 v22 }
+  { va1: vshrl.8x128.s32 v23, v22, 0x8 }
+  { va0: vcvt.8x128.s32.f32 v24, v23 }
+  { va0: vmul.8x128.f32 v25, 5.960464477539063e-08, v24 }
+  { vst: vst.8x128 [vmem:0x0], v25 ; .encoding { vst.opcode = s0 } }
+  { va0: vrng.8x128.u32 v26 }
+## stateful_uniform(minval=-1, maxval=1)
+  每个 TC VREG 的变换指令 6.0 条：vadd.8x128.f32 2，vshrl.8x128.s32 1，vor.8x128.u32 1，vmul.8x128.f32 1，vmax.8x128.f32 1
+  最小 -0.999989033，最大 0.999975443，不同取值 65276 个 / 65536，均值 -0.00357
+  全部是 2^-23 的整数倍：True；全部是 2^-24 的整数倍：True
+  { va0: vrng.8x128.u32 v22 }
+  { va1: vshrl.8x128.s32 v23, v22, 0x9 }
+  { va0: vor.8x128.u32 v24, 0x3f800000, v23 }
+  { va1: vadd.8x128.f32 v25, -1.0, v24 }
+  { va0: vmul.8x128.f32 v26, 2.0, v25 }
+  { va0: vrng.8x128.u32 v28 ; va1: vadd.8x128.f32 v27, -1.0, v26 }
+stateful_uniform 与手写尾数版本逐位相同：True
+手写尾数版本等于 (比特 >> 9) × 2^-23：True

@@ -1,0 +1,22 @@
+## pltpu.stochastic_round：编译失败：Stochastic convert not supported on TPU generations < 5.
+## 手写：1 + 2^-10 介于 bf16 的 1 与 1 + 2^-7 之间，向上的概率应为 1/8
+  每个 TC VREG 的变换指令 3.0 条：vand.8x128.u32 2，vadd.8x128.s32 1
+  向上的比例 0.1250，其余都是 1.0：True
+  { va0: vrng.8x128.u32 v23 }
+  { va0: vand.8x128.u32 v24, 0xffff, v23 }
+  { va0: vadd.8x128.s32 v25, v24, v22 }
+  { va0: vand.8x128.u32 v26, 0xffff0000, v25 ; vld: vld.8x128 v25, [vmem:0x38] ; .encoding { va0.y = ones_hi(imm0) } }
+  { vst: vst.8x128 [vmem:0x200], v26 }
+## 128 个随机的数，每个独立舍入 512 次
+  512 次的平均值与原值的最大相对误差 3.21e-04；舍入到最近的 bf16 的最大相对误差 3.67e-03
+  每个结果都是原值两侧相邻的两个 bf16 之一：True
+## 特殊输入
+  +inf：inf × 512
+  -inf：-inf × 512
+  NaN：NaN × 512
+  最大有限值：inf × 512
+  +0：0 × 512
+  -0：-0 × 512
+  1e-40（非正规数）：1.83671e-40 × 37，9.18355e-41 × 475
+  -1e-40：-1.83671e-40 × 43，-9.18355e-41 × 469
+  NaN（位型 0x7f800001）：inf × 512

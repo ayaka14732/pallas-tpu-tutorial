@@ -1,0 +1,17 @@
+连续追加 3 次（起始行 5、8、11）后数值检查：True；前 16 行的第 0 列：[0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 0.0, 0.0]
+## 优化后的 HLO
+  input_output_alias：{ {}: (0, {}, may-alias) }
+  %args_1_ = s32[1]{0:T(128)} parameter(2)
+  %args_0_.1 = f32[3,128]{1,0:T(4,128)} parameter(1)
+  %args_2_.1 = f32[64,128]{1,0:T(8,128)} parameter(0), sharding={mesh[], [{}, {}]}
+  %copy.4.args_1_ = s32[1]{0:T(128)S(6)} copy(%args_1_), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scope
+  ROOT %append.1 = f32[64,128]{1,0:T(8,128)} custom-call(%args_0_.1, %copy.4.args_1_, %args_2_.1)
+## 清单中的 DMA
+{ s1: sld s21, [smem:0x0] }
+{ s1: sld s22, [smem:0x1] }
+{ s1: sld s12, [smem:0x1] }
+{ s0: dma.simple [smem:s16], [vmem:s15], length=1, dst_flag=[sflag:52] }
+s1: sld s17, [smem:0x3f] ;
+{ s0: dma.general [hbm:s20], [hbm:s0], length=3, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s21], dst_flag=[sflag:s3], ici_dest=s22 }
+{ s1: sld s17, [smem:0x0] }
+{ s1: sld s7, [smem:0x3e] }
