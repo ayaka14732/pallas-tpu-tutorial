@@ -41,16 +41,19 @@ def barrier() -> None:
     pl.semaphore_wait(ready, CHIPS)
 ```
 
-一次交换同时发出三个 remote DMA，写进对方 `inbox` 的不同格子，然后相加：
+一次交换同时发出三个 remote DMA，写进对方 `inbox` 的不同格子，然后相加。`offsets` 默认为 `(1, 2, 3)`，即依次发给 mesh 中的 me + 1、me + 2、me + 3：
 
 ```python
-copies = [pltpu.make_async_remote_copy(acc, inbox.at[k], send_sems.at[k], recv_sems.at[k], device_id={'device': (me + k + 1) % CHIPS, 'tc': 0}, device_id_type=pl.DeviceIdType.MESH) for k in range(CHIPS - 1)]
+copies = [pltpu.make_async_remote_copy(acc, inbox.at[k], send_sems.at[k], recv_sems.at[k], device_id={'device': (me + offset) % CHIPS, 'tc': 0}, device_id_type=pl.DeviceIdType.MESH) for k, offset in enumerate(offsets)]
 for copy in copies:
     copy.start()
 for copy in copies:
     copy.wait_send()
     copy.wait_recv()
-inbox[0] = acc[...] + inbox[0] + inbox[1] + inbox[2]
+total = acc[...]
+for k in range(len(offsets)):
+    total = total + inbox[k]
+inbox[0] = total
 ```
 
 环形的每一步是“等下游许可 → 发送 → 等发出和收到 → 累加 → 给上游许可”：
