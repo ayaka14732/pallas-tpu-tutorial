@@ -35,3 +35,4 @@
 | 第 6 节 | 公开接口不能表达 CMEM → 另一颗芯片 CMEM 的 remote DMA；只改端点会使对方停机 | 用 tpuasm 改写端点，并清除 `ici_dest` 中的 TensorCore 字段 |
 | 第 6 节 | tpuasm 的 canonical 重新编码改变了 102 个 bundle 中不出现在文本里的位，程序挂起 | 改写时只重新编码被修改的 bundle |
 | 第 8 节 | 运行时页号写主机内存触发 LLO_CHECK（JAX issue #40200） | 用 tpuasm 把页号改为从 SMEM 读出的寄存器 |
+| 第 9 节 | 一次 `jnp.dot` 的操作数整个展开为 TC VREG，块大时溢出区超过 TC VMEM；512 行一次的程序无法序列化，读不到清单 | 每次 `jnp.dot` 只算 256 或 512 行 |

@@ -1,0 +1,30 @@
+数值检查通过
+## 优化后的 HLO
+  %lhs.1 = bf16[2048,2048]{1,0:T(8,128)(2,1)} parameter(0)
+  %copy-start = (bf16[2048,2048]{1,0:T(8,128)(2,1)S(3)}, bf16[2048,2048]{1,0:T(8,128)(2,1)}, u32[]{:S(2)}) copy-start(%lhs.1), cross_program_prefetch_index=0
+  %rhs.1 = bf16[2048,2048]{1,0:T(8,128)(2,1)} parameter(1)
+  %copy-done = bf16[2048,2048]{1,0:T(8,128)(2,1)S(3)} copy-done(%copy-start)
+  ROOT %fusion = f32[2048,2048]{1,0:T(8,128)} fusion(%copy-done, %rhs.1), kind=kOutput, calls=%fused_computation
+## 清单（两个 TensorCore 执行同一份程序，按 core 编号分工）
+  cld.8x128 512，dma.strided 2，vdwg.128x128.f16 4，vld.8x128 4487，vmatmul.packed.8x128.f16 1988，vmatmul.packed.dwg.8x128.f16 60，vmatpush.packed.8x128.f16 512，vpop.8x128 4608，vst.8x128 4231
+bundle    0: prelude-prefix-start
+bundle    9: routine:wait-for-active-dma
+bundle   16: routine:program-exit
+bundle   19: routine:allocation-table-find
+bundle   28: routine:allocation-table-get-or-add
+bundle   54: routine:allocation-table-cut-and-add
+bundle   71: routine:branch-impl
+bundle  122: routine:branch
+bundle  128: trampoline:program-start
+bundle  549: entry bundle: %fusion = fusion(%copy-done, %rhs.1)
+bundle 8863: exit bundle: %fusion = fusion(%copy-done, %rhs.1)
+bundle 9000: 清单结束（共 9000 个 bundle）
+## XProf，16 对新输入的中位数
+  /device:TPU:0 XLA Modules module：99.16 µs
+  /device:TPU:0 XLA Ops copy-done：8.87 µs
+  /device:TPU:0 XLA Ops copy-start：0.00 µs
+  /device:TPU:0 XLA Ops fusion：71.18 µs
+  /device:TPU:1 XLA Modules module：80.15 µs
+  /device:TPU:1 XLA Ops copy-done：8.89 µs
+  /device:TPU:1 XLA Ops copy-start：0.00 µs
+  /device:TPU:1 XLA Ops fusion：71.15 µs
