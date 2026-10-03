@@ -120,7 +120,8 @@ def discover_site() -> tuple[tuple[Page, ...], tuple[Chapter, ...], tuple[str, .
     return tuple(pages), tuple(chapters), tuple(skipped)
 
 def collect_assets(chapters: tuple[Chapter, ...]) -> set[Path]:
-    assets = set()
+    assets = {Path("LICENSE")}
+    assets.update(path.relative_to(ROOT_DIR) for path in (ROOT_DIR / "LICENSES").glob("*.txt"))
     for path in ROOT_DIR.iterdir():
         if path.is_file() and path.suffix.lower() in ASSET_SUFFIXES:
             assets.add(path.relative_to(ROOT_DIR))
