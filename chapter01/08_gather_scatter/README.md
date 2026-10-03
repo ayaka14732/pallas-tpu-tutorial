@@ -102,21 +102,77 @@ for copy in copies:
 
 ## scatter：写的位置由索引决定
 
+本小节实验[源码](04_pallas_row_scatter_dma.py)、[输出](04_pallas_row_scatter_dma.txt)。
+
 scatter 把索引当作写的位置：
 
 ```text
 out[s, i[s,l]] = update[s,l]
 ```
 
-它比 gather 多一个问题：多个元素可能写到同一个位置。此时是覆盖、相加还是取最大，必须由算法规定。XLU 的 `vperm` 只能为每个输出位置指定从哪里读，回答不了“多个写者”的问题，所以不存在一条“scatter 指令”。
+它比 gather 多一个问题：多个元素可能写到同一个位置。此时是覆盖、相加还是取最大，必须由算法规定。下面按与 gather 相同的两个层次看 scatter：TC VREG 内按 lane，以及 HBM 中按行。
 
-有一种重要的特殊情况：每行的索引恰好是 0–127 的一个排列（没有重复）。这时先求出逆排列 `inverse[s, i[s,l]] = l`，scatter 就变成 gather：
+### TC VREG 内：没有 scatter 指令
+
+在 kernel 中直接写 scatter：
+
+```python
+rows = jax.lax.broadcasted_iota(jnp.int32, x.shape, 0)
+x_vmem[...] = jnp.zeros(x.shape, x.dtype).at[rows, i_vmem[...]].set(x_vmem[...])
+```
+
+编译失败：
+
+```text
+Unimplemented primitive in Pallas TPU lowering for tc: scatter.
+```
+
+这与硬件一致。XLU 的 `vperm` 为每个输出位置指定“从哪个 lane 读”，是 gather 的形式；它回答不了“多个写者写同一个位置”的问题，所以不存在一条 scatter 指令。
+
+有一种重要的特殊情况：每行的索引恰好是 0–127 的一个排列，没有重复。这时先求出逆排列 `inverse[s, i[s,l]] = l`，scatter 就变成 gather：
 
 ```text
 out[s, d] = update[s, inverse[s, d]]
 ```
 
-于是仍然只需一次 XLU 重排。手写 kernel 时，应当先识别出这类无冲突的结构，把写的重排改成读的重排。
+实验在主机上用 `np.argsort(permutation, axis=1)` 求出逆排列，kernel 只改一行，做一次 lane gather：
+
+```python
+x_vmem[...] = jnp.take_along_axis(x_vmem[...], i_vmem[...], axis=1)
+```
+
+结果与 NumPy 的 `np.put_along_axis` 完全相同，清单中只有一次重排：`vsetperm`、`vperm`、`vpop` 各 1 条，加上处理负索引的 `vlt`、`vadd`、`vsel`。逆排列本身也是一次 scatter；如果排列在 kernel 中才得到，求逆排列要另想办法，例如按值排序（本节不展开）。手写 kernel 时，应当先识别出这类无冲突、且排列事先已知的结构，把写的重排改成读的重排。
+
+### HBM 中：每行一次 DMA
+
+整行的 scatter 与按行 gather 对称：DMA 的目的地址由行号决定。这里要修改一个已有的表，所以表作为 jax Ref 传入 kernel（第 13 节详细介绍这种写法），kernel 没有输出：
+
+```python
+def kernel(u_hbm: Ref, r_hbm: Ref, t_hbm: Ref, u_vmem: Ref, r_smem: Ref, sem: Ref) -> None:
+    pltpu.async_copy(u_hbm, u_vmem, sem).wait()
+    pltpu.async_copy(r_hbm, r_smem, sem).wait()
+    # 与按行 gather 对称：源是更新的第 j 行，目的地是表的第 r[j] 行。8 次 DMA 先全部发出，再一起等待。
+    copies = [pltpu.async_copy(u_vmem.at[pl.ds(j, 1)], t_hbm.at[pl.ds(r_smem[j], 1)], sem) for j in range(8)]
+    for copy in copies:
+        copy.wait()
+```
+
+与按行 gather 相比只交换了 DMA 的源和目的。行号互不相同时结果正确。清单中，每个目的地址由 `sadd` 把行号（已换算成 granule 的偏移）加到表的起点上算出，随后是一条 `length=1` 的 `dma.simple`，8 条 DMA 之后只有一次 `vwait.ge [sflag:52], 8`：
+
+```text
+{ s0: sadd.s32 s24, s19, s2 ; ... }
+{ s0: dma.simple [hbm:s24], [vmem:s13], length=1, dst_flag=[sflag:52] }
+...
+{ misc: vwait.ge [sflag:52], 8 ; ... }
+```
+
+行号重复时，两次 DMA 写同一行。实验让第 4、5 个更新都写到第 17 行，运行 20 次：
+
+```text
+第 17 行最终等于哪个更新：{5: 20}
+```
+
+20 次都是后发出的第 5 个留下。但这只是观察：两次 DMA 同时在途，它们写入 HBM 的先后不是公开接口承诺的语义。需要确定的结果时，要么保证行号不重复（例如先在主机或标量单元上合并重复的行），要么让写同一行的 DMA 先后发出、中间等待完成。需要累加而不是覆盖时（例如梯度的 scatter-add），DMA 做不到，只能把行读进 TC VMEM、相加、再写回，并且同一行的更新必须串行。
 
 ## 对照：原生 XLA
 

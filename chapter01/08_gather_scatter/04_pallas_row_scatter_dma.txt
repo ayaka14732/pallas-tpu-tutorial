@@ -1,0 +1,34 @@
+## 按行 scatter：行号互不相同
+  行号 [5, 3, 60, 0, 17, 42, 9, 63]：数值检查 True
+  { s0: dma.simple [vmem:s13], [hbm:s0], length=8, dst_flag=[sflag:52] }
+  { misc: vwait.ge [sflag:52], 8 ;
+  misc: vsyncadd.s32 [sflag:52], -8 ;
+  { s0: dma.simple [smem:s16], [hbm:s1], length=1, dst_flag=[sflag:52] }
+  { misc: vwait.ge [sflag:52], 1 ;
+  { misc: vsyncadd.s32 [sflag:52], -1 ;
+  { s0: sfence }
+  { s0: sadd.s32 s24, s19, s2 ;
+  { s0: dma.simple [hbm:s24], [vmem:s13], length=1, dst_flag=[sflag:52] }
+  { s0: sadd.s32 s27, s3, s2 ;
+  s1: sadd.s32 s1, s20, s2 }
+  { s0: dma.simple [hbm:s27], [vmem:s30], length=1, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s1], [vmem:s4], length=1, dst_flag=[sflag:52] }
+  { s0: sadd.s32 s7, s21, s2 ;
+  s1: sadd.s32 s10, s25, s2 }
+  { s0: dma.simple [hbm:s7], [vmem:s11], length=1, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s10], [vmem:s12], length=1, dst_flag=[sflag:52] }
+  { s0: sadd.s32 s18, s13, s2 }
+  { s0: dma.simple [hbm:s18], [vmem:s19], length=1, dst_flag=[sflag:52] }
+  { s0: sadd.s32 s21, s14, s2 ;
+  s1: sadd.s32 s24, s15, s2 }
+  { s0: dma.simple [hbm:s21], [vmem:s25], length=1, dst_flag=[sflag:52] }
+  { s0: dma.simple [hbm:s24], [vmem:s0], length=1, dst_flag=[sflag:52] }
+  { misc: vwait.ge [sflag:52], 8 ;
+  { misc: vsyncadd.s32 [sflag:52], -8 ;
+  { misc: vwait.ge [sflag:45], 1 ;
+## 按行 scatter：第 4、5 个更新都写到第 17 行，运行 20 次
+  第 17 行最终等于哪个更新：{5: 20}
+## 在 TC VREG 内按 lane scatter：每行的索引是 0–127 的一个排列
+  直接写 .at[].set()：编译失败：Unimplemented primitive in Pallas TPU lowering for tc: scatter. Please file an issue at https://github.com/jax-ml/jax/is
+  按逆排列 gather：与 NumPy 的 scatter 结果相同 True
+  计算指令：vadd.8x128.s32 1，vlt.8x128.s32 1，vperm.0.8x128 1，vpop.8x128 1，vsel.8x128 1，vsetperm.2.all.u8 1
