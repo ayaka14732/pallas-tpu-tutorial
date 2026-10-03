@@ -7,9 +7,11 @@ import re
 VIF_ENTRIES = 20  # 标量侧有 20 项未释放时，任何 bundle 都不能标量发射。
 RELEASE = 10  # 一项在向量发射后 10 个周期才在标量侧释放。
 MEMORY = ('vld', 'vst', 'cld')  # 访问内存的 bundle 最早在标量发射后 2 个周期向量发射，其余 1 个周期。
-RESULT_LATENCY = {'vmul.8x128.f32': 2}  # 写 TC VREG 的指令：结果在几个周期后可用，未列出的为 1。
+RESULT_LATENCY = {'vmul.8x128.f32': 2, 'vrot.slane.down.8x128.u32': 2}  # 写 TC VREG 的指令：结果在几个周期后可用，未列出的为 1。
 # 提交—取回通路：结果进入哪个队列、发射后多少周期可以取回。
 PUSH_LATENCY = {'erf': 7, 'mrf': 83, 'trf': 6, 'crf': 53, 'v2sf': 42}
+# XLU 的跨 lane 归约同样进入 trf 队列，但每次提交产生一个结果，79 个周期后可以取回。
+XLANE_LATENCY = 79
 # 同一个队列上，相邻两次提交（push）或取回（pop）之间的最小间隔，未列出的为 1。
 INTERVAL = {'push erf': 2, 'push mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
 SLD_INTERVAL = 4  # 相邻两条 sld 至少相隔 4 个周期（第 4 节）。
@@ -86,7 +88,8 @@ def replay(program: list[list[str]]) -> dict[int, int]:
             elif operands and kind(operands[0]) in PUSH_LATENCY:
                 # 转置要收齐 16 个 TC VREG，最后一次提交（.end）之后才产生 16 个结果。
                 count = 0 if mnemonic.startswith('vxpose') and '.end' not in mnemonic else 16 if mnemonic.startswith('vxpose') else 1
-                queues.setdefault(operands[0], []).extend([issue + PUSH_LATENCY[kind(operands[0])]] * count)
+                latency = XLANE_LATENCY if '.xlane' in mnemonic else PUSH_LATENCY[kind(operands[0])]
+                queues.setdefault(operands[0], []).extend([issue + latency] * count)
             elif operands and re.fullmatch(r'v\d+', operands[0]):
                 ready[operands[0]] = issue + RESULT_LATENCY.get(mnemonic, 1)
         for event, queue in events:

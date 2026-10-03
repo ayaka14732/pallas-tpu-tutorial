@@ -40,6 +40,31 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, o_vmem: Ref, sem: Ref) -> None:
 
 bf16 输入（`bf16[16,128]`，先 `astype(jnp.float32)`）先 unpack 成两个 f32 TC VREG，各做一次 `vadd.xlane`。
 
+### 结果在每个 lane 中
+
+本小节实验[源码](04_tpuasm_xlane_layout.py)、[输出](04_tpuasm_xlane_layout.txt)。
+
+上面的掩码 store 只写第 0 列，那么 `vpop` 取回的 TC VREG 中，各行的和放在哪里？用 tpuasm 直接执行一条 `vadd.xlane`，把取回的整个 TC VREG 写回主机（第三章第 4 节的 `LccProbe` 载体，`run_tiles` 取回片段写入 TC VMEM 的 tile）：
+
+```python
+body = bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10') + GAP + bundle('vr0: vpop.8x128 v11, trf0') + GAP + bundle('vst: vst.8x128 [vmem:0x8], v11') + GAP
+```
+
+输入第 s 行第 l 列是 `(128s + l) mod 7`，再在第 37 列加上 10s，使各行的和与最大值都不同：
+
+```text
+## vadd.xlane
+  每行的期望值：[379.0, 393.0, 407.0, 414.0, 421.0, 435.0, 449.0, 449.0]
+  取回的 TC VREG 第 0、1、127 列：[379.0, 393.0, ...]、[379.0, 393.0, ...]、[379.0, 393.0, ...]
+  每行 128 个 lane 都等于该行的结果：True
+```
+
+`vmax.xlane` 相同。XLU 把每一行的结果广播到这一行的全部 128 个 lane。所以 `keepdims=True` 的 `f32[8,1]` 只是取第 0 列；如果下一步要用这个结果对同一行的每个元素做运算（例如减去最大值、除以和），它已经在每个 lane 中，不需要再广播。
+
+### 时间
+
+> 暂且可以理解为：`vadd.xlane` 是提交—取回的形式，从提交到能取回要等约 80 个周期，但连续提交每 8 个周期一次，多个 TC VREG 一起归约时等待被重叠。第三章第 6 节测得这两个数分别是 79 和 8 个周期。
+
 ## 沿 sublane：循环移位与逐元素运算
 
 `jnp.sum(x, axis=0, keepdims=True)` 把 8 行加成一行。XLU 没有跨 sublane 的归约，编译器用第 8 节介绍的 `vrot.slane.down` 拼出一棵二叉树：
@@ -51,6 +76,8 @@ bf16 输入（`bf16[16,128]`，先 `astype(jnp.float32)`）先 unpack 成两个 
 ```
 
 共 7 条 `vrot.slane.down`、3 条 `vadd.8x128.f32`，每个 sublane 都得到 8 行之和。第 8 节已经看到，`vrot.slane.down` 每次只移动一个 sublane，没有位移量操作数；所以树虽然只有 3 层，移位却要 4 + 2 + 1 = 7 条。
+
+`vrot.slane.down` 与 `vadd` 一样在向量 ALU 槽（`va0`、`va1`）中执行，不经过 XLU，也不需要取回；第三章第 6 节测得它的结果 2 个周期后可用。树的每一层都依赖上一层，7 条移位与 3 条加法串成一条链，一个 TC VREG 约 17 个周期，比沿 lane 的 XLU 归约等待的时间短得多。
 
 `jnp.max(x, axis=0)` 却没有用树：清单中是 7 条 `vrot.slane.down` 和 7 条 `vmax.8x128.f32`，每移动一行就取一次最大值。移位数相同，逐元素运算多了 4 条，而且 7 次 `vmax` 前后依赖，串成一条长链。
 
@@ -87,7 +114,7 @@ def f(x):
 
 第 7 节说过，标量进入向量单元只需一条 `vmov`；反方向要经过队列 `v2sf`：向量单元用 `vpush` 送入，标量单元用 `spop` 取出。这条通路让向量的计算结果可以决定标量单元的行为，例如作为循环次数或分支条件。这里结果最终又要写回 TC VMEM，编译器仍然把它送进了标量单元，再广播回来。
 
-> 暂且可以理解为：`vpush` 与 `spop` 之间要经过一段延迟，标量单元在数据到达之前等待。第三章第 6 节给出这类跨单元通路的时序。
+> 暂且可以理解为：`vpush` 与 `spop` 之间要经过一段延迟，标量单元在数据到达之前停止发射。第三章第 6 节测得 `spop` 最早在 `vpush` 之后 43 个周期执行。
 
 ## 对照：原生 XLA
 

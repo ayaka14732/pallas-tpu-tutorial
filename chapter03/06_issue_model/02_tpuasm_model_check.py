@@ -59,6 +59,10 @@ def cases() -> list[tuple[str, str, str, str]]:
     add('第 4 节：sld 之后紧接使用其结果', load + use)
     add('第 4 节：4 组“sld + 3 条无关的 sadd”', (load + bundle('s0: sadd.s32 s23, 1, s23') * 3) * 4)
     add('sld 与依赖 sld 结果的向量运算', load + bundle('va0: vmov.8x128 v11, s24') + bundle('va0: vadd.8x128.s32 v12, v11, v10'))
+    xlane, pop_trf = bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10'), bundle('vr0: vpop.8x128 v11, trf0')
+    add('vadd.xlane → vpop', xlane + pop_trf)
+    add('8 条 vadd.xlane → 8 条 vpop', xlane * 8 + pop_trf * 8)
+    add('7 条相互依赖的 vrot.slane.down', bundle('va0: vrot.slane.down.8x128.u32 v11, v10') + bundle('va0: vrot.slane.down.8x128.u32 v11, v11') * 6)
     for count in (1, 16, 64):
         listing, trace = loop(count)
         add(f'计数循环 {count} 次', listing, trace=trace)

@@ -5,7 +5,7 @@ tpu_init.initialise_one_chip()
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc
 
-DISTANCES = (1, 2, 4, 6, 7, 8, 12)
+DISTANCES = (1, 2, 4, 6, 7, 8, 12, 40)
 END = read_lcc(21) + bundle('s0: sfence') + read_lcc(22)
 # 发射之前的准备放在 setup 中，不计入区间：MXU 先装好权重，XLU 先提交转置的前 15 个 TC VREG。
 MXU_SETUP = bundle('vx0: vmatpush.packed.8x128.f16 gsfn0, v10') * 8 + bundle('vx0: vdwg.128x128.f16 gmr0, gsfn0')
@@ -26,6 +26,7 @@ PATHS = {
     'MXU vmatmul → vpop mrf0': (MXU_SETUP, 'vx0: vmatmul.8x128.f32 mrf0, v10', 'vr0: vpop.8x128 v11, mrf0', ''),
     # 转置的结果有 16 个，其余 15 个在读数之后取回，否则 kernel 结束时队列不空，TensorCore 会停机。
     'XLU 最后一次 vxpose → 第一次 vpop trf0': (XLU_SETUP, xpose(15), 'vr0: vpop.8x128 v11, trf0', POP_TRF * 15),
+    'XLU vadd.xlane → vpop trf0': ('', 'vx0: vadd.xlane.0.8x128.f32 trf0, v10', 'vr0: vpop.8x128 v11, trf0', ''),
 }
 
 def show(probe: tpuasm_tools.LccProbe, label: str, body: str, setup: str = '') -> None:
@@ -59,6 +60,12 @@ def main() -> None:
         submit = ''.join(bundle(xpose(index)) for index in range(16)) + bundle('s0: sfence')
         show(probe, f'k = {count:2d}', submit + read_lcc(20) + POP_TRF * count + END + POP_TRF * (16 - count))
     xlu_variants(probe)
+    print('## XLU：连续 k 次 vadd.xlane，再连续取回 k 次')
+    for count in (1, 2, 4, 8):
+        show(probe, f'k = {count}', read_lcc(20) + bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10') * count + POP_TRF * count + END)
+    print('## N 条相互依赖的 vrot.slane.down（sublane 循环移位，在向量 ALU 中执行）')
+    for count in (1, 4, 7, 16):
+        show(probe, f'N = {count:2d}', read_lcc(20) + bundle('va0: vrot.slane.down.8x128.u32 v11, v10') + bundle('va0: vrot.slane.down.8x128.u32 v11, v11') * (count - 1) + END)
 
 def xpose_variant(index: int, count: int, packed: str, width: int) -> str:
     """count 次提交组成的一次转置中的第 index 次；packed 为 '.packed' 时输入是打包的 16 bit 数据，width 是转置后的行数。"""
