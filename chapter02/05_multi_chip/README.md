@@ -59,11 +59,57 @@ mesh 的顺序决定了“下一颗”是谁。用 `jax.make_mesh` 的顺序，�
 mesh = jax.sharding.Mesh(np.array([devices[i] for i in [0, 1, 3, 2]]), ('device',))
 ```
 
-清单中跨芯片的 remote DMA 与第 4 节同一颗芯片内的完全相同，仍是一条 `dma.general`，只是 `ici_dest` 寄存器中的目标不同：
+## 清单：汇合、目标芯片与 remote DMA
+
+kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标量计算。以物理环、1 轮为例（完整清单见输出的最后一段，这里省略输入输出 DMA）：
 
 ```text
-{ s0: dma.general [vmem:s3], [vmem:s13], length=8, ..., src_flag=[sflag:s4], dst_flag=[sflag:s30], ici_dest=s2 }
+{ s0: simm.s32 s7, 0 ; s1: simm.s32 s8, 1 }
+{ s0: simm.s32 s9, 3 ; s1: sst [smem:0x3f], s7 }
+{ s0: simm.s32 s10, 2 ; s1: sst [smem:0x40], s8 }
+{ ... s1: sst [smem:0x41], s9 }
+{ s1: sst [smem:0x42], s10 }
 ```
+
+**mesh 位置到芯片编号的表。** kernel 一开始把 `[0, 1, 3, 2]` 写进 SMEM 的 `0x3f`–`0x42`。这正是构造 mesh 时给出的 device 顺序：mesh 中第 i 个位置是哪颗芯片。`device_id` 里写的是 mesh 位置，硬件需要的是芯片编号，这张表负责换算。
+
+```text
+{ s1: sld s11, [smem:0x3ffe2] }
+{ s1: sld s12, [smem:0x3ffe3] }
+{ s0: sshll.u32 s16, s12, 0x2 }
+{ s0: sadd.s32 s17, s16, s11 }
+...（取模，结果在 s20）
+```
+
+**本芯片在 mesh 中的位置。** `jax.lax.axis_index('device')` 由 runtime 写在 SMEM 高地址处的两个值算出（`s12 × 4 + s11`，再对 4 取模），结果 `me` 在 `s20` 中。
+
+```text
+{ s0: simm.s32 s21, 294920 ; misc: vsyncadd.remote.s32 [sflag:32776], 1 }
+{ s0: simm.s32 s22, 819208 ; misc: vsyncadd.remote.s32 [sflag:s21], 1 }
+{ s0: simm.s32 s23, 557064 ; misc: vsyncadd.remote.s32 [sflag:s22], 1 }
+{ misc: vsyncadd.remote.s32 [sflag:s23], 1 }
+{ misc: vsyncadd.s32 [sflag:8], -4 }
+{ ... misc: vwait.ge [sflag:8], 0 }
+```
+
+**四方汇合。** 循环中的四次 `pl.semaphore_signal(ready, 1, device_id={'device': rank, 'tc': 0})` 变成四条 `vsyncadd.remote`，目标的编号是常数：32776、294920、819208、557064，即十六进制的 `0x08008`、`0x48008`、`0xC8008`、`0x88008`。拆开看，低位的 `8` 是汇合用的信号量 `sflag 8`（`get_barrier_semaphore`，第 4 节），`0x8000` 是一个固定的位，第 18 位起是芯片编号：0、1、3、2，正是 mesh 位置 0–3 对应的芯片。rank 是常数，编译器在编译时就查好了表。`pl.semaphore_wait(ready, 4)` 变成两条指令：先把本地的 `sflag 8` 减 4，再等它不小于 0，即四个信号都已到达。
+
+```text
+{ s0: sadd.s32 s0, 1, s20 ; ... }       # me + 1
+...（对 4 取模，结果在 s27）
+{ s1: sld s28, [smem:s27 + 0x3f] }      # 查表：mesh 位置 → 芯片编号
+{ s0: sor.u32 s2, 0x88008000, s28 }     # 拼出 ici_dest
+{ s0: dma.general [vmem:s3], [vmem:s13], length=8, ..., src_flag=[sflag:s4], dst_flag=[sflag:s30], ici_dest=s2 }
+{ misc: vwait.ge [sflag:53], 8 }        # wait_send
+...
+{ misc: vwait.ge [sflag:54], 8 }        # wait_recv
+```
+
+**目标芯片与 remote DMA。** `(me + 1) % 4` 在运行时才知道，于是先算出 mesh 位置，再用 `sld` 从表中查出芯片编号，与常数 `0x88008000` 合成 `ici_dest`。第 6 节会看到，这个常数的第 26–28 位指定由目标芯片上的哪个 TensorCore 接收。DMA 本身是一条 `dma.general`，两端都是 TC VMEM，长度 8 个 granule（4 KiB）。`src_flag` 是本地的 `sems.at[1]`（`sflag 53`），数据发完后它增加，`wait_send` 就等它；`dst_flag` 是 `0x4000 | 54`，指向接收方的 `sems.at[2]`，数据到达对方后对方的这个信号量增加，`wait_recv` 等的是本地同一个编号的信号量，即别的芯片发给自己的那一次。
+
+同一颗芯片内的 remote DMA（第 4 节）与跨芯片的写法完全相同，只是 `ici_dest` 中的芯片编号就是自己。
+
+清单的最后，输出 DMA 之后，是第 1 节见过的出口汇合：从 `[smem:0x0]`、`[smem:0x1]` 拼出同一颗芯片上另一个 TensorCore 的 sflag 45 的地址，`vsyncadd.remote` 给它加 1，再等自己的 sflag 45。它与本节的四方汇合无关，跨芯片的 kernel 同样只在芯片内部两个 TensorCore 之间做这一次汇合。
 
 ## 跨芯片的代价
 
@@ -85,10 +131,10 @@ mesh = jax.sharding.Mesh(np.array([devices[i] for i in [0, 1, 3, 2]]), ('device'
 
 | mesh 顺序 | 环上每一步的跳数 | 每轮 |
 | --- | --- | ---: |
-| `jax.make_mesh`：0, 2, 1, 3 | 1, 2, 1, 2 | 约 2.99 µs |
-| 物理环：0, 1, 3, 2 | 1, 1, 1, 1 | 约 2.43 µs |
+| `jax.make_mesh`：0, 2, 1, 3 | 1, 2, 1, 2 | 约 2.54 µs |
+| 物理环：0, 1, 3, 2 | 1, 1, 1, 1 | 约 2.06 µs |
 
-两种顺序的数值都正确，但按 `jax.make_mesh` 的顺序成环时，有两步要走对角线，每轮慢约 0.56 µs。每一轮中的汇合是四颗芯片两两互发信号，两种顺序都相同；差别全部来自发送那一步的跳数。
+两种顺序的数值都正确，但按 `jax.make_mesh` 的顺序成环时，有两步要走对角线，每轮慢约 0.48 µs。主机计时的绝对值在不同的运行之间会变（另一次运行为 2.99 与 2.43 µs），两种顺序之差则稳定在 0.5 µs 左右。这比单条 DMA 两跳与一跳的固定开销之差（约 970 个周期，0.92 µs）小：一轮的时间还包括汇合等两种顺序共有的部分，本实验没有把一轮再拆开。每一轮中的汇合是四颗芯片两两互发信号，两种顺序都相同；差别全部来自发送那一步的跳数。
 
 设计跨芯片的通信时，应当按 `device.coords` 安排谁和谁通信，而不是按 mesh 中的序号。
 

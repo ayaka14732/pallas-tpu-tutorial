@@ -2,6 +2,7 @@
 import tpu_init
 tpu_init.initialise_local_chips()
 
+import re
 import statistics
 import time
 
@@ -88,8 +89,10 @@ def main() -> None:
         np.testing.assert_array_equal(np.asarray(compiled(x)), np.roll(np.asarray(x), 1, axis=0))
         print(f'## {name}：mesh 中依次为 device {order}，坐标 {coords}；环上每一步的跳数 {hops}')
         print(f'  一轮数值检查通过；每轮约 {round_time(mesh, x):.2f} µs')
+    print('## 物理环、1 轮时的 kernel 段清单（去掉源码注释与编码约束）')
     listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
-    print('\n'.join(line.split('#')[0].rstrip() for line in listing.splitlines() if 'dma.general' in line))
+    text = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', '\n'.join(line.split('#')[0].rstrip() for line in listing.splitlines()))
+    print('\n'.join(line for line in text.splitlines() if line.strip()))
 
 if __name__ == '__main__':
     main()

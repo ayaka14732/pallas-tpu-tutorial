@@ -1,5 +1,82 @@
 ## jax.make_mesh 的顺序：mesh 中依次为 device [0, 2, 1, 3]，坐标 [(0, 0), (0, 1), (1, 0), (1, 1)]；环上每一步的跳数 [1, 2, 1, 2]
-  一轮数值检查通过；每轮约 2.99 µs
+  一轮数值检查通过；每轮约 2.54 µs
 ## 物理环的顺序：mesh 中依次为 device [0, 1, 3, 2]，坐标 [(0, 0), (1, 0), (1, 1), (0, 1)]；环上每一步的跳数 [1, 1, 1, 1]
-  一轮数值检查通过；每轮约 2.43 µs
+  一轮数值检查通过；每轮约 2.06 µs
+## 物理环、1 轮时的 kernel 段清单（去掉源码注释与编码约束）
+{ misc: vtrace 0x80000000 }
+{ s0: simm.s32 s1, 0 }
+{ s1: sld s6, [smem:0x1] }
+{ s0: sne.s32 p0, s6, 0 }
+{ s0: @p0 sbr.rel L_0305 }
+{ s0: simm.s32 s7, 0 ;
+  s1: simm.s32 s8, 1 }
+{ s0: simm.s32 s9, 3 ;
+  s1: sst [smem:0x3f], s7 }
+{ s0: simm.s32 s10, 2 ;
+  s1: sst [smem:0x40], s8 }
+{ s0: simm.s32 s13, 0 ;
+  s1: sst [smem:0x41], s9 }
+{ s1: sst [smem:0x42], s10 }
+{ s1: sld s11, [smem:0x3ffe2] }
+{ s1: sld s12, [smem:0x3ffe3] }
+{ s0: dma.simple [vmem:s13], [hbm:s0], length=8, dst_flag=[sflag:52] }
+{ s0: sshll.u32 s16, s12, 0x2 }
+{ s0: sadd.s32 s17, s16, s11 }
+{ s0: slt.s32 p1, s17, 0 ;
+  s1: ssub.s32 s18, 0, s17 }
+{ s0: @!p1 smov s18, s17 }
+{ s0: sand.u32 s19, 0x3, s18 }
+{ s0: ssub.s32 s20, 0, s19 }
+{ s0: @!p1 smov s20, s19 }
+{ misc: vwait.ge [sflag:52], 8 }
+{ misc: vsyncadd.s32 [sflag:52], -8 }
+{ s0: simm.s32 s21, 294920 ;
+  misc: vsyncadd.remote.s32 [sflag:32776], 1 }
+{ s0: simm.s32 s22, 819208 ;
+  misc: vsyncadd.remote.s32 [sflag:s21], 1 }
+{ s0: simm.s32 s23, 557064 ;
+  misc: vsyncadd.remote.s32 [sflag:s22], 1 }
+{ misc: vsyncadd.remote.s32 [sflag:s23], 1 }
+{ misc: vsyncadd.s32 [sflag:8], -4 }
+{ s0: sadd.s32 s0, 1, s20 ;
+  s1: simm.s32 s29, 54 ;
+  misc: vwait.ge [sflag:8], 0 }
+{ s0: slt.s32 p2, s0, 0 ;
+  s1: ssub.s32 s24, 0, s0 }
+{ s0: @!p2 smov s24, s0 ;
+  s1: sor.u32 s30, 0x4000, s29 }
+{ s0: sand.u32 s25, 0x3, s24 ;
+  s1: simm.s32 s3, 8 }
+{ s0: ssub.s32 s26, 0, s25 ;
+  s1: simm.s32 s4, 53 }
+{ s0: @!p2 smov s26, s25 }
+{ s0: slt.s32 p3, s26, 0 ;
+  s1: sadd.s32 s27, 4, s26 }
+{ s0: @!p3 smov s27, s26 }
+{ s1: sld s28, [smem:s27 + 0x3f] }
+{ s0: sor.u32 s2, 0x88008000, s28 }
 { s0: dma.general [vmem:s3], [vmem:s13], length=8, stride_descriptor=[smem:0x0], stride_count=0, src_flag=[sflag:s4], dst_flag=[sflag:s30], ici_dest=s2 }
+{ misc: vwait.ge [sflag:53], 8 }
+{ misc: vsyncadd.s32 [sflag:53], -8 }
+{ misc: vwait.ge [sflag:54], 8 }
+{ misc: vsyncadd.s32 [sflag:54], -8 }
+{ s0: dma.simple [hbm:s1], [vmem:s3], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 }
+{ misc: vsyncadd.s32 [sflag:52], -8 }
+{ s1: sld s12, [smem:0x0] }
+{ s1: sld s13, [smem:0x1] }
+{ s0: sand.u32 s16, 0xfff, s12 }
+{ s0: sadd.s32 s14, 1, s13 ;
+  s1: sshll.u32 s20, s16, 0x12 }
+{ s0: sand.u32 s15, 0x1, s14 }
+{ s0: sand.u32 s18, 0x3, s15 }
+{ s0: sshll.u32 s19, s18, 0x10 }
+{ s0: sadd.s32 s21, 131072, s19 }
+{ s0: sshrl.u32 s22, s21, 0x2 }
+{ s0: sor.u32 s23, 0x2d, s22 }
+{ s0: sor.u32 s17, s23, s20 }
+{ misc: vsyncadd.remote.s32 [sflag:s17], 1 }
+{ misc: vwait.ge [sflag:45], 1 }
+{ misc: vsyncadd.s32 [sflag:45], -1 }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
