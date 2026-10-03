@@ -1,0 +1,88 @@
+输入 memory_kind：pinned_host
+## HOST → HBM → TC VMEM → HBM → HOST：数值检查通过；输出 memory_kind：pinned_host
+# function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]; image bundles [503, 508)
+{ misc: vtrace 0x80000000 }
+{ s0: simm.s32 s2, 32 }  # materialized constant
+# entry bundle: %roundtrip.1 = custom-call(%x_host.1)
+{ s1: sld s9, [smem:0x1] }
+{ s0: sne.s32 p0, s9, 0 }
+{ s0: @p0 sbr.rel L_021b }
+# end function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]; image bundles [509, 539)
+{ s0: sand.u32 s15, 0x3ffffff, s2 ;
+  s1: sshll.u32 s12, s0, 0x1a ;
+  misc: vwait.eq [sflag:485], 0 ;
+  .encoding { s1.y = lo(imm2) } }
+{ s0: sor.u32 s16, s15, s12 ;
+  s1: simm.s32 s17, 52 }  # materialized constant
+{ s0: sshll.u32 s18, s17, 0x14 ;
+  s1: sshrl.u32 s22, s0, 0x6 }
+{ s0: sand.u32 s23, 0xfffff, s22 ;
+  s1: sand.u32 s19, 0x1ff00000, s18 }
+{ s0: sor.u32 s24, s23, s19 }
+{ s0: sor.u32 s25, 0x80000000, s24 }
+{ misc: vsyncset.s32 [sflag:487], 8 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncset.s32 [sflag:486], s16 }
+{ misc: vsyncset.s32 [sflag:485], s25 }
+{ misc: vint 2 }  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:42:12-42:54
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:42:12-42:61 [dma_wait; LLO 84]
+  .encoding { misc.value = imm2 } }
+{ s0: simm.s32 s26, 0 ;  # materialized constant
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:42:12-42:61 [dma_wait; LLO 85]
+  .encoding { misc.value = imm2 ; s0.y = lo(imm0) } }
+{ s0: dma.simple [vmem:s26], [hbm:s2], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:43:12-43:59 [dma_wait; LLO 86]
+  .encoding { misc.value = imm2 } }
+{ vld: vld.8x128 v0, [vmem:0x0] ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:44:24-44:33 [get; LLO 40]
+  misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:43:12-43:59 [dma_wait; LLO 87]
+  .encoding { misc.value = imm2 } }
+{ va0: vmul.8x128.f32 v1, 2.0, v0 }  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:44:24-44:39 [mul; LLO 41]
+{ va1: vadd.8x128.f32 v2, 1.0, v1 }  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:44:24-44:45 [add; LLO 42]
+{ vst: vst.8x128 [vmem:0x0], v2 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:44:12-44:21 [swap; LLO 43]
+  .encoding { vst.opcode = s0 } }
+{ s0: dma.simple [hbm:s2], [vmem:s26], length=8, dst_flag=[sflag:52] }
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:45:12-45:59 [dma_wait; LLO 88]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:45:12-45:59 [dma_wait; LLO 89]
+  .encoding { misc.value = imm2 } }
+{ s0: sshll.u32 s4, s1, 0x1a ;
+  s1: sshrl.u32 s8, s1, 0x6 ;
+  misc: vwait.eq [sflag:485], 0 }
+{ s0: sand.u32 s9, 0xfffff, s8 ;
+  s1: sor.u32 s5, s4, s15 }
+{ s0: sor.u32 s10, s9, s19 }
+{ misc: vsyncset.s32 [sflag:487], 8 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncset.s32 [sflag:486], s5 }
+{ misc: vsyncset.s32 [sflag:485], s10 }
+{ misc: vint 2 }  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:46:12-46:54
+{ misc: vwait.ge [sflag:52], 8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:46:12-46:61 [dma_wait; LLO 103]
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:52], -8 ;  # chapter02/08_host_memory/01_pallas_host_roundtrip.py:46:12-46:61 [dma_wait; LLO 104]
+  .encoding { misc.value = imm2 } }
+# end function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]
+# ... 省略 runtime 代码 1 个 bundle
+# function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]; image bundles [540, 556)
+{ s1: sld s20, [smem:0x0] }
+{ s1: sld s21, [smem:0x1] }
+{ s0: sand.u32 s24, 0xfff, s20 }
+{ s0: sadd.s32 s22, 1, s21 ;
+  s1: sshll.u32 s27, s24, 0x12 }
+{ s0: sand.u32 s23, 0x1, s22 }  # smod.u32 w/div 2
+{ s0: sand.u32 s25, 0x3, s23 }
+{ s0: sshll.u32 s26, s25, 0x10 }
+{ s0: sadd.s32 s28, 131072, s26 }
+{ s0: sshrl.u32 s29, s28, 0x2 }
+{ s0: sor.u32 s17, 0x2d, s29 }
+{ s0: sor.u32 s30, s17, s27 }
+{ misc: vsyncadd.remote.s32 [sflag:s30], 1 }
+{ misc: vwait.ge [sflag:45], 1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:45], -1 ;
+  .encoding { misc.value = imm2 } }
+{ misc: cfence }
+{ misc: vtrace 0x90000000 }
+# end function jit(roundtrip)/roundtrip/mpmd_map [symbol 4, roundtrip.1]
+## HOST ↔ TC VMEM 直接 DMA：编译失败：FAILED_PRECONDITION: Unimplemented DMA from host to vmem.

@@ -1,0 +1,10 @@
+## 载体（页号为常数 2）中，主机地址的计算与发给主机的请求
+{ s0: sfence }
+{ s0: sadd.s32 s25, 2, s2 ;
+{ misc: vsyncset.s32 [sflag:487], 8 ;
+{ misc: vsyncset.s32 [sflag:486], s29 }
+{ misc: vsyncset.s32 [sflag:485], s7 }
+{ misc: vint 2 }
+
+## 改写后：sfence 之后插入 { s1: sld s14, [smem:0x3e] }，地址计算改为 sadd.s32 s25, s14, s2
+page[0] 分别为 0、1、2、3 时，对应的页都写入了正确的数据

@@ -24,13 +24,13 @@ _SOURCE_MAPPING.enter_context(compiler_source_mapping())
 atexit.register(_SOURCE_MAPPING.close)
 _INSTRUCTION = re.compile(r'^\s*\{?\s*([a-z]+[0-9]*): (?:@!?p[0-9]+ )?([a-z][\w.]*)')
 
-def compile(function: Callable[..., Any], *arguments: Any, mesh: jax.sharding.Mesh | None = None, compiler_options: dict[str, str] | None = None) -> Compiled:
-    """编译并保留源码映射；mesh 是 shard_map 使用的 mesh，没有时省略。"""
+def compile(function: Callable[..., Any], *arguments: Any, mesh: jax.sharding.Mesh | None = None, compiler_options: dict[str, str] | None = None, **jit_options: Any) -> Compiled:
+    """编译并保留源码映射；mesh 是 shard_map 使用的 mesh，没有时省略；其余关键字参数（如 out_shardings）原样传给 jax.jit。"""
     jax.config.update('jax_enable_compilation_cache', False)
     # 设置 abstract mesh 后，kernel 中重复调用的 jnp 函数不会复用第一次追踪的 jaxpr，来源注释的行号才准确。
     abstract_mesh = jax.sharding.use_abstract_mesh(mesh.abstract_mesh) if mesh is not None else contextlib.nullcontext()
     with abstract_mesh:
-        return jax.jit(function, compiler_options=compiler_options).lower(*arguments).compile()
+        return jax.jit(function, compiler_options=compiler_options, **jit_options).lower(*arguments).compile()
 
 def serialize(compiled: Compiled) -> bytes:
     return bytes(cast(LoadedExecutable, compiled.runtime_executable()).serialize())
