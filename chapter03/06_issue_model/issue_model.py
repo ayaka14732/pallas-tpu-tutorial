@@ -8,7 +8,7 @@ VIF_ENTRIES = 20  # 标量侧有 20 项未释放时，任何 bundle 都不能标
 RELEASE = 10  # 一项在向量发射后 10 个周期才在标量侧释放。
 MEMORY = ('vld', 'vst', 'cld')  # 访问内存的 bundle 最早在标量发射后 2 个周期向量发射，其余 1 个周期。
 RESULT_LATENCY = {'vmul.8x128.f32': 2}  # 写 TC VREG 的指令：结果在几个周期后可用，未列出的为 1。
-# 发射—取回通路：结果进入哪个队列、发射后多少周期可以取回。
+# 提交—取回通路：结果进入哪个队列、发射后多少周期可以取回。
 PUSH_LATENCY = {'erf': 7, 'mrf': 83, 'trf': 6, 'crf': 53, 'v2sf': 42}
 # 同一个队列上，相邻两次提交（push）或取回（pop）之间的最小间隔，未列出的为 1。
 INTERVAL = {'push erf': 2, 'push mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
