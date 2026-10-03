@@ -249,7 +249,8 @@ def extract_headings(document: dict[str, object]) -> tuple[Heading, ...]:
     return tuple(headings)
 
 def render_markdown(page: Page, pages_by_source: dict[Path, Page], assets: set[Path]) -> tuple[str, tuple[Heading, ...]]:
-    document = json.loads(run_pandoc(["--from=markdown+tex_math_single_backslash", "--to=json", str(page.source)]))
+    # 管道表格的行超过 --columns 时 Pandoc 会按源码宽度固定列宽，教程中的表格行都很长，所以放宽这个限制。
+    document = json.loads(run_pandoc(["--from=markdown+tex_math_single_backslash", "--to=json", "--columns=100000", str(page.source)]))
     transform_references(document, page, pages_by_source, assets)
     headings = extract_headings(document)
     encoded = json.dumps(document, ensure_ascii=False).encode("utf-8")

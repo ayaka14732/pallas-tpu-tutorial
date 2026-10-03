@@ -38,11 +38,18 @@ XLA 是通用编译器，它采用的算法未必最好，即便算法合适，�
 
 学习本教程中的 Pallas 用法时，请始终记住：你在学习的不是“Pallas 允许你做什么”，而是“TPU 允许你做什么”。
 
+## 目录
+
+- [第一章：基本操作的 TC 实现](chapter01/README.md)：一颗芯片、一个 TensorCore 上每种基本操作由哪些指令完成。
+- [第二章：多 TC 与 DMA](chapter02/README.md)：两个 TensorCore、Megacore Shared CMEM、多芯片与主机内存之间的数据通路，以及由它们推导出的流水线与集合通信。
+- [第三章：静态分析与计时](chapter03/README.md)：从主机时间到单个周期的计时方法，以及从清单推算执行周期的发射模型。
+- [第四章：随机数](chapter04/README.md)：硬件随机数生成器、计数器式生成器与各种分布的代价。
+
 ## 开发环境
 
 本教程使用 TPU v4、JAX HEAD（`0.12.0.dev20261002`）、jaxlib `0.12.0.dev20261002` nightly、libtpu `0.0.49` 和 [tpuasm](../tpuasm)。实验环境为 `/srv/workspace/venv`。
 
-单芯片实验在 `import jax` 之前调用 [`tpu_init.initialise_one_chip()`](tpu_init.py)，只让 runtime 打开一颗芯片；本 host 四芯片实验调用 `tpu_init.initialise_local_chips()`。编译产物统一用 [`tpuasm_tools.py`](tpuasm_tools.py) 读取机器清单。从仓库根目录运行全部实验：
+单芯片实验在 `import jax` 之前调用 [`tpu_init.initialise_one_chip()`](tpu_init.py)，只让 runtime 打开一颗芯片；本 host 四芯片实验调用 `tpu_init.initialise_local_chips()`。编译产物统一用 [`tpuasm_tools.py`](tpuasm_tools.py) 读取机器清单，XProf 的设备事件用 [`xprof_tools.py`](xprof_tools.py) 读取。从仓库根目录运行全部实验：
 
 ```sh
 ./run_all.sh
