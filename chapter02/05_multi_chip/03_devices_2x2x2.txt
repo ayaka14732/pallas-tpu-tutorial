@@ -1,11 +1,11 @@
-[host-0] 进程数 2，全部 device 8 个，本进程的 device 4 个
-[host-0]   id=0，coords=[0, 0, 0]，process_index=0
-[host-0]   id=1，coords=[1, 0, 0]，process_index=0
-[host-0]   id=2，coords=[0, 1, 0]，process_index=0
-[host-0]   id=3，coords=[1, 1, 0]，process_index=0
-[host-0]   id=4，coords=[0, 0, 1]，process_index=1
-[host-0]   id=5，coords=[1, 0, 1]，process_index=1
-[host-0]   id=6，coords=[0, 1, 1]，process_index=1
-[host-0]   id=7，coords=[1, 1, 1]，process_index=1
-[host-0] jax.make_mesh((8,), ...) 的 device id： [0, 4, 2, 6, 1, 5, 3, 7]
-[host-0] 对应的芯片坐标： [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)]
+进程数 2，全部 device 8 个，本进程的 device 4 个
+  id=0，coords=[0, 0, 0]，process_index=0
+  id=1，coords=[1, 0, 0]，process_index=0
+  id=2，coords=[0, 1, 0]，process_index=0
+  id=3，coords=[1, 1, 0]，process_index=0
+  id=4，coords=[0, 0, 1]，process_index=1
+  id=5，coords=[1, 0, 1]，process_index=1
+  id=6，coords=[0, 1, 1]，process_index=1
+  id=7，coords=[1, 1, 1]，process_index=1
+jax.make_mesh((8,), ...) 的 device id： [0, 4, 2, 6, 1, 5, 3, 7]
+对应的芯片坐标： [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)]
