@@ -74,6 +74,39 @@ TensorCore 0 的 module 比 kernel 长约 19–22 µs，这段时间在 kernel �
 
 **5. 从清单读出的时间。** 清单给出设备上要执行的指令；没有等待时，bundle 数就是周期数（第 4 节），有等待时可以用第 6 节的发射模型推算。这个时间不需要运行程序，但不包含 DMA 等异步工作的时间，必须由实测验证。
 
+## 等到结果的时间花在哪里
+
+本小节实验[源码](02_jax_host_events.py)、[输出](02_jax_host_events.txt)。
+
+第 2 种时间比设备时间多出 100 多微秒。XProf 同时记录了主机一侧的事件，可以把一次调用拆开。实验对 `pl.delay(100000)` 的 kernel 连续调用 8 次，每次用 `jax.profiler.TraceAnnotation('call')` 标出整个调用，统计调用区间内各个主机事件的开始时刻与持续时间：
+
+```python
+with jax.profiler.TraceAnnotation('call'):
+    compiled(x).block_until_ready()
+```
+
+8 次调用的中位数（开始时刻相对调用开始，单位 µs）：
+
+| 事件 | 开始 | 持续 | 含义 |
+| --- | ---: | ---: | --- |
+| `PjitFunction(jit(wait))` | 2.4 | 78.8 | Python 一侧的 `jit` 调用（嵌套出现两次） |
+| `PjRtCApiLoadedExecutable::Execute` | 11.5 | 64.7 | 交给 runtime 执行 |
+| `CommonPjRtLoadedExecutable::ExecutePrepare` | 17.5 | 10.5 | 准备参数，分配输出 buffer |
+| `TpuLoadedExecutable::ExecuteLaunch` | 28.7 | 43.6 | 把程序放进设备的执行队列 |
+| `tpu::System::Execute`（两次） | 30.1、55.6 | 24.4、14.1 | 其中的两次入队 |
+| `ReadSyncFlag`（两次） | 209.4、210.8 | 27.7、28.0 | 读取设备的完成标志 |
+| `CompleteCallbacks`（两次） | 237.3、239.0 | 20.5、32.0 | 完成后的回调 |
+| `tpu::System::Execute=>Done`（两次） | 253.1、260.6 | 3.0、13.0 | 标记执行结束 |
+| 整个调用 | 0 | 279.4 | |
+
+`tpu::System::Execute` 等事件每次调用出现两次，与一颗芯片上 TensorCore 的个数相同；本节没有进一步确认两次各对应什么。按时间顺序，一次调用分成三段：
+
+- **提交，约 72 µs。** 从调用开始到 `ExecuteLaunch` 结束（28.7 + 43.6），主机在 Python、参数处理、输出分配和入队上花掉的时间。第 1 种时间（只等调用返回）主要就是这一段。
+- **等待设备，约 137 µs。** 从入队结束到主机开始读完成标志（209.4）。设备上的 module 117.3 µs、kernel 100.8 µs 都在这一段之内，其余是程序启动与结束、完成标志传回主机的时间。
+- **完成处理，约 70 µs。** 读完成标志、执行回调、标记结束，直到 `block_until_ready()` 返回（279.4）。
+
+所以 10 µs 的 kernel 调用并等到结果要 139 µs，不是因为 kernel 慢：提交与完成处理这两段在主机上就占了约 140 µs，与 kernel 的长短无关。要缩短调用方的等待，只能减少调用次数，例如把多步工作合进一个程序、在 kernel 内部循环，或者让多个调用在途重叠（第 3 种时间）。
+
 ## 各自回答什么
 
 | 时间 | 回答的问题 |

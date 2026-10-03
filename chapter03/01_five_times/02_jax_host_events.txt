@@ -1,0 +1,18 @@
+## 主机：8 次调用，每次的中位数（开始时刻相对调用开始）
+  整个调用（call 区间）：279.4 µs
+  PjitFunction(jit(wait)) 第 1 次：开始 2.4 µs，持续 78.8 µs
+  PjitFunction(jit(wait)) 第 2 次：开始 2.5 µs，持续 78.6 µs
+  PjRtCApiLoadedExecutable::Execute 第 1 次：开始 11.5 µs，持续 64.7 µs
+  CommonPjRtLoadedExecutable::ExecutePrepare 第 1 次：开始 17.5 µs，持续 10.5 µs
+  TpuLoadedExecutable::ExecuteLaunch 第 1 次：开始 28.7 µs，持续 43.6 µs
+  tpu::System::Execute 第 1 次：开始 30.1 µs，持续 24.4 µs
+  tpu::System::Execute 第 2 次：开始 55.6 µs，持续 14.1 µs
+  ReadSyncFlag 第 1 次：开始 209.4 µs，持续 27.7 µs
+  ReadSyncFlag 第 2 次：开始 210.8 µs，持续 28.0 µs
+  CompleteCallbacks 第 1 次：开始 237.3 µs，持续 20.5 µs
+  CompleteCallbacks 第 2 次：开始 239.0 µs，持续 32.0 µs
+  tpu::System::Execute=>Done 第 1 次：开始 253.1 µs，持续 3.0 µs
+  tpu::System::Execute=>Done 第 2 次：开始 260.6 µs，持续 13.0 µs
+## 设备
+  TensorCore 0 XLA Modules：117.3 µs
+  TensorCore 0 XLA Ops：100.8 µs
