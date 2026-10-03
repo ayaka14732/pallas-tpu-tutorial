@@ -229,6 +229,10 @@ class LccProbe:
 
     def _load(self, body: str, reads: int, setup: str) -> Callable[[jax.Array], jax.Array]:
         """把 setup、片段和写回读数的后缀插入载体，返回可调用的 executable。"""
+        return load(self.program(body, reads, setup), self.compiled)
+
+    def program(self, body: str, reads: int = 3, setup: str = '') -> bytes:
+        """插入 setup、片段和写回读数的后缀之后的 executable（序列化形式），可以用 full_listing 查看。"""
         # 载体在插入点之后还要用到的标量寄存器可能落在 s20–s30 中：先广播进 v20–v30 保存，最后经 vpush/spop 恢复。
         save = ''.join(bundle(f'va0: vmov.8x128 v{register}, s{register}') for register in SAVED) + bundle('s0: sfence')
         restore = ''.join(bundle(f'vst: vpush v2sf, v{register}') + bundle(f's0: spop s{register}, v2sf') for register in SAVED)
@@ -238,7 +242,7 @@ class LccProbe:
         for tile, register in enumerate(registers, 1):
             suffix += bundle(f'va0: vmov.8x128 v12, s{register}') + bundle('misc: vnop') * 8 + bundle(f'vst: vst.8x128 [vmem:0x{tile * 8:x}], v12')
         suffix += bundle('misc: vnop') * 16 + bundle('s0: sfence') + restore + bundle('s0: sfence')
-        return load(insert_bundles(self.serialized, {self.marker: prefix + body + suffix}), self.compiled)
+        return insert_bundles(self.serialized, {self.marker: prefix + body + suffix})
 
     def run_raw(self, body: str, reads: int, repeats: int = 8, setup: str = '') -> np.ndarray:
         """返回 (repeats, num_cores, reads) 的 64 位读数。"""

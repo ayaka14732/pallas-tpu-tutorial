@@ -53,6 +53,12 @@ def cases() -> list[tuple[str, str, str, str]]:
     both = ''.join(bundle(xpose(index, 0) + ' ; ' + xpose(index, 1)) for index in range(16))
     add('两次转置分给 trf0、trf1，成对取回', both + bundle('vr0: vpop.8x128 v11, trf0 ; vr1: vpop.8x128 v12, trf1') * 16)
     add('两次转置分给 trf0、trf1，先取完 trf0', both + bundle('vr0: vpop.8x128 v11, trf0') * 16 + bundle('vr0: vpop.8x128 v12, trf1') * 16)
+    load, use = bundle('s1: sld s24, [smem:0x0]'), bundle('s0: sadd.s32 s24, 1, s24')
+    for count in (2, 16):
+        add(f'第 4 节：{count} 条连续的 sld', load * count)
+    add('第 4 节：sld 之后紧接使用其结果', load + use)
+    add('第 4 节：4 组“sld + 3 条无关的 sadd”', (load + bundle('s0: sadd.s32 s23, 1, s23') * 3) * 4)
+    add('sld 与依赖 sld 结果的向量运算', load + bundle('va0: vmov.8x128 v11, s24') + bundle('va0: vadd.8x128.s32 v12, v11, v10'))
     for count in (1, 16, 64):
         listing, trace = loop(count)
         add(f'计数循环 {count} 次', listing, trace=trace)

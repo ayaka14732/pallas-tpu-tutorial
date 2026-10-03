@@ -21,6 +21,21 @@ def main() -> None:
             deltas = probe.run(body)
             values = sorted({tuple(row) for row in deltas.tolist()})
             print(f'  N = {count:2d}：(R1 − R0, R2 − R0) = {values}')
+    show_program(probe)
+
+def show_program(probe: tpuasm_tools.LccProbe) -> None:
+    """打印插入片段后的完整清单中，从片段之前的 sfence 到第一段写回读数为止的部分。"""
+    body = read_lcc(20) + bundle('va0: vadd.8x128.s32 v11, 1, v10') * 2 + read_lcc(21) + bundle('s0: sfence') + read_lcc(22)
+    lines = [line.split('#')[0].rstrip() for line in tpuasm_tools.full_listing(probe.program(body)).splitlines() if line.split('#')[0].strip()]
+    start = next(index for index, line in enumerate(lines) if 'srdreg.lcclo s20' in line)
+    end = next(index for index, line in enumerate(lines) if index > start and 'vst.8x128 [vmem:0x8]' in line)
+    print('## 插入后的清单（N = 2 条向量加法；省略 suffix 中重复的 vnop）')
+    previous = ''
+    for line in lines[start - 2:end + 1]:
+        if 'vnop' in line and 'vnop' in previous:
+            continue
+        print('  ' + (line + '  …' if 'vnop' in line else line))
+        previous = line
 
 if __name__ == '__main__':
     main()

@@ -22,3 +22,19 @@
   N =  4：(R1 − R0, R2 − R0) = [(5, 17)]
   N = 16：(R1 − R0, R2 − R0) = [(17, 29)]
   N = 64：(R1 − R0, R2 − R0) = [(65, 77)]
+## 插入后的清单（N = 2 条向量加法；省略 suffix 中重复的 vnop）
+  { misc: vnop }  …
+  { s0: sfence }
+  { s0: srdreg.lcclo s20 ;
+    s1: srdreg.lcchi s25 }
+  { va0: vadd.8x128.s32 v11, 1, v10 }
+  { va0: vadd.8x128.s32 v11, 1, v10 }
+  { s0: srdreg.lcclo s21 ;
+    s1: srdreg.lcchi s26 }
+  { s0: sfence }
+  { s0: srdreg.lcclo s22 ;
+    s1: srdreg.lcchi s27 }
+  { misc: vnop }  …
+  { va0: vmov.8x128 v12, s20 }
+  { misc: vnop }  …
+  { vst: vst.8x128 [vmem:0x8], v12 }

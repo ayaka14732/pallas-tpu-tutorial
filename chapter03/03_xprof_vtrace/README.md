@@ -38,24 +38,74 @@ with jax.named_scope('store'):
     pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 ```
 
-实验只改编译选项。关闭时 kernel 段 159 个 bundle、2 条 `vtrace`；打开时 168 个 bundle、10 条 `vtrace`：
+实验只改编译选项。关闭时 kernel 段 159 个 bundle，只有开头和结尾两条 `vtrace`；打开时 168 个 bundle，10 条 `vtrace`。打开时的清单（连续 6 个以上不含 `vtrace` 的 bundle 折叠成一行）：
 
 ```text
-vtrace 0x80000000；vtrace 0xb8000000；vtrace 0xc8000000；vtrace 0xb8000001；vtrace 0xc8000001；vtrace 0xb8000002；vtrace 0xc8000002；vtrace 0xb8000003；vtrace 0xc8000003；vtrace 0x90000000
+[0] { misc: vtrace 0x80000000 }
+[1] { s1: sld s6, [smem:0x1] }
+[2] { s0: sne.s32 p0, s6, 0 }
+[3] { s0: @p0 sbr.rel L_0293 }
+[4] { misc: vtrace 0xb8000000 }
+[5] { s0: simm.s32 s7, 0 }
+[6] { s0: dma.simple [vmem:s7], [hbm:s0], length=1024, dst_flag=[sflag:52] }
+[7] { misc: vtrace 0xc8000000 }
+[8] { misc: vtrace 0xb8000001 }
+[9] { misc: vwait.ge [sflag:52], 1024 }
+[10] { misc: vsyncadd.s32 [sflag:52], -1024 }
+[11] { misc: vtrace 0xc8000001 }
+[12] { misc: vtrace 0xb8000002 }
+[13] { vld: vld.8x128 v0, [vmem:0x0] }
+[14] { va0: vmul.8x128.f32 v1, 2.0, v0 ; vld: vld.8x128 v2, [vmem:0x8] }
+… 129 个 bundle
+[144] { vst: vst.8x128 [vmem:0x3f0], v30 }
+[145] { vst: vst.8x128 [vmem:0x3f8], v31 }
+[146] { misc: vtrace 0xc8000002 }
+[147] { misc: vtrace 0xb8000003 }
+[148] { s0: dma.simple [hbm:s1], [vmem:s7], length=1024, dst_flag=[sflag:52] }
+[149] { misc: vwait.ge [sflag:52], 1024 }
+[150] { misc: vsyncadd.s32 [sflag:52], -1024 }
+[151] { misc: vtrace 0xc8000003 }
+...
+[167] { misc: vtrace 0x90000000 }
 ```
 
-类型 `0xb` 与 `0xc` 是区域的开始与结束，低位的 0–3 是区域的编号，开始与结束靠编号配对。区域的名字不在指令中：编译器把编号与名字的对应关系存在程序的 metadata 里，主机解析时再查回来（[研究报告 35](../../../pallas-tpu-readings-dev/research_reports/35_pallas_vtrace_to_xplane.md)）。位 27 的 `0x08000000` 来自编译器分配编号的范围，不是类型的一部分。
+逐段读：
 
-多出的 9 个 bundle 说明打开 region trace 改变了程序：区域的边界限制了编译器跨边界重排指令（[研究报告 34](../../../pallas-tpu-readings-dev/research_reports/34_named_scope_changes_tpu_scheduling.md)）。所以带 region trace 测到的时间，属于一个与正式运行略有不同的程序。
+- `[0]` 与 `[167]` 是 kernel 本身的开始与结束（类型 `0x8`、`0x9`），对应 XProf 的 `XLA Ops` 事件。`[1]`–`[3]` 是 `num_cores=1` 时让 TensorCore 1 跳过主体的分支（第一章第 1 节）。
+- 每个 `named_scope` 变成一对 `vtrace`：类型 `0xb` 开始、`0xc` 结束，低位的 0–3 是区域的编号，开始与结束靠编号配对。`load_start`（编号 0）只包住发起 DMA 的 `[5]`、`[6]`；`load_wait`（编号 1）包住 `vwait` 与信号量清零；`compute`（编号 2）包住 `[13]`–`[145]` 共 133 个 bundle 的读、算、写；`store`（编号 3）包住输出 DMA 的发起与等待。
+- 区域的名字不在指令中：编译器把编号与名字的对应关系存在程序的 metadata 里，主机解析时再查回来（[研究报告 35](../../../pallas-tpu-readings-dev/research_reports/35_pallas_vtrace_to_xplane.md)）。位 27 的 `0x08000000` 来自编译器分配编号的范围，不是类型的一部分。
+- 每条 `vtrace` 独占一个 bundle，8 条就多出 8 个 bundle；除此之外还多出 1 个 bundle。区域的边界还限制了编译器跨边界重排指令（[研究报告 34](../../../pallas-tpu-readings-dev/research_reports/34_named_scope_changes_tpu_scheduling.md)）；本例的数据依赖本来就不允许跨区域重排，影响很小，在可以交错的程序中影响会更大。所以带 region trace 测到的时间，属于一个与正式运行略有不同的程序。本例中 kernel 的时间从 2012 ns 变为 2039 ns。
 
 XProf 中 TensorCore 0 的 `XLA TraceMe` 轨道上出现四个区域，16 次调用的中位数：
 
 | 区域 | 时间 | 对照 |
 | --- | ---: | --- |
 | `load_start` | 1 ns | — |
-| `load_wait` | 990 ns | HBM → TC VMEM 512 KiB：`483.6 + 1.105 × 512` ≈ 1049 周期 ≈ 999 ns |
-| `compute` | 128 ns | 128 个 TC VREG，每周期一组 `vld`/`vmul`/`vadd`/`vst` |
-| `store` | 900 ns | TC VMEM → HBM 512 KiB：`417.5 + 1.051 × 512` ≈ 956 周期 ≈ 910 ns |
+| `load_wait` | 985 ns | HBM → TC VMEM 512 KiB：`483.6 + 1.105 × 512` ≈ 1049 周期 ≈ 999 ns |
+| `compute` | 127 ns | 133 个 bundle，按每周期一个约 127 ns |
+| `store` | 903 ns | TC VMEM → HBM 512 KiB：`417.5 + 1.051 × 512` ≈ 956 周期 ≈ 910 ns |
+
+`compute` 区域的 127 ns 与区域内的 133 个 bundle 按 1.05 GHz 换算的 126.7 ns 一致：这一段没有任何等待，每周期发射一个 bundle（第 4 节）。
+
+### 只改结构：嵌套的区域
+
+`named_scope` 可以嵌套。把 `compute` 和 `store` 放进一个外层区域：
+
+```python
+with jax.named_scope('compute_and_store'):
+    with jax.named_scope('compute'):
+        x_vmem[...] = x_vmem[...] * 2.0 + 1.0
+    with jax.named_scope('store'):
+        pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+```
+
+清单中多了一对编号为 2 的 `vtrace`，内层的两个区域编号变为 3、4，外层的结束标记排在内层之后：
+
+```text
+...；vtrace 0xb8000002；vtrace 0xb8000003；vtrace 0xc8000003；vtrace 0xb8000004；vtrace 0xc8000004；vtrace 0xc8000002；vtrace 0x90000000
+```
+
+XProf 中外层区域 1034 ns，内层 `compute` 127 ns、`store` 903 ns，合计 1030 ns：外层的时间就是内层之和加上两条 `vtrace` 之间的几个周期。嵌套的区域适合先粗后细地定位：先看外层占多少，再看是哪个内层。
 
 ## 区间测的是什么
 

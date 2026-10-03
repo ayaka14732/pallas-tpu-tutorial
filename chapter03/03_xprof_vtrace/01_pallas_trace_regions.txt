@@ -1,13 +1,57 @@
-## xla_enable_custom_call_region_trace=false：数值检查通过；kernel 段 159 个 bundle，其中 vtrace 2 条
+## xla_enable_custom_call_region_trace=false：数值检查通过；kernel 段 159 个 bundle，其中含 vtrace 的 2 个
   misc: vtrace 0x80000000；misc: vtrace 0x90000000
-## xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 168 个 bundle，其中 vtrace 10 条
-  misc: vtrace 0x80000000；misc: vtrace 0xb8000000；misc: vtrace 0xc8000000；misc: vtrace 0xb8000001；misc: vtrace 0xc8000001；misc: vtrace 0xb8000002；misc: vtrace 0xc8000002；misc: vtrace 0xb8000003；misc: vtrace 0xc8000003；misc: vtrace 0x90000000
-## XProf，16 次调用的中位数
-  /device:TPU:0 XLA Modules jit_affine(1861720714005130170)：19254 ns
-  /device:TPU:0 XLA Ops affine.1：2029 ns
-  /device:TPU:0 XLA TraceMe compute：128 ns
-  /device:TPU:0 XLA TraceMe load_start：1 ns
-  /device:TPU:0 XLA TraceMe load_wait：990 ns
-  /device:TPU:0 XLA TraceMe store：900 ns
-  /device:TPU:1 XLA Modules jit_affine(1861720714005130170)：2129 ns
-  /device:TPU:1 XLA Ops affine.1：2048 ns
+  XProf，16 次调用的中位数：
+    /device:TPU:0 XLA Modules module：19585 ns
+    /device:TPU:0 XLA Ops affine.1：2012 ns
+    /device:TPU:1 XLA Modules module：2112 ns
+## xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 168 个 bundle，其中含 vtrace 的 10 个
+  清单（[编号] bundle）：
+    [0] { misc: vtrace 0x80000000 }
+    [1] { s1: sld s6, [smem:0x1] }
+    [2] { s0: sne.s32 p0, s6, 0 }
+    [3] { s0: @p0 sbr.rel L_0293 }
+    [4] { misc: vtrace 0xb8000000 }
+    [5] { s0: simm.s32 s7, 0 }
+    [6] { s0: dma.simple [vmem:s7], [hbm:s0], length=1024, dst_flag=[sflag:52] }
+    [7] { misc: vtrace 0xc8000000 }
+    [8] { misc: vtrace 0xb8000001 }
+    [9] { misc: vwait.ge [sflag:52], 1024 }
+    [10] { misc: vsyncadd.s32 [sflag:52], -1024 }
+    [11] { misc: vtrace 0xc8000001 }
+    [12] { misc: vtrace 0xb8000002 }
+    [13] { vld: vld.8x128 v0, [vmem:0x0] }
+    [14] { va0: vmul.8x128.f32 v1, 2.0, v0 ; vld: vld.8x128 v2, [vmem:0x8] }
+    … 129 个 bundle
+    [144] { vst: vst.8x128 [vmem:0x3f0], v30 }
+    [145] { vst: vst.8x128 [vmem:0x3f8], v31 }
+    [146] { misc: vtrace 0xc8000002 }
+    [147] { misc: vtrace 0xb8000003 }
+    [148] { s0: dma.simple [hbm:s1], [vmem:s7], length=1024, dst_flag=[sflag:52] }
+    [149] { misc: vwait.ge [sflag:52], 1024 }
+    [150] { misc: vsyncadd.s32 [sflag:52], -1024 }
+    [151] { misc: vtrace 0xc8000003 }
+    [152] { s1: sld s20, [smem:0x0] }
+    [153] { s1: sld s21, [smem:0x1] }
+    … 11 个 bundle
+    [165] { misc: vsyncadd.s32 [sflag:45], -1 }
+    [166] { misc: cfence }
+    [167] { misc: vtrace 0x90000000 }
+  XProf，16 次调用的中位数：
+    /device:TPU:0 XLA Modules module：18892 ns
+    /device:TPU:0 XLA Ops affine.1：2039 ns
+    /device:TPU:0 XLA TraceMe compute：127 ns
+    /device:TPU:0 XLA TraceMe load_start：1 ns
+    /device:TPU:0 XLA TraceMe load_wait：985 ns
+    /device:TPU:0 XLA TraceMe store：903 ns
+    /device:TPU:1 XLA Modules module：2138 ns
+## 嵌套区域，xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 170 个 bundle，其中含 vtrace 的 12 个
+  misc: vtrace 0x80000000；misc: vtrace 0xb8000000；misc: vtrace 0xc8000000；misc: vtrace 0xb8000001；misc: vtrace 0xc8000001；misc: vtrace 0xb8000002；misc: vtrace 0xb8000003；misc: vtrace 0xc8000003；misc: vtrace 0xb8000004；misc: vtrace 0xc8000004；misc: vtrace 0xc8000002；misc: vtrace 0x90000000
+  XProf，16 次调用的中位数：
+    /device:TPU:0 XLA Modules module：19746 ns
+    /device:TPU:0 XLA Ops affine.1：2140 ns
+    /device:TPU:0 XLA TraceMe compute：127 ns
+    /device:TPU:0 XLA TraceMe compute_and_store：1034 ns
+    /device:TPU:0 XLA TraceMe load_start：1 ns
+    /device:TPU:0 XLA TraceMe load_wait：1090 ns
+    /device:TPU:0 XLA TraceMe store：903 ns
+    /device:TPU:1 XLA Modules module：2241 ns

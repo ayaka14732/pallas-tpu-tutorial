@@ -4,6 +4,7 @@ tpu_init.initialise_one_chip()
 
 from collections import defaultdict
 from pathlib import Path
+import re
 import statistics
 
 import jax
@@ -17,7 +18,7 @@ import numpy as np
 import tpuasm_tools
 import xprof_tools
 
-def build():
+def build(nested: bool = False):
     mesh = jax.make_mesh((1,), ('device',))
     tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
 
@@ -44,33 +45,81 @@ def build():
                 load.start()
             with jax.named_scope('load_wait'):
                 load.wait()
-            with jax.named_scope('compute'):
-                x_vmem[...] = x_vmem[...] * 2.0 + 1.0
-            with jax.named_scope('store'):
-                pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+            if nested:
+                # 外层区域包住两个内层区域。
+                with jax.named_scope('compute_and_store'):
+                    with jax.named_scope('compute'):
+                        x_vmem[...] = x_vmem[...] * 2.0 + 1.0
+                    with jax.named_scope('store'):
+                        pltpu.async_copy(x_vmem, o_hbm, sem).wait()
+            else:
+                with jax.named_scope('compute'):
+                    x_vmem[...] = x_vmem[...] * 2.0 + 1.0
+                with jax.named_scope('store'):
+                    pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 
         return kernel(x)
 
     return mesh, affine
 
-def main() -> None:
-    x = jnp.arange(1024 * 128, dtype=jnp.float32).reshape(1024, 128) / 1024
-    mesh, affine = build()
-    for flag in ('false', 'true'):
-        compiled = tpuasm_tools.compile(affine, x, mesh=mesh, compiler_options={'xla_enable_custom_call_region_trace': flag})
-        np.testing.assert_array_equal(np.asarray(compiled(x)), np.asarray(x) * 2.0 + 1.0)
-        listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
-        bundles = [line for line in listing.splitlines() if line.startswith('{')]
-        traces = [line.split('#')[0].strip(' {};') for line in listing.splitlines() if 'vtrace' in line.split('#')[0]]
-        print(f'## xla_enable_custom_call_region_trace={flag}：数值检查通过；kernel 段 {len(bundles)} 个 bundle，其中 vtrace {len(traces)} 条')
-        print('  ' + '；'.join(traces))
+def joined_bundles(listing: str) -> list[str]:
+    """清单中的 bundle，每个拼成一行，去掉源码注释。"""
+    bundles, current = [], []
+    for line in listing.splitlines():
+        text = line.split('#')[0].strip()
+        if text.startswith('{'):
+            current = [text]
+        elif current:
+            current.append(text)
+        if current and text.endswith('}'):
+            bundles.append(re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', ' '.join(current)))
+            current = []
+    return bundles
+
+def device_medians(compiled, x: jax.Array) -> dict[tuple[str, str, str], float]:
     events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(x).block_until_ready() for _ in range(16)], Path('/tmp/pallas_tpu_tutorial/xprof')))
     durations = defaultdict(list)
     for event in events:
-        durations[(event['device'], event['track'], event['name'])].append(xprof_tools.duration_us(event))
-    print('## XProf，16 次调用的中位数')
-    for (device, track, name), values in sorted(durations.items()):
-        print(f'  {device} {track} {name}：{statistics.median(values) * 1000:.0f} ns')
+        name = 'module' if event['track'] == 'XLA Modules' else event['name']
+        durations[(event['device'], event['track'], name)].append(xprof_tools.duration_us(event))
+    return {key: statistics.median(values) for key, values in durations.items()}
+
+def main() -> None:
+    x = jnp.arange(1024 * 128, dtype=jnp.float32).reshape(1024, 128) / 1024
+    for nested in (False, True):
+        mesh, affine = build(nested)
+        for flag in (('false', 'true') if not nested else ('true',)):
+            compiled = tpuasm_tools.compile(affine, x, mesh=mesh, compiler_options={'xla_enable_custom_call_region_trace': flag})
+            np.testing.assert_array_equal(np.asarray(compiled(x)), np.asarray(x) * 2.0 + 1.0)
+            bundles = joined_bundles(tpuasm_tools.kernel_listing(compiled, pallas_only=True))
+            traces = [index for index, text in enumerate(bundles) if 'vtrace' in text]
+            print(f'## {"嵌套区域，" if nested else ""}xla_enable_custom_call_region_trace={flag}：数值检查通过；kernel 段 {len(bundles)} 个 bundle，其中含 vtrace 的 {len(traces)} 个')
+            if flag == 'true' and not nested:
+                # 打印整个 kernel 段，连续 6 个以上不含 vtrace 的 bundle 折叠成一行。
+                print('  清单（[编号] bundle）：')
+                index = 0
+                while index < len(bundles):
+                    run = index
+                    while run < len(bundles) and 'vtrace' not in bundles[run]:
+                        run += 1
+                    if run - index > 6:
+                        for k in (index, index + 1):
+                            print(f'    [{k}] {bundles[k]}')
+                        print(f'    … {run - index - 4} 个 bundle')
+                        for k in (run - 2, run - 1):
+                            print(f'    [{k}] {bundles[k]}')
+                    else:
+                        for k in range(index, run):
+                            print(f'    [{k}] {bundles[k]}')
+                    if run < len(bundles):
+                        print(f'    [{run}] {bundles[run]}')
+                    index = run + 1
+            else:
+                print('  ' + '；'.join(bundles[index].strip('{} ') for index in traces))
+            print(f'  XProf，16 次调用的中位数：')
+            for (device, track, name), value in sorted(device_medians(compiled, x).items()):
+                if device == '/device:TPU:0' or track == 'XLA Modules':
+                    print(f'    {device} {track} {name}：{value * 1000:.0f} ns')
 
 if __name__ == '__main__':
     main()

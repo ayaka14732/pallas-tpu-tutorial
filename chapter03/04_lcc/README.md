@@ -1,6 +1,6 @@
 # LCC：指令级计时
 
-主机计时（第 1、2 节）只能看到整个程序的时间。XProf 的区域（第 3 节）能标出 kernel 内部的几段，但它改变了调度，分辨率也只到纳秒。要知道 kernel 中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，并用它验证第一章第 2 节的说法：没有等待时，TensorCore 每个周期发射一个 bundle。
+主机计时（第 1、2 节）只能看到整个程序的时间。XProf 的区域（第 3 节）能标出 kernel 内部的几段，但它改变了调度，分辨率也只到纳秒。要知道 kernel 中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，用它验证第一章第 2 节的说法“没有等待时，TensorCore 每个周期发射一个 bundle”，并测出标量单元中哪些指令会让发射停下来。
 
 ## 读 LCC 的指令
 
@@ -10,31 +10,61 @@ LCC 是 64 位的，标量寄存器是 32 位的，所以要分两半读：
 { s0: srdreg.lcclo s20 ; s1: srdreg.lcchi s25 }
 ```
 
-`srdreg` 读一个特殊寄存器，`lcclo` 和 `lcchi` 是 LCC 的低、高 32 位。两条指令放在同一个 bundle 的两个标量槽中，同时执行，得到的两半属于同一个时刻，拼起来就是一致的 64 位读数。如果分在两个 bundle 读，两次读之间低位可能恰好进位，拼出的值会错 2³²。
+`srdreg` 读一个特殊寄存器（special register），`lcclo` 和 `lcchi` 是 LCC 的低、高 32 位，结果写进标量寄存器。两条指令放在同一个 bundle 的两个标量槽 `s0`、`s1` 中，在同一个周期执行，得到的两半属于同一个时刻，拼起来就是一致的 64 位读数。如果分在两个 bundle 读，两次读之间低位可能恰好从 `0xFFFFFFFF` 进位到 0，拼出的值会差 2³²。
 
 Pallas 的公开接口没有读 LCC 的函数，所以本章用 tpuasm 把这样的 bundle 直接插进机器程序。
 
 ## 载体：LccProbe
 
-[`tpuasm_tools.LccProbe`](../../tpuasm_tools.py) 把插入的过程包装起来。它先用 Pallas 编译一个载体 kernel：
+[`tpuasm_tools.LccProbe`](../../tpuasm_tools.py) 把“编译载体、插入片段、取回读数”包装成一个类。
+
+### 载体 kernel
+
+它先用 Pallas 编译一个普通的 kernel：
 
 ```python
 def kernel(x_hbm, out_hbm, data, sem) -> None:
     pltpu.async_copy(x_hbm, data, sem).wait()
     # 带唯一立即数的 vxor 标出插入位置。
     data[:8, :] = data[:8, :] ^ jnp.uint32(0x13579BDF)
-    pltpu.async_copy(data.at[:56, :], out_hbm, sem).wait()
+    core = jax.lax.axis_index('tc')
+    pltpu.async_copy(data.at[:72, :], out_hbm.at[pl.ds(core * 72, 72)], sem).wait()
 ```
 
-`0x13579BDF` 在整个程序中只出现一次，`find_bundles` 由它找到插入位置。`run(body)` 在这个位置插入三段清单：
+输入是 `u32[256,128]` 的随机数，先整块搬进 TC VMEM 的 `data`；然后对前 8 行做一次异或，常数 `0x13579BDF` 在整个程序中只出现一次，`find_bundles` 由它找到这条 `vxor` 所在的 bundle，作为插入位置；最后把 `data` 的前 72 行（9 个 tile）写回 HBM。`num_cores=2` 时两个 TensorCore 执行同一个程序，各自写回输出的一半（第 7 节用到）。
 
-1. 前缀：把输入读进 `v10` 供片段当作数据使用，再用一条 `sfence` 让此前的工作全部发射完（第 5 节解释为什么需要这一条）。
-2. 片段 `body`：由调用者写出，其中用 `read_lcc(20)`、`read_lcc(21)`、`read_lcc(22)` 三次读 LCC，记作 R0、R1、R2。
-3. 后缀：把六个半字读数各广播成一个 TC VREG，存进 TC VMEM 的第 1–6 个 tile，随载体的输出 DMA 返回主机。
+构造时还用 `edit_bundles` 把这条 `vxor` 改成 `vmov`，让输出的第 0 个 tile 等于输入，不再依赖异或的结果。
 
-主机把半字拼成 64 位，返回每次运行的 `(R1 − R0, R2 − R0)`。插入后的程序不再经过编译器，bundle 的内容和顺序就是设备实际执行的内容。
+### 插入的三段
 
-片段用两个小函数写出：`bundle(text)` 生成一个 bundle 的清单文本，`read_lcc(low)` 生成上面那个读 LCC 的 bundle。
+`run(body)` 在插入位置之前放入三段清单：
+
+1. **前缀。** 先把载体此后还要用到的标量寄存器 s20–s30 广播进 v20–v30 保存（载体在插入点之后用这些寄存器计算输出地址，片段会改写它们）；再把输入的第 0 个 tile 读进 `v10`，供片段当作数据使用；最后执行 `setup`，并用一条 `sfence` 让此前的工作全部发射完，使计时从一个空的队列开始（第 5 节解释为什么需要这一条）。
+2. **片段 `body`。** 由调用者写出，其中用 `read_lcc(20)`、`read_lcc(21)`、`read_lcc(22)` 三次读 LCC，记作 R0、R1、R2。
+3. **后缀。** 把六个半字读数各用 `vmov` 广播成一个 TC VREG，用 `vst` 存进 TC VMEM 的第 1–6 个 tile，随载体的输出 DMA 返回主机；再用 `vpush`/`spop` 从 v20–v30 恢复标量寄存器。
+
+主机把每对半字拼成 64 位，返回每次运行的 `(R1 − R0, R2 − R0)`。插入后的程序不再经过编译器，bundle 的内容和顺序就是设备实际执行的内容。`LccProbe.program(body)` 返回插入后的程序，可以用 `full_listing` 查看：
+
+```text
+{ s0: sfence }
+{ s0: srdreg.lcclo s20 ;
+  s1: srdreg.lcchi s25 }
+{ va0: vadd.8x128.s32 v11, 1, v10 }
+{ va0: vadd.8x128.s32 v11, 1, v10 }
+{ s0: srdreg.lcclo s21 ;
+  s1: srdreg.lcchi s26 }
+{ s0: sfence }
+{ s0: srdreg.lcclo s22 ;
+  s1: srdreg.lcchi s27 }
+{ misc: vnop }  …
+{ va0: vmov.8x128 v12, s20 }
+{ misc: vnop }  …
+{ vst: vst.8x128 [vmem:0x8], v12 }
+```
+
+这是下面实验中 N = 2 条向量加法的片段：前缀最后的 `sfence`，R0，两条 `vadd`，R1，`sfence`，R2，接着是后缀中第一个读数的广播与写回（`vmov` 与 `vst` 之间的 8 个 `vnop` 等待广播结果写完）。
+
+片段用两个小函数写出：`bundle(text)` 生成一个 bundle 的清单文本，`text` 为空时是空 bundle；`read_lcc(low)` 生成上面那个读 LCC 的 bundle，低位写进 `s{low}`、高位写进 `s{low + 5}`。
 
 ## 实验：几种 N 个 bundle 的序列
 
@@ -55,7 +85,7 @@ body = read_lcc(20) + bundle(instruction) * count + read_lcc(21) + bundle('s0: s
 | 独立的向量加法 | `'va0: vadd.8x128.s32 v11, 1, v10'` |
 | 从 TC VMEM 读一个 TC VREG | `'vld: vld.8x128 v11, [vmem:0x0]'` |
 
-四种 bundle 的结果完全相同，8 次运行的读数也完全相同：
+四种 bundle 的结果完全相同，每种配置 8 次运行的读数也完全相同：
 
 | N | 0 | 1 | 4 | 16 | 64 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -64,14 +94,42 @@ body = read_lcc(20) + bundle(instruction) * count + read_lcc(21) + bundle('s0: s
 
 从中读出三条规则：
 
-- **R1 − R0 = N + 1。** 两个相邻的读数相差 1，中间每多一个 bundle，差值加 1：这些 bundle 都是一个周期发射一个。标量加法链中每条依赖前一条的结果，也没有变慢：标量运算的结果在下一个周期就可用。
+- **R1 − R0 = N + 1。** 两个相邻的读数相差 1，中间每多一个 bundle，差值加 1：这些 bundle 都是一个周期发射一个。标量加法链中每条依赖前一条的结果，也没有变慢：标量加法的结果在下一个周期就可用。
 - **向量指令不改变 R1。** 向量加法和 `vld` 与空 bundle 的读数相同。这不说明向量指令都只要一个周期，而是说明 R1 只反映标量一侧走到了哪里。第 5 节会看到，向量一侧可以远远落在后面，R1 却看不到。
 - **`sfence` 加 11 个周期。** R2 − R1 总是 12：一个是相邻读数之间的 1，另外 11 来自 `sfence`。第 5 节解释它的含义。
 
-第一章第 2 节说“没有等待时，TensorCore 大约每个周期发射一个 bundle”，这里给出了确切的版本：每个周期一个 bundle 指的是标量发射。对只含标量指令或与前后无依赖的向量指令的序列，清单中的 bundle 数就是周期数。
+第一章第 2 节说“没有等待时，TensorCore 大约每个周期发射一个 bundle”，这里给出了确切的版本：每个周期一个 bundle 指的是标量发射。对只含标量指令或与前后无依赖的向量指令的序列，清单中的 bundle 数就是周期数，读数完全确定，没有任何波动。
+
+## 实验：标量单元中会等待的指令
+
+本小节实验[源码](02_tpuasm_scalar_timing.py)、[输出](02_tpuasm_scalar_timing.txt)。
+
+上面的标量加法不会让发射停下。标量单元还有乘法、读写 SMEM 的指令，第一章第 7 节的清单中就有成对的 `sld`。片段的形式不变，只换中间的序列：
+
+| 序列 | R1 − R0 | 结论 |
+| --- | --- | --- |
+| N 条相互依赖的 `smul.u32 s24, 3, s24`，N = 1、4、16 | 2、5、17 | 标量乘法也是下一周期可用 |
+| N 条连续的 `sld s24, [smem:0x0]`，N = 1、2、4、16 | 2、6、14、62 | 每条 `sld` 占 4 个周期 |
+| N 组“`sld` + 3 条无关的 `sadd`”，N = 2、4 | 9、17 | 中间的 3 条填满了间隔，不再等待 |
+| `sld` 后隔 d − 1 个空 bundle 使用结果，d = 1–5 | 6、6、6、6、7 | 结果 4 个周期后才可用 |
+| N 条连续的 `sst [smem:0x7f0], s24`，N = 1、4、16 | 2、5、17 | 每周期一条 |
+| `sst` → 读同一地址的 `sld` → 使用 | 7 | `sld` 不必等前面的 `sst` |
+
+最后一组检查结果的值：先把 7 存进 SMEM、把 `s24` 清零，再 `sld s24`，紧接着用 `vmov` 或 `sadd` 使用它：
+
+```text
+vmov v11, s24，d = 1、2、3：[7, 7, 7]
+sadd s23 = s24 + 100，再 vmov，d = 1、2、3：[107, 107, 107]
+```
+
+无论隔几个 bundle，读到的都是新值：硬件会等待，程序员不必自己插入空 bundle。
+
+`sld` 有两个限制：连续两条 `sld` 至少相隔 4 个周期，使用 `sld` 结果的指令最早在它之后 4 个周期发射。两种情况下，标量发射都会停下来等待，后面所有的 bundle 一起推迟。但间隔中可以放别的标量指令：“`sld` + 3 条无关的 `sadd`”每组恰好 4 个 bundle，读数与没有任何等待时相同。`sst` 则每周期一条，紧随其后的 `sld` 读同一地址也只按 `sld` 自己的规则等待。
+
+这解释了第一章第 7 节清单中的一个现象：编译器把两个标量参数的 `sld` 放在相邻两个 bundle 中，第二条要等 4 个周期；如果标量参数很多，按每个 4 个周期估算读入的时间，或者把它们的读取与其他标量工作交错。反过来把标量放进 TC VREG 再取出并不划算：向量到标量要经过 `vpush`/`spop`，等待 43 个周期（第 6 节）。
 
 ## LCC 的适用范围
 
-LCC 只在同一个 TensorCore 上可比：两次读数相减才有意义。不同 TensorCore、不同芯片的 LCC 起点不同，不能直接相减；第 7 节介绍怎样借助全局时钟 GTC 比较不同 TensorCore 上的时间，以及怎样由此标定 LCC 的频率（约 1.05 GHz）。
+LCC 只在同一个 TensorCore 上可比：两次读数相减才有意义。不同 TensorCore 的 LCC 起点不同，即使在同一颗芯片上也不能直接相减；第 7 节介绍怎样借助全局时钟 GTC 比较不同 TensorCore 上的时间，以及怎样由此标定 LCC 的频率（约 1.05 GHz）。
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/README.md) 用同样的载体与读法测量了第二章引用的全部 DMA 代价。[研究报告 48](../../../pallas-tpu-readings-dev/research_reports/48_scalar_cycle_lowering.md) 则走了另一条路：为读 LCC 增加一个 Pallas primitive 和它的 lowering，由编译器生成读数指令。两条路得到的读法相同。

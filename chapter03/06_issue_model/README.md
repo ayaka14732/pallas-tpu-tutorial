@@ -40,7 +40,16 @@ for event, queue in events:
     issue = max(issue, last.get(f'{event} {queue}', -99) + INTERVAL.get(f'{event} {kind(queue)}', 1))   # 等单元
 ```
 
-模型的输入是**动态执行的** bundle 序列：循环要按实际迭代次数展开。模型不处理 DMA 和 `vwait`，它们的时间取决于数据通路，由第二章的代价模型给出。
+模型的输入是**动态执行的** bundle 序列：循环要按实际迭代次数展开。模型不处理 DMA 和 `vwait`，它们的时间取决于数据通路，由第二章的代价模型给出。标量一侧加入了第 4 节测得的 `sld` 规则：
+
+```python
+if mnemonic == 'sld':
+    scalar = max(scalar, last_sld + SLD_INTERVAL)       # 相邻两条 sld 至少相隔 4 个周期
+# 读取尚未就绪的标量寄存器时，整个 bundle 等待。
+scalar = max([scalar, *(scalar_ready.get(source, 0) for source in sources)])
+```
+
+`sld` 写入的寄存器在 4 个周期后就绪（`SLD_LATENCY`）；其余标量指令的结果都按下一周期可用处理。有一点与预期不同：紧接在 `sld` 之后的 `vmov.8x128 v11, s24` 读同一个寄存器，读数里看不到任何等待，模型不加等待时恰好与真机一致（下表的“`sld` 与依赖 `sld` 结果的向量运算”）。第 4 节的实验确认，此时 `vmov` 读到的就是 `sld` 载入的新值，而不是旧值；`vmov` 读标量操作数的时刻本节没有进一步确定。
 
 ## 测量通路的参数
 
@@ -84,7 +93,7 @@ reads = issue_model.replay(issue_model.parse(trace))
 predicted = (reads[21] - reads[20], reads[22] - reads[20])
 ```
 
-34 段片段中 31 段的 R1 − R0、R2 − R0 与模型完全一致，包括 VIF 积压、挡住标量发射的情况。例如 16 组 `cld` + `vpop`：模型和真机都是 (337, 877)。R1 = 337 的来历是：R1 前面有 32 个进入 VIF 的 bundle，R1 要等到只剩 19 项未释放，也就是第 13 项（第 7 条 `cld`）释放；它在第 327 个周期向量发射，第 337 个周期释放。
+39 段片段中 36 段的 R1 − R0、R2 − R0 与模型完全一致，包括 VIF 积压、挡住标量发射的情况，以及第 4 节的 `sld` 规则。例如 16 组 `cld` + `vpop`：模型和真机都是 (337, 877)。R1 = 337 的来历是：R1 前面有 32 个进入 VIF 的 bundle，R1 要等到只剩 19 项未释放，也就是第 13 项（第 7 条 `cld`）释放；它在第 327 个周期向量发射，第 337 个周期释放。
 
 不一致的 3 段：
 
