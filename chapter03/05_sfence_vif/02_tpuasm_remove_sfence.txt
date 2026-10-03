@@ -1,0 +1,8 @@
+kernel 中的 sfence：bundle [517]
+  514: { s0: dma.simple [smem:s13], [hbm:s1], length=1, dst_flag=[sflag:52] }
+  515: { misc: vwait.ge [sflag:52], 1 }
+  516: { misc: vsyncadd.s32 [sflag:52], -1 }
+  517: { s0: sfence }
+  518: { s1: sld s16, [smem:0x3e] ; vld: vld.8x128 v0, [vmem:0x0] }
+原程序：20 次运行中，用本次标量 20 次，用上一次运行的标量 0 次
+去掉 sfence：20 次运行中，用本次标量 0 次，用上一次运行的标量 19 次
