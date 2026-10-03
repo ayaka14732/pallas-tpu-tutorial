@@ -1,0 +1,18 @@
+## pl.delay(10000)
+清单：{ misc: vdelay 10500 }
+1. 调用返回：中位数 65.4 µs
+2. 调用并等到结果：中位数 139.1 µs
+3. 连续调用 64 次：第 1–30 次每次中位数 65.9 µs，第 35–64 次每次中位数 63.9 µs；从开始到等到最后一个结果共 4907 µs，平均每次 76.7 µs
+4. XProf /device:TPU:0 XLA Modules：8 个事件，中位数 29.68 µs
+4. XProf /device:TPU:0 XLA Ops：8 个事件，中位数 10.84 µs
+4. XProf /device:TPU:1 XLA Modules：8 个事件，中位数 10.94 µs
+4. XProf /device:TPU:1 XLA Ops：8 个事件，中位数 10.86 µs
+## pl.delay(1000000)
+清单：{ s0: simm.s32 s10, 1050000 ;；{ misc: vdelay s10 }
+1. 调用返回：中位数 70.5 µs
+2. 调用并等到结果：中位数 1137.5 µs
+3. 连续调用 64 次：第 1–30 次每次中位数 54.7 µs，第 35–64 次每次中位数 1001.7 µs；从开始到等到最后一个结果共 64304 µs，平均每次 1004.8 µs
+4. XProf /device:TPU:0 XLA Modules：8 个事件，中位数 1022.33 µs
+4. XProf /device:TPU:0 XLA Ops：8 个事件，中位数 1000.83 µs
+4. XProf /device:TPU:1 XLA Modules：8 个事件，中位数 1000.93 µs
+4. XProf /device:TPU:1 XLA Ops：8 个事件，中位数 1000.85 µs

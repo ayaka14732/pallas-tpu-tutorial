@@ -14,6 +14,7 @@ import jax
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 import jax.numpy as jnp
+from jax.sharding import PartitionSpec as P
 from jax.stages import Compiled
 from jaxlib.xla_client import LoadedExecutable
 import numpy as np
@@ -169,55 +170,81 @@ def read_lcc(low: int) -> str:
     """在同一个 bundle 中读 LCC 的低、高 32 位：低位写入 s{low}，高位写入 s{low + 5}。"""
     return bundle(f's0: srdreg.lcclo s{low} ; s1: srdreg.lcchi s{low + 5}')
 
-class LccProbe:
-    """在一个载体 kernel 中插入手写片段，用三次 LCC 读数计时（参照 tpu-v4-latency-numbers 第 0 节）。
+def read_gtc(low: int) -> str:
+    """在同一个 bundle 中读 GTC 的低、高 32 位：低位写入 s{low}，高位写入 s{low + 5}。"""
+    return bundle(f's0: srdreg.gtclo s{low} ; s1: srdreg.gtchi s{low + 5}')
 
-    片段约定：R0 = read_lcc(20)，R1 = read_lcc(21)，R2 = read_lcc(22)；片段不得改写存放读数的 s20–s22、s25–s27，也不得改写写回读数时使用的 v12。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在 R0 之前执行，之后由一条 sfence 排空，不计入区间。
+SAVED = range(20, 31)
+
+class LccProbe:
+    """在一个载体 kernel 中插入手写片段，用 LCC（或 GTC）读数计时（参照 tpu-v4-latency-numbers 第 0 节）。
+
+    片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28，也不得改写写回读数时使用的 v12。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。
     """
 
-    def __init__(self) -> None:
-        tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
+    def __init__(self, num_cores: int = 1) -> None:
+        self.num_cores = num_cores
+        mesh = jax.make_mesh((1,), ('device',))
+        tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=num_cores)
 
-        @pl.kernel(
-            out_type=jax.ShapeDtypeStruct((56, 128), jnp.uint32),
-            mesh=tc_mesh,
-            scratch_types=(pltpu.VMEM((256, 128), jnp.uint32), pltpu.SemaphoreType.DMA),
-            name='lcc_probe',
-            compiler_params=pltpu.CompilerParams(
-                disable_bounds_checks=True,
-                disable_semaphore_checks=True,
-            ),
+        @jax.shard_map(
+            mesh=mesh,
+            in_specs=P(),
+            out_specs=P(),
+            check_vma=False,
         )
-        def kernel(x_hbm, out_hbm, data, sem) -> None:
-            pltpu.async_copy(x_hbm, data, sem).wait()
-            # 带唯一立即数的 vxor 标出插入位置。
-            data[:8, :] = data[:8, :] ^ jnp.uint32(0x13579BDF)
-            pltpu.async_copy(data.at[:56, :], out_hbm, sem).wait()
+        def probe(x: jax.Array) -> jax.Array:
+            @pl.kernel(
+                out_type=jax.ShapeDtypeStruct((num_cores * 72, 128), jnp.uint32),
+                mesh=tc_mesh,
+                scratch_types=(pltpu.VMEM((256, 128), jnp.uint32), pltpu.SemaphoreType.DMA),
+                name='lcc_probe',
+                compiler_params=pltpu.CompilerParams(
+                    disable_bounds_checks=True,
+                    disable_semaphore_checks=True,
+                ),
+            )
+            def kernel(x_hbm, out_hbm, data, sem) -> None:
+                pltpu.async_copy(x_hbm, data, sem).wait()
+                # 带唯一立即数的 vxor 标出插入位置。
+                data[:8, :] = data[:8, :] ^ jnp.uint32(0x13579BDF)
+                core = jax.lax.axis_index('tc')
+                pltpu.async_copy(data.at[:72, :], out_hbm.at[pl.ds(core * 72, 72)], sem).wait()
+
+            return kernel(x)
 
         self.host = np.random.default_rng(0).integers(0, 1 << 32, (256, 128), dtype=np.uint64).astype(np.uint32)
         self.x = jax.device_put(self.host, jax.local_devices()[0])
-        self.compiled = compile(kernel, self.x)
+        self.compiled = compile(probe, self.x, mesh=mesh)
         serialized = serialize(self.compiled)
         marker, = find_bundles(serialized, '0x13579bdf')
         text = bundle_text(serialized, marker, encoding='exact')
-        instruction = text.strip('{} \n').split(';')[0].strip()
+        instruction, = [item.strip(' {}\n') for item in text.split(';') if '0x13579bdf' in item]
         destination = instruction.split()[2].rstrip(',')
         # 标记本身改为把 v10 原样写出，使输出的第一个 tile 等于输入。
         self.serialized = edit_bundles(serialized, {marker: (instruction, f'{instruction.split(":")[0]}: vmov.8x128 {destination}, v10')})
         self.marker = marker
 
-    def run(self, body: str, repeats: int = 8, setup: str = '') -> np.ndarray:
-        """返回 (repeats, 2) 的数组：每次运行的 R1 − R0 与 R2 − R0。"""
-        prefix = bundle('vld: vld.8x128 v10, [vmem:0x0]') + bundle('s0: simm.s32 s24, 0') + bundle('misc: vnop') * 16 + setup + bundle('s0: sfence')
+    def run_raw(self, body: str, reads: int, repeats: int = 8, setup: str = '') -> np.ndarray:
+        """返回 (repeats, num_cores, reads) 的 64 位读数。"""
+        # 载体在插入点之后还要用到的标量寄存器可能落在 s20–s30 中：先广播进 v20–v30 保存，最后经 vpush/spop 恢复。
+        save = ''.join(bundle(f'va0: vmov.8x128 v{register}, s{register}') for register in SAVED) + bundle('s0: sfence')
+        restore = ''.join(bundle(f'vst: vpush v2sf, v{register}') + bundle(f's0: spop s{register}, v2sf') for register in SAVED)
+        prefix = save + bundle('vld: vld.8x128 v10, [vmem:0x0]') + bundle('s0: simm.s32 s24, 0') + bundle('misc: vnop') * 16 + setup + bundle('s0: sfence')
         suffix = bundle('misc: vnop') * 16
-        for tile, register in enumerate((20, 21, 22, 25, 26, 27), 1):
+        registers = [*range(20, 20 + reads), *range(25, 25 + reads)]
+        for tile, register in enumerate(registers, 1):
             suffix += bundle(f'va0: vmov.8x128 v12, s{register}') + bundle('misc: vnop') * 8 + bundle(f'vst: vst.8x128 [vmem:0x{tile * 8:x}], v12')
-        suffix += bundle('misc: vnop') * 16 + bundle('s0: sfence')
+        suffix += bundle('misc: vnop') * 16 + bundle('s0: sfence') + restore + bundle('s0: sfence')
         function = load(insert_bundles(self.serialized, {self.marker: prefix + body + suffix}), self.compiled)
-        deltas = []
+        rows = [core * 72 + tile * 8 for core in range(self.num_cores) for tile in range(1, 2 * reads + 1)]
+        samples = []
         for _ in range(repeats):
-            output = np.asarray(function(self.x))
-            halves = output[[8, 16, 24, 32, 40, 48], 0].astype(np.uint64)
-            counters = halves[:3] | (halves[3:] << np.uint64(32))
-            deltas.append([int(counters[1] - counters[0]), int(counters[2] - counters[0])])
-        return np.array(deltas)
+            halves = np.asarray(function(self.x))[rows, 0].astype(np.uint64).reshape(self.num_cores, 2, reads)
+            samples.append(halves[:, 0] | (halves[:, 1] << np.uint64(32)))
+        return np.array(samples)
+
+    def run(self, body: str, repeats: int = 8, setup: str = '') -> np.ndarray:
+        """返回 (repeats, 2) 的数组：每次运行的 R1 − R0 与 R2 − R0（R0、R1、R2 是第 0、1、2 次读数）。"""
+        counters = self.run_raw(body, 3, repeats, setup)[:, 0].astype(np.int64)
+        return counters[:, 1:] - counters[:, :1]

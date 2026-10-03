@@ -17,7 +17,7 @@ import tpuasm_tools
 
 ROWS = 32768
 
-def build(style: str, repeats: int = 1, tile_rows: int = 512):
+def build(style: str, repeats: int = 1, tile_rows: int = 512, out_hbm: bool = True):
     tiles = ROWS // tile_rows
     mesh = jax.make_mesh((1,), ('device',))
     tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
@@ -30,8 +30,8 @@ def build(style: str, repeats: int = 1, tile_rows: int = 512):
     )
     def transform(x: jax.Array) -> jax.Array:
         @pl.kernel(
-            # 输入输出都固定在 HBM：否则 XLA 可能把它们放进 Megacore Shared CMEM（第 3 节），测到的就不是 HBM 的数据通路。
-            out_type=pltpu.HBM(x.shape, x.dtype),
+            # 输出固定在 HBM：否则在 XLA 的循环中，XLA 可能把它放进 Megacore Shared CMEM（第 3 节），测到的就不是 HBM 的数据通路。
+            out_type=pltpu.HBM(x.shape, x.dtype) if out_hbm else jax.ShapeDtypeStruct(x.shape, x.dtype),
             mesh=tc_mesh,
             scratch_types=(
                 pltpu.VMEM((2, tile_rows, 128), x.dtype),

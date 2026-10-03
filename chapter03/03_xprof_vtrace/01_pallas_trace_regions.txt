@@ -1,0 +1,13 @@
+## xla_enable_custom_call_region_trace=false：数值检查通过；kernel 段 159 个 bundle，其中 vtrace 2 条
+  misc: vtrace 0x80000000；misc: vtrace 0x90000000
+## xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 168 个 bundle，其中 vtrace 10 条
+  misc: vtrace 0x80000000；misc: vtrace 0xb8000000；misc: vtrace 0xc8000000；misc: vtrace 0xb8000001；misc: vtrace 0xc8000001；misc: vtrace 0xb8000002；misc: vtrace 0xc8000002；misc: vtrace 0xb8000003；misc: vtrace 0xc8000003；misc: vtrace 0x90000000
+## XProf，16 次调用的中位数
+  /device:TPU:0 XLA Modules jit_affine(1861720714005130170)：19254 ns
+  /device:TPU:0 XLA Ops affine.1：2029 ns
+  /device:TPU:0 XLA TraceMe compute：128 ns
+  /device:TPU:0 XLA TraceMe load_start：1 ns
+  /device:TPU:0 XLA TraceMe load_wait：990 ns
+  /device:TPU:0 XLA TraceMe store：900 ns
+  /device:TPU:1 XLA Modules jit_affine(1861720714005130170)：2129 ns
+  /device:TPU:1 XLA Ops affine.1：2048 ns

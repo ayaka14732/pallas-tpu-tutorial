@@ -1,6 +1,6 @@
 # LCC：指令级计时
 
-主机计时（第 1、2 节）只能看到整个程序的时间，XProf 的 `vtrace`（第 3 节）也只能标出 HLO 一级的区间。要知道 kernel 中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，并用它验证第一章第 2 节的说法：没有等待时，TensorCore 每个周期发射一个 bundle。
+主机计时（第 1、2 节）只能看到整个程序的时间。XProf 的区域（第 3 节）能标出 kernel 内部的几段，但它改变了调度，分辨率也只到纳秒。要知道 kernel 中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，并用它验证第一章第 2 节的说法：没有等待时，TensorCore 每个周期发射一个 bundle。
 
 ## 读 LCC 的指令
 
