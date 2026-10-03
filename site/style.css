@@ -7,19 +7,19 @@
     --muted: #6f6965;
     --border: #dedad5;
     --border-strong: #c8c2bc;
-    --accent: #8b1e2d;
-    --accent-hover: #6f1522;
-    --accent-soft: #f7e8ea;
+    --accent: #aa2e45;
+    --accent-hover: #8b2035;
+    --accent-soft: #f4e6e9;
     --code-background: #f2f0ed;
     --code-gutter: #e7e3df;
     --shadow: 0 1rem 3rem rgb(62 43 38 / 12%);
     --syntax-comment: #78716c;
-    --syntax-keyword: #8b1e2d;
+    --syntax-keyword: #aa2e45;
     --syntax-builtin: #175f6c;
     --syntax-string: #367249;
     --syntax-number: #9a4c13;
     --syntax-function: #65469b;
-    --syntax-operator: #9b2435;
+    --syntax-operator: #b03951;
     --diagram-filter: none;
     --diagram-blend-mode: normal;
     font-synthesis: none;
@@ -34,19 +34,19 @@
     --muted: #b5ada7;
     --border: #2c2927;
     --border-strong: #45403d;
-    --accent: #ee9aa6;
-    --accent-hover: #ffb5bf;
-    --accent-soft: #3b2026;
+    --accent: #cd586f;
+    --accent-hover: #dd7488;
+    --accent-soft: #250e17;
     --code-background: #181616;
     --code-gutter: #211e1d;
     --shadow: 0 1rem 3rem rgb(0 0 0 / 35%);
     --syntax-comment: #a8a29e;
-    --syntax-keyword: #ff9daa;
+    --syntax-keyword: #d96b80;
     --syntax-builtin: #78c6d3;
     --syntax-string: #8bc99a;
     --syntax-number: #e8a56d;
     --syntax-function: #c8a9f2;
-    --syntax-operator: #f58b9a;
+    --syntax-operator: #cd586f;
     --diagram-filter: invert(100%) brightness(90%);
     --diagram-blend-mode: screen;
 }
@@ -61,19 +61,19 @@
         --muted: #b5ada7;
         --border: #2c2927;
         --border-strong: #45403d;
-        --accent: #ee9aa6;
-        --accent-hover: #ffb5bf;
-        --accent-soft: #3b2026;
+        --accent: #cd586f;
+        --accent-hover: #dd7488;
+        --accent-soft: #250e17;
         --code-background: #181616;
         --code-gutter: #211e1d;
         --shadow: 0 1rem 3rem rgb(0 0 0 / 35%);
         --syntax-comment: #a8a29e;
-        --syntax-keyword: #ff9daa;
+        --syntax-keyword: #d96b80;
         --syntax-builtin: #78c6d3;
         --syntax-string: #8bc99a;
         --syntax-number: #e8a56d;
         --syntax-function: #c8a9f2;
-        --syntax-operator: #f58b9a;
+        --syntax-operator: #cd586f;
         --diagram-filter: invert(100%) brightness(90%);
         --diagram-blend-mode: screen;
     }
@@ -105,13 +105,11 @@ input {
 
 a {
     color: var(--accent);
-    text-decoration-thickness: 0.075em;
-    text-underline-offset: 0.18em;
+    text-decoration: none;
 }
 
 a:hover {
     color: var(--accent-hover);
-    text-decoration-thickness: 0.12em;
 }
 
 a:focus-visible,
@@ -358,7 +356,7 @@ summary:focus-visible {
 }
 
 .doc-content h3 {
-    margin: 2.8rem 0 1rem;
+    margin: 2.4rem 0 1rem;
     font-size: 1.28rem;
 }
 

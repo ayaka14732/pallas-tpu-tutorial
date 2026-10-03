@@ -147,12 +147,12 @@ def relative_page_href(page: Page, target: Page) -> str:
 def append_url_parts(path: str, query: str, fragment: str) -> str:
     return urlunsplit(("", "", path, query, fragment))
 
-def add_attribute(node: dict[str, object], css_class: str, name: str, value: str) -> None:
+def add_attribute(node: dict[str, object], css_class: str | None, name: str, value: str) -> None:
     content = node["c"]
     attributes = content[0]
     classes = attributes[1]
     key_values = attributes[2]
-    if css_class not in classes:
+    if css_class and css_class not in classes:
         classes.append(css_class)
     attributes[2] = [item for item in key_values if item[0] != name]
     attributes[2].append([name, value])
@@ -207,7 +207,7 @@ def rewrite_reference(node: dict[str, object], page: Page, pages_by_source: dict
         raise ValueError(f"{page.source.relative_to(ROOT_DIR)} 链接的文件不会发布：{relative}")
     href = relative_output_href(page, relative)
     target[0] = append_url_parts(href, parsed.query, parsed.fragment)
-    if node.get("t") == "Link" and relative.suffix.lower() in {".py", ".txt"}:
+    if node.get("t") == "Link" and (relative.suffix.lower() in {".py", ".txt"} or relative.name == "LICENSE"):
         preview_href = relative_output_href(page, Path(str(relative) + ".html"))
         add_attribute(node, "source-link", "data-source-preview", preview_href)
 
@@ -217,6 +217,11 @@ def transform_references(value: object, page: Page, pages_by_source: dict[Path, 
             transform_references(child, page, pages_by_source, assets)
         if value.get("t") in {"Image", "Link"}:
             rewrite_reference(value, page, pages_by_source, assets)
+        if value.get("t") == "Link":
+            parsed = urlsplit(value["c"][2][0])
+            if parsed.scheme in {"http", "https"} or parsed.netloc:
+                add_attribute(value, None, "target", "_blank")
+                add_attribute(value, None, "rel", "noopener")
     elif isinstance(value, list):
         for child in value:
             transform_references(child, page, pages_by_source, assets)
@@ -326,7 +331,7 @@ def html_document(page: Page, content: str, headings: tuple[Heading, ...], pages
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#8b1e2d">
+<meta name="theme-color" content="#aa2e45">
 <meta name="description" content="系统学习 Pallas TPU kernel 与 TPU v4 用户可编程硬件能力。">
 <title>{escape(title)}</title>
 <script>try{{const theme=localStorage.getItem("pallas-tpu-theme");if(theme==="light"||theme==="dark")document.documentElement.dataset.theme=theme}}catch(error){{}}</script>
@@ -349,7 +354,7 @@ def html_document(page: Page, content: str, headings: tuple[Heading, ...], pages
 </div>
 {navigation_html(page, root_page, chapters)}
 <div class="site-sidebar-footer">
-<a href="{GITHUB_URL}">GitHub ↗</a>
+<a href="{GITHUB_URL}" target="_blank" rel="noopener">GitHub ↗</a>
 <button class="theme-toggle" type="button" data-theme-toggle><svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg></button>
 </div>
 </aside>
@@ -394,7 +399,7 @@ def copy_assets(output: Path, assets: set[Path]) -> None:
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
-        if relative.suffix.lower() in {".py", ".txt"}:
+        if relative.suffix.lower() in {".py", ".txt"} or relative.name == "LICENSE":
             preview = output / Path(str(relative) + ".html")
             preview.write_bytes(render_source_preview(source))
 
