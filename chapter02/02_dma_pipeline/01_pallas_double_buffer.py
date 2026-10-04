@@ -99,7 +99,7 @@ def build(style: str, repeats: int = 1, tile_rows: int = 512, out_hbm: bool = Tr
     return mesh, transform
 
 def pass_cycles(clock: tpuasm_tools.KernelClock, style: str, x: jax.Array, tile_rows: int = 512) -> float:
-    """每遍流水线的周期数：kernel 内部重复 8 遍与 4 遍，各用 LCC 读出 kernel 的周期数（第三章第 4 节的 KernelClock），相减除以 4，消去 kernel 中只做一次的部分。"""
+    """每遍流水线的周期数：kernel 内部重复 8 遍与 4 遍，各用 LCC 读出 kernel 的周期数（第三章第 3 节的 KernelClock），相减除以 4，消去 kernel 中只做一次的部分。"""
     cycles = {}
     for repeats in (4, 8):
         mesh, transform = build(style, repeats, tile_rows)

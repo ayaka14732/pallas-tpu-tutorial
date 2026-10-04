@@ -1,0 +1,30 @@
+kernel 段 168 个 bundle；vtrace（清单中的位置, 操作数）：[(0, '0x80000000'), (1, '0xa0000000'), (4, '0xb8000000'), (7, '0xc8000000'), (8, '0xb8000001'), (11, '0xc8000001'), (12, '0xb8000002'), (146, '0xc8000002'), (147, '0xb8000003'), (151, '0xc8000003'), (153, '0xa000018f'), (161, '0xa0000199'), (167, '0x90000000')]
+0xa 类型标记的低 28 位：[0, 399, 409]
+TensorCore 0 的轨道：['Pallas Primitives', 'SALU Instructions', 'VALU Instructions', 'VLD Instructions', 'VST Instructions', 'XLA Modules', 'XLA Ops', 'XLA TraceMe']
+bundle 编号、其中一条指令、与上一个 bundle 的起始时刻之差（ns）：
+    0  inlined_call_operand 
+   10  vtrace         2.86
+   11  vtrace         122.14
+   12  dma.done.wait  122.14
+   13  vsyncadd       122.14
+   14  vtrace         122.14
+   15  vtrace         122.14
+   16  vld            122.14
+   17  vmul.f32       122.14
+   18  vmul.f32       122.14
+   19  vadd.f32       122.14
+   20  vadd.f32       122.14
+   21  vadd.f32       0.98
+   22  vadd.f32       0.98
+   23  vadd.f32       0.98
+   24  vadd.f32       0.98
+   25  vadd.f32       1.07
+   26  vadd.f32       0.98
+   27  vadd.f32       0.98
+   28  vadd.f32       0.98
+   29  vadd.f32       0.98
+   30  vadd.f32       1.07
+   31  vadd.f32       0.98
+   32  vadd.f32       0.98
+   33  vadd.f32       0.98
+   34  vadd.f32       1.07

@@ -173,7 +173,7 @@ for position in range(CHIPS):
 
 在 `shard_map` 中调用 `jax.lax.psum`，XLA 生成一个 `psum` 段，其中有 16 条 `dma.general`、20 条 `vsyncadd.remote`，三种大小都相同。读清单的开头可以看出它和谁通信：它从 `[smem:0x0]` 读出本芯片的编号，拆出坐标的 x、y 位，算出 x + 1、x − 1、y + 1、y − 1 四个邻居的编号，汇合与数据都只发给这四颗芯片，从不直接发往对角线。在 2×2 中，x + 1 与 x − 1 是同一颗芯片，y 方向也一样，所以每个邻居要收两路数据。传数据的部分是几个循环，循环体中 4 条 `dma.general` 同时发往四个方向，`ici_dest` 分别由这四个编号拼成，每条 4 KiB 或 8 KiB。这符合沿 x、y 两个方向各做一次双向环形的结构，本节没有进一步逐条验证。
 
-XLA 的 psum 程序带有 overlay，tpuasm 不能在其中插入读数，这里改用 XProf 的设备事件（第三章第 3 节）：用 `fori_loop` 循环 64 次与 32 次，取整个程序在 device 0 上的时间之差，除以 32，按 1.05 GHz 换算成周期：
+XLA 的 psum 程序带有 overlay，tpuasm 不能在其中插入读数，这里改用 XProf 的设备事件（第三章第 7 节）：用 `fori_loop` 循环 64 次与 32 次，取整个程序在 device 0 上的时间之差，除以 32。XProf 的设备时间来自全局时钟 GTC，device 0 是 GTC 的时间源，它的 GTC 与本地周期的比例是精确的，所以可以按 1.05 GHz 折算成周期：
 
 | 每颗芯片 | XLA `psum` | 本节最快的设计 |
 | --- | ---: | ---: |

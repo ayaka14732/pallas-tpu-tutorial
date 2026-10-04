@@ -33,11 +33,11 @@ def main() -> None:
     starts: dict[int, tuple[int, str]] = {}
     for event in sorted(instructions, key=lambda event: event['start_ps']):
         starts.setdefault(int(event['stats']['bundle_number']), (event['start_ps'], event['name']))
-    print('bundle 编号、其中一条指令、与上一个 bundle 的起始时刻之差（按 1.05 GHz 换算成周期）：')
+    print('bundle 编号、其中一条指令、与上一个 bundle 的起始时刻之差（ns）：')
     previous = None
     for number in sorted(starts)[:26]:
         start, name = starts[number]
-        delta = '' if previous is None else f'{(start - previous) * 1.05e-3:.1f}'
+        delta = '' if previous is None else f'{(start - previous) / 1000:.2f}'
         print(f'  {number:3d}  {name:<14} {delta}')
         previous = start
 

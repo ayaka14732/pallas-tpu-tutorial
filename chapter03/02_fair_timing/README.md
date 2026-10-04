@@ -50,14 +50,14 @@ Pallas（out_type=ShapeDtypeStruct）：cross_program_prefetch 无，S(3) 0 处�
 
 方法 1 与方法 2 的区别是输入是否每次都是新数组。这里两者相同，因为 XLA 没有做跨程序预取；在第二章第 9 节的矩阵乘法中，XLA 会把输入预取进 CMEM，固定输入时下一次调用可能直接用上片上的副本。正式比较应当每次用一个新的输入数组（[研究报告 28](../../../pallas-tpu-readings-dev/research_reports/28_xla_pallas_kernel_fair_timing.md) 称为 fresh-HBM），并且在预热之后计时。
 
-**方法 3：设备上的 LCC。** 第 4 节的 `KernelClock.time_ops` 在整个程序和每条 HLO 指令的起止标记处读周期计数器：
+**方法 3：设备上的 LCC。** 第 3 节的 `KernelClock.time_ops` 在整个程序和每条 HLO 指令的起止标记处读周期计数器：
 
 ```python
 for op, cycles in clock.time_ops(compiled, lambda timed: timed(next(inputs)).block_until_ready(), samples=16):
     print(f'{name}，{op}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
 ```
 
-差别清楚：XLA 的 fusion 36229 个周期，Pallas kernel 44257 个周期，16 次运行的中位数，每次都是新的输入。比较完整程序时应看整个程序的周期数：它包含 kernel 之外的 copy 等其他指令。TensorCore 0 的整个程序还包含一段 kernel 之前的 runtime 代码，这里约 3 万个周期，每次运行都不一样（第 4 节）；两个候选都有这一段，用 TensorCore 1 的整个程序比较。
+差别清楚：XLA 的 fusion 36229 个周期，Pallas kernel 44257 个周期，16 次运行的中位数，每次都是新的输入。比较完整程序时应看整个程序的周期数：它包含 kernel 之外的 copy 等其他指令。TensorCore 0 的整个程序还包含一段 kernel 之前的 runtime 代码，这里约 3 万个周期，每次运行都不一样（第 3 节）；两个候选都有这一段，用 TensorCore 1 的整个程序比较。
 
 **方法 4：在 jit 中循环。** 把调用放进 `jax.lax.fori_loop`，用循环 32 次与 16 次之差消去固定开销：
 

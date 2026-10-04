@@ -34,7 +34,7 @@ def main() -> None:
         listing = tpuasm_tools.kernel_listing(compiled)
         counts = tpuasm_tools.count_mnemonics(listing)
         entries = sorted({line[len('# entry bundle: '):].split(' = ')[0] for line in listing.splitlines() if line.startswith('# entry bundle')})
-        # XLA 的 psum 程序带有 overlay，tpuasm 不能在其中插入 LCC 读数，所以用 XProf 的设备事件（第三章第 3 节），按 1.05 GHz 换算成周期。
+        # XLA 的 psum 程序带有 overlay，tpuasm 不能在其中插入 LCC 读数，所以用 XProf 的设备事件（第三章第 7 节）：它的时间来自 GTC，device 0 是 GTC 的时间源，按 1.05 GHz 折算成周期。
         # 与 Pallas 版本一样取差值：fori_loop 循环 64 次与 32 次的整个程序在 device 0 的 TensorCore 0 上的周期数，相减除以 32；循环中每次先除以 4 再求和，数值保持不变。
         modules = {}
         for repeats in (32, 64):

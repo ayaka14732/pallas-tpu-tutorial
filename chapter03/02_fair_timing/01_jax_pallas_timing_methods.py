@@ -59,7 +59,7 @@ def main() -> None:
     print('## 方法 2：每次调用并等到结果，每次一个新的输入数组')
     for name, compiled in candidates.items():
         print(f'  {name}：{synchronized(compiled, fresh) * 1e6:.1f} µs')
-    print('## 方法 3：设备上的 LCC（第 4 节的 KernelClock），每次一个新的输入数组')
+    print('## 方法 3：设备上的 LCC（第 3 节的 KernelClock），每次一个新的输入数组')
     clock = tpuasm_tools.KernelClock(num_cores=2)
     for name, compiled in candidates.items():
         inputs = iter(fresh)

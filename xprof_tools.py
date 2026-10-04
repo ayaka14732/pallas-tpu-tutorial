@@ -103,6 +103,18 @@ def device_events(events: list[dict]) -> list[dict]:
     """TensorCore 上的事件，每个附上 device（如 /device:TPU:0）和 track（如 XLA Modules）。"""
     return [{**event, 'device': event['plane'], 'track': event['line']} for event in events if event['plane'].startswith('/device:TPU')]
 
+def gtc_delta(event: dict) -> int:
+    """事件结束与开始两条 vtrace 记录的 GTC 之差（完整的 64 位读数相减）。XPlane 中的 duration_ps 由它按 11.2 个计数 / ns 换算而来，这里换回去。"""
+    return round(event['duration_ps'] * 11.2e-3)
+
+def gtc_ticks(event: dict) -> int:
+    """事件结束与开始两条 vtrace 记录的 GTC 高 60 位之差。XPlane 中的 device_duration_ps 由它按 700 MHz（每个计数 1428.57 ps）换算而来，这里换回去。"""
+    return round(event['stats']['device_duration_ps'] * 0.7e-3)
+
+def device_ns(event: dict) -> float:
+    """事件在设备上的持续时间，单位 ns：GTC 高 60 位之差按 700 MHz 换算。"""
+    return event['stats']['device_duration_ps'] / 1000
+
 def device_cycles(event: dict) -> float:
-    """事件在设备上的持续时间，按 TensorCore 的周期计数器约 1.05 GHz 换算成周期数。优先使用由设备计数直接换算的 device_duration_ps。"""
+    """把事件在设备上的持续时间折算成 TensorCore 的周期数：GTC 高 60 位每走 2 个计数对应 3 个周期，即按 1.05 GHz 换算。这是折算而不是计数：分辨率是 1.5 个周期，而且只在本芯片的时钟与 GTC 的时间源同步时才准确（第三章第 6、7 节）。"""
     return event['stats'].get('device_duration_ps', event['duration_ps']) * 1.05e-3

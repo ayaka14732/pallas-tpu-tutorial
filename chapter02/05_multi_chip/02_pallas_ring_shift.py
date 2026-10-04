@@ -59,7 +59,7 @@ def build(mesh: jax.sharding.Mesh, rounds: int):
     return shift
 
 def round_cycles(clock: tpuasm_tools.KernelClock, mesh: jax.sharding.Mesh, x: jax.Array) -> float:
-    """每一轮的周期数：kernel 内部 64 轮与 32 轮，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 4 节的 KernelClock），相减除以 32。"""
+    """每一轮的周期数：kernel 内部 64 轮与 32 轮，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 3 节的 KernelClock），相减除以 32。"""
     cycles = {}
     for rounds in (32, 64):
         compiled = tpuasm_tools.compile(build(mesh, rounds), x, mesh=mesh)

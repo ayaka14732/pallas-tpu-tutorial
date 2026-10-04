@@ -189,7 +189,7 @@ def bidirectional(mesh: jax.sharding.Mesh, rows: int, repeats: int):
     return ring(mesh, rows, repeats, directions=2)
 
 def cycles_per_call(clock: tpuasm_tools.KernelClock, build, mesh: jax.sharding.Mesh, rows: int, x: jax.Array) -> float:
-    """每次 all-reduce 的周期数：kernel 内部重复 64 次与 32 次，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 4 节的 KernelClock），相减除以 32。"""
+    """每次 all-reduce 的周期数：kernel 内部重复 64 次与 32 次，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 3 节的 KernelClock），相减除以 32。"""
     cycles = {}
     for repeats in (32, 64):
         compiled = tpuasm_tools.compile(build(mesh, rows, repeats), x, mesh=mesh)

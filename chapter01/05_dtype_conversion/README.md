@@ -72,7 +72,7 @@ int32 ： [0,   1,   2,   0,    -1,   -2,   2,   -2]
 
 本小节实验[源码](03_tpuasm_vcvt_rounding.py)、[输出](03_tpuasm_vcvt_rounding.txt)。
 
-tpuasm 的指令索引中，`vcvt.8x128.f32.s32` 的第三个操作数可以是 TC VREG、标量寄存器或 32 位立即数，本节的清单中 Mosaic 写的是立即数 `0xffffffff`。实验用第三章第 4 节的 `LccProbe` 把手写的片段插进一个载体 kernel 执行（这里只用它执行片段、取回结果，不读周期计数器）：先用 `vimm` 把一个 f32 常数的位型广播成整个 TC VREG，再用 `vcvt` 转换，第三个操作数取不同的值 T，写回后读出：
+tpuasm 的指令索引中，`vcvt.8x128.f32.s32` 的第三个操作数可以是 TC VREG、标量寄存器或 32 位立即数，本节的清单中 Mosaic 写的是立即数 `0xffffffff`。实验用第三章第 3 节的 `LccProbe` 把手写的片段插进一个载体 kernel 执行（这里只用它执行片段、取回结果，不读周期计数器）：先用 `vimm` 把一个 f32 常数的位型广播成整个 TC VREG，再用 `vcvt` 转换，第三个操作数取不同的值 T，写回后读出：
 
 ```python
 body += bundle(f'va0: vimm.8x128.s32 v13, 0x{as_bits(value):x}') + bundle(f'va0: vcvt.8x128.f32.s32 v14, v13, {operand}') + bundle(f'vst: vst.8x128 [vmem:0x{tile * 8:x}], v14')

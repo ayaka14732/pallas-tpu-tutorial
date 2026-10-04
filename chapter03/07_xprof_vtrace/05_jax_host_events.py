@@ -59,8 +59,8 @@ def main() -> None:
         print(f'  {name}{note}：开始 {statistics.median(value[0] for value in values):.1f} µs，持续 {statistics.median(value[1] for value in values):.1f} µs')
     print('## 设备')
     for track in ('XLA Modules', 'XLA Ops'):
-        durations = [xprof_tools.device_cycles(event) for event in xprof_tools.device_events(events) if event['device'] == '/device:TPU:0' and event['track'] == track]
-        print(f'  TensorCore 0 {track}：{statistics.median(durations):.0f} 个周期')
+        durations = [xprof_tools.device_ns(event) / 1000 for event in xprof_tools.device_events(events) if event['device'] == '/device:TPU:0' and event['track'] == track]
+        print(f'  TensorCore 0 {track}：{statistics.median(durations):.1f} µs')
 
 if __name__ == '__main__':
     main()

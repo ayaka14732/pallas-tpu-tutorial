@@ -76,13 +76,14 @@ def joined_bundles(listing: str) -> list[str]:
             current = []
     return bundles
 
-def device_medians(compiled, x: jax.Array) -> dict[tuple[str, str, str], float]:
+def device_medians(compiled, x: jax.Array) -> dict[tuple[str, str, str], int]:
+    """每个事件 16 次调用的中位数：GTC 高 60 位之差。"""
     events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(x).block_until_ready() for _ in range(16)], Path('/tmp/pallas_tpu_tutorial/xprof')))
     durations = defaultdict(list)
     for event in events:
         name = 'module' if event['track'] == 'XLA Modules' else event['name']
-        durations[(event['device'], event['track'], name)].append(xprof_tools.device_cycles(event))
-    return {key: statistics.median(values) for key, values in durations.items()}
+        durations[(event['device'], event['track'], name)].append(xprof_tools.gtc_ticks(event))
+    return {key: round(statistics.median(values)) for key, values in durations.items()}
 
 def main() -> None:
     x = jnp.arange(1024 * 128, dtype=jnp.float32).reshape(1024, 128) / 1024
@@ -116,10 +117,10 @@ def main() -> None:
                     index = run + 1
             else:
                 print('  ' + '；'.join(bundles[index].strip('{} ') for index in traces))
-            print(f'  XProf，16 次调用的中位数：')
+            print('  XProf，16 次调用的中位数（GTC 高 60 位之差 ΔT，每个计数 1/0.7 ns）：')
             for (device, track, name), value in sorted(device_medians(compiled, x).items()):
                 if device == '/device:TPU:0' or track == 'XLA Modules':
-                    print(f'    {device} {track} {name}：{value:.0f} 个周期')
+                    print(f'    {device} {track} {name}：ΔT = {value}，即 {value / 0.7:.1f} ns')
 
 if __name__ == '__main__':
     main()

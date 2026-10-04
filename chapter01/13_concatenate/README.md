@@ -54,7 +54,7 @@ for copy in copies:
   { vst: vst.8x128 [vmem:0x30, sm=3], v21 }
   ```
 
-  `vrot.slane.down` 每次只把 8 个 sublane 循环移动一个位置：第 s 个 sublane 的内容移到第 s − 1 个，第 0 个绕到第 7 个。这里需要的是反方向移一个位置（b 的第 0 行从第 0 个 sublane 移到第 1 个），硬件没有反方向的指令，于是转 7 次：b 的两个 tile 各一条 7 次的链，共 14 条。转完之后，`v18` 的第 1–7 个 sublane 是 b 的第 0–6 行，第 0 个 sublane 是绕回来的第 7 行；`v19` 的第 1 个 sublane 是 b 的第 8 行。两条 `vsel` 用“第 0 个 sublane”的掩码拼出输出的后两个 tile：第一个 tile 的第 0 个 sublane 取 a 的第 8 行，其余取 `v18`；第二个 tile 的第 0 个 sublane 取 `v18` 中绕回来的第 7 行，第 1 个取 `v19`，用 `sm=3` 只写这两行。每条 `vrot.slane.down` 的结果要 2 个周期后才可用（第三章第 6 节），一条 7 次的链是 14 个周期。
+  `vrot.slane.down` 每次只把 8 个 sublane 循环移动一个位置：第 s 个 sublane 的内容移到第 s − 1 个，第 0 个绕到第 7 个。这里需要的是反方向移一个位置（b 的第 0 行从第 0 个 sublane 移到第 1 个），硬件没有反方向的指令，于是转 7 次：b 的两个 tile 各一条 7 次的链，共 14 条。转完之后，`v18` 的第 1–7 个 sublane 是 b 的第 0–6 行，第 0 个 sublane 是绕回来的第 7 行；`v19` 的第 1 个 sublane 是 b 的第 8 行。两条 `vsel` 用“第 0 个 sublane”的掩码拼出输出的后两个 tile：第一个 tile 的第 0 个 sublane 取 a 的第 8 行，其余取 `v18`；第二个 tile 的第 0 个 sublane 取 `v18` 中绕回来的第 7 行，第 1 个取 `v19`，用 `sm=3` 只写这两行。每条 `vrot.slane.down` 的结果要 2 个周期后才可用（第三章第 5 节），一条 7 次的链是 14 个周期。
 - DMA 写入窗口：两次 DMA 的长度都是 9 个 granule，第二次从第 9 行写起。数组只有一列 tile（第 3 节），任意行窗口都连续，DMA 不需要额外工作。
 
 ## 只改 shape：不对齐的列
@@ -78,7 +78,7 @@ for copy in copies:
   { vst: vst.msk.8x128 [vmem:0x30], vm1, v9 }
   ```
 
-  输出有 3 个 tile。第一个是 a 的第 0–127 列，原样写出。第二个是输出的第 128–255 列：第 0 个 lane 是 a 的第 128 列，其余 127 个 lane 是 b 的第 0–126 列。b 的第一个 tile 沿 lane 循环右移 1 之后（`v5`），b 的第 j 列在第 j + 1 个 lane，第 127 列绕回第 0 个 lane；`vsel` 把第 0 个 lane 换成 a 的第 128 列。第三个 tile 只有两列：第 256 列是 b 的第 127 列，正是 `v5` 中绕回第 0 个 lane 的那一个；第 257 列是 b 的第 128 列，来自 b 的第二个 tile 右移 1 之后的第 1 个 lane（`v8`）。最后用 `vst.msk` 只写前 2 个 lane。两次 `vrot` 各要 69 个周期才能取回（第三章第 6 节），这段拼接的时间主要花在等 XLU 上。
+  输出有 3 个 tile。第一个是 a 的第 0–127 列，原样写出。第二个是输出的第 128–255 列：第 0 个 lane 是 a 的第 128 列，其余 127 个 lane 是 b 的第 0–126 列。b 的第一个 tile 沿 lane 循环右移 1 之后（`v5`），b 的第 j 列在第 j + 1 个 lane，第 127 列绕回第 0 个 lane；`vsel` 把第 0 个 lane 换成 a 的第 128 列。第三个 tile 只有两列：第 256 列是 b 的第 127 列，正是 `v5` 中绕回第 0 个 lane 的那一个；第 257 列是 b 的第 128 列，来自 b 的第二个 tile 右移 1 之后的第 1 个 lane（`v8`）。最后用 `vst.msk` 只写前 2 个 lane。两次 `vrot` 各要 69 个周期才能取回（第三章第 5 节），这段拼接的时间主要花在等 XLU 上。
 - DMA 写入窗口：编译失败，`Slice sizes along tiled dimensions must be aligned to tiles`。
 
 列方向上，一个 granule 是一个 sublane 的 128 个 lane。DMA 的地址和长度都以 granule 为单位（第 3 节），表达不了从某个 granule 中间开始的窗口，所以从第 129 列开始的窗口不能由 DMA 描述。这与行方向不同：行方向的最小单位是一个 granule（一行），列方向的最小单位是 128 列。所以不对齐的列只能交给 XLU 在 TC VREG 内移动。

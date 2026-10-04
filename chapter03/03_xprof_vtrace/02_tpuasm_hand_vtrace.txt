@@ -1,6 +1,0 @@
-计算部分是 bundle 511–643，共 133 个；程序中的 vtrace 标记：[('module', 460, 678), ('affine.1', 503, 663)]
-未改写：XLA Ops affine.1 2125 个周期
-vtrace 0xb8000000 … vtrace 0xc8000000：XLA Ops affine.1 2135 个周期，XLA TraceMe $$unknown$$ 134 个周期
-vtrace 0xb0000005 … vtrace 0xc0000005：XLA Ops affine.1 2131 个周期，XLA TraceMe overlayer-overhead 134 个周期
-vtrace 0x80000007 … vtrace 0x90000007：XLA Ops affine.1 2254 个周期，XLA Ops region.7 134 个周期
-同样的位置换成 LCC 读数：两次读数相差 151 个周期，其中 20 个是读数自身的开销

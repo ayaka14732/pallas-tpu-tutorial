@@ -1,0 +1,5 @@
+计算部分是 bundle 511–643，共 133 个；程序中的 vtrace 标记：[('module', 460, 678), ('affine.1', 503, 663)]
+未改写：XLA Ops affine.1 ΔT = 1414（2020.0 ns）
+vtrace 0xb8000000 … vtrace 0xc8000000：XLA Ops affine.1 ΔT = 1470（2099.3 ns），XLA TraceMe $$unknown$$ ΔT = 89（127.1 ns）
+vtrace 0xb0000005 … vtrace 0xc0000005：XLA Ops affine.1 ΔT = 1416（2023.6 ns），XLA TraceMe overlayer-overhead ΔT = 89（127.1 ns）
+vtrace 0x80000007 … vtrace 0x90000007：XLA Ops affine.1 ΔT = 1419（2027.1 ns），XLA Ops region.7 ΔT = 90（127.9 ns）

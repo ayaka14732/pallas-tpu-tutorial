@@ -1,4 +1,4 @@
-"""用发射模型预测第 4、5 节和本节各段手写清单的 LCC 读数，再在真机上运行同样的清单，逐一比较。"""
+"""用发射模型预测第 3、4 节和本节各段手写清单的 LCC 读数，再在真机上运行同样的清单，逐一比较。"""
 import tpu_init
 tpu_init.initialise_one_chip()
 
@@ -31,12 +31,12 @@ def cases() -> list[tuple[str, str, str, str]]:
         program = read_lcc(20) + body + END
         result.append((name, setup, program + after, program if trace is None else read_lcc(20) + trace + END))
     for count in (0, 16, 64):
-        add(f'第 4 节：{count} 条独立 vadd', bundle('va0: vadd.8x128.s32 v11, 1, v10') * count)
-        add(f'第 4 节：{count} 条 vld', bundle('vld: vld.8x128 v11, [vmem:0x0]') * count)
+        add(f'第 3 节：{count} 条独立 vadd', bundle('va0: vadd.8x128.s32 v11, 1, v10') * count)
+        add(f'第 3 节：{count} 条 vld', bundle('vld: vld.8x128 v11, [vmem:0x0]') * count)
     for count in (4, 16, 32, 64):
-        add(f'第 5 节：{count} 条相互依赖的 vmul', bundle('va0: vmul.8x128.f32 v11, v11, v10') * count)
+        add(f'第 4 节：{count} 条相互依赖的 vmul', bundle('va0: vmul.8x128.f32 v11, v11, v10') * count)
     for count in (1, 4, 16, 32, 64):
-        add(f'第 5 节：{count} 组 cld + vpop', (bundle('cld: cld.8x128 crf, [cmem:0x0]') + bundle('vr0: vpop.8x128 v11, crf')) * count, CMEM_SETUP)
+        add(f'第 4 节：{count} 组 cld + vpop', (bundle('cld: cld.8x128 crf, [cmem:0x0]') + bundle('vr0: vpop.8x128 v11, crf')) * count, CMEM_SETUP)
     add('vpow2 → vpop', bundle('va0: vpow2.8x128.f32 erf, v10') + bundle('vr0: vpop.8x128 v11, erf'))
     for count in (8, 16):
         add(f'{count} 条 vpow2 → {count} 条 vpop', bundle('va0: vpow2.8x128.f32 erf, v10') * count + bundle('vr0: vpop.8x128 v11, erf') * count)
@@ -55,9 +55,9 @@ def cases() -> list[tuple[str, str, str, str]]:
     add('两次转置分给 trf0、trf1，先取完 trf0', both + bundle('vr0: vpop.8x128 v11, trf0') * 16 + bundle('vr0: vpop.8x128 v12, trf1') * 16)
     load, use = bundle('s1: sld s24, [smem:0x0]'), bundle('s0: sadd.s32 s24, 1, s24')
     for count in (2, 16):
-        add(f'第 4 节：{count} 条连续的 sld', load * count)
-    add('第 4 节：sld 之后紧接使用其结果', load + use)
-    add('第 4 节：4 组“sld + 3 条无关的 sadd”', (load + bundle('s0: sadd.s32 s23, 1, s23') * 3) * 4)
+        add(f'第 3 节：{count} 条连续的 sld', load * count)
+    add('第 3 节：sld 之后紧接使用其结果', load + use)
+    add('第 3 节：4 组“sld + 3 条无关的 sadd”', (load + bundle('s0: sadd.s32 s23, 1, s23') * 3) * 4)
     add('sld 与依赖 sld 结果的向量运算', load + bundle('va0: vmov.8x128 v11, s24') + bundle('va0: vadd.8x128.s32 v12, v11, v10'))
     xlane, pop_trf = bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10'), bundle('vr0: vpop.8x128 v11, trf0')
     add('vadd.xlane → vpop', xlane + pop_trf)

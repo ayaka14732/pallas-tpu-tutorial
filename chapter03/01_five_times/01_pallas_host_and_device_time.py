@@ -84,7 +84,7 @@ def main() -> None:
         result.block_until_ready()
         total = time.perf_counter() - begin
         print(f'3. 连续调用 {CALLS} 次：第 1–30 次每次中位数 {statistics.median(calls[:30]) * 1e6:.1f} µs，第 35–64 次每次中位数 {statistics.median(calls[34:]) * 1e6:.1f} µs；从开始到等到最后一个结果，平均每次 {total / CALLS * 1e6:.1f} µs')
-        # 设备上的周期数：在程序和 kernel 的 vtrace 起止标记处各插入一次 LCC 读数（第 4 节的 KernelClock）。相邻两次读数之间有 20 个周期是读数自身的开销。
+        # 设备上的周期数：在程序和 kernel 的 vtrace 起止标记处各插入一次 LCC 读数（第 3 节的 KernelClock）。相邻两次读数之间有 20 个周期是读数自身的开销。
         (_, module_start, module_end), (_, start, end) = tpuasm_tools.hlo_ops(compiled)
         timed = clock.instrument(compiled, [module_start, start, end + 1, module_end + 1])
         samples = []

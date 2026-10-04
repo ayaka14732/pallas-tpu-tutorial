@@ -12,7 +12,7 @@ from top_k_common import argmax, run, top_k_by_hand
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'chapter03' / '06_issue_model'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'chapter03' / '05_issue_model'))
 import issue_model
 
 END = read_lcc(21) + bundle('s0: sfence') + read_lcc(22)

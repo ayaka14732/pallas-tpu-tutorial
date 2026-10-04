@@ -98,7 +98,7 @@ patched = tpuasm_tools.edit_bundles(serialized, edits)
 
 去掉入口汇合省去了一次等待对方到达的时间。两个 TensorCore 几乎同时开始时，这段等待很短；但只要一方因为别的原因晚到，另一方就要空等。
 
-> 暂且可以理解为：跨核汇合的代价取决于两个 TensorCore 谁先到、差多少；第三章第 7 节介绍如何在两个 TensorCore 上同时计时，测出这种差距。
+> 暂且可以理解为：跨核汇合的代价取决于两个 TensorCore 谁先到、差多少；第三章第 6 节介绍如何在两个 TensorCore 上同时计时，测出这种差距。
 
 反过来，如果一个 TensorCore 要读另一个写入 HBM 的数据，就必须在读之前确认对方已经写完。删掉同步的前提是证明两方之间没有这样的依赖。[研究报告 20](../../../pallas-tpu-readings-dev/research_reports/20_pallas_tpu_v4_megacore_entry_barrier_patch.md) 用一个生产者—消费者的反例说明了这一点：删掉 XLA 插入的全部隐式汇合后，消费者会读到尚未写入的零。需要这种顺序时，应在 Pallas 中显式写出同步（第 4 节），而不是依赖编译器插入的汇合。
 

@@ -1,4 +1,4 @@
-"""解释第 2 个实验中均匀分布、指数分布与 Gumbel 分布每个 TC VREG 的周期数：取出编译器生成的循环体，用 LCC 实测它本身的周期数，再用第三章第 6 节的发射模型分别在不考虑与考虑 vrng 发射间隔时预测。"""
+"""解释第 2 个实验中均匀分布、指数分布与 Gumbel 分布每个 TC VREG 的周期数：取出编译器生成的循环体，用 LCC 实测它本身的周期数，再用第三章第 5 节的发射模型分别在不考虑与考虑 vrng 发射间隔时预测。"""
 import tpu_init
 tpu_init.initialise_one_chip()
 
@@ -10,7 +10,7 @@ from generation_common import METHODS, build
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'chapter03' / '06_issue_model'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'chapter03' / '05_issue_model'))
 import issue_model
 
 # (方法, 每次生成的行数)：前三个与第 2 个实验相同，最后一个只改每次的行数。

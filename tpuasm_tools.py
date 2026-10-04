@@ -201,12 +201,12 @@ def reload_saved(address: int = 0x80) -> str:
 class LccProbe:
     """在一个载体 kernel 中插入手写片段，用 LCC（或 GTC）读数计时（参照 tpu-v4-latency-numbers 第 0 节）。
 
-    片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28；v20–v30 保存着载体的标量寄存器，片段若要改写，须在 setup 中用 spill_saved() 存起来、在最后一次读数之后用 reload_saved() 读回。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。
+    片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28；v20–v30 保存着载体的标量寄存器，片段若要改写，须在 setup 中用 spill_saved() 存起来、在最后一次读数之后用 reload_saved() 读回。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。进程打开多颗芯片时，device 选择载体在第几颗芯片上运行。
     """
 
-    def __init__(self, num_cores: int = 1) -> None:
+    def __init__(self, num_cores: int = 1, device: int = 0) -> None:
         self.num_cores = num_cores
-        mesh = jax.make_mesh((1,), ('device',))
+        mesh = jax.make_mesh((1,), ('device',), devices=[jax.local_devices()[device]])
         tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=num_cores)
 
         @jax.shard_map(
@@ -236,7 +236,7 @@ class LccProbe:
             return kernel(x)
 
         self.host = np.random.default_rng(0).integers(0, 1 << 32, (256, 128), dtype=np.uint64).astype(np.uint32)
-        self.x = jax.device_put(self.host, jax.local_devices()[0])
+        self.x = jax.device_put(self.host, jax.local_devices()[device])
         self.compiled = compile(probe, self.x, mesh=mesh)
         serialized = serialize(self.compiled)
         marker, = find_bundles(serialized, '0x13579bdf')
@@ -291,15 +291,15 @@ class LccProbe:
 
 CLOCK_BASE = 0x20000  # SMEM 中存放 KernelClock 读数的位置：第 i 个读数的低、高 32 位在 CLOCK_BASE + 2i 与 + 2i + 1
 CLOCK_SAVE = 0x20100  # 读数时借用 s30、s31，原值暂存在这里
-CLOCK_OVERHEAD = 20  # 相邻两次 clock_read 之间，读数自身占用的周期数（第三章第 4 节实测）
+CLOCK_OVERHEAD = 20  # 相邻两次 clock_read 之间，读数自身占用的周期数（第三章第 3 节实测）
 
-def clock_read(index: int) -> str:
-    """读一次 LCC 并存进 SMEM 的一段清单：先 sfence 等此前的向量工作全部发射，再在同一个 bundle 中读 LCC 的两半。借用的 s30、s31 读完后恢复。"""
+def clock_read(index: int, counter: str = 'lcc') -> str:
+    """读一次 LCC 并存进 SMEM 的一段清单：先 sfence 等此前的向量工作全部发射，再在同一个 bundle 中读 LCC 的两半。借用的 s30、s31 读完后恢复。counter='gtc' 时改读 GTC。"""
     return (
         bundle(f's1: sst [smem:0x{CLOCK_SAVE:x}], s30')
         + bundle(f's1: sst [smem:0x{CLOCK_SAVE + 1:x}], s31')
         + bundle('s0: sfence')
-        + bundle('s0: srdreg.lcclo s30 ; s1: srdreg.lcchi s31')
+        + bundle(f's0: srdreg.{counter}lo s30 ; s1: srdreg.{counter}hi s31')
         + bundle(f's1: sst [smem:0x{CLOCK_BASE + 2 * index:x}], s30')
         + bundle(f's1: sst [smem:0x{CLOCK_BASE + 2 * index + 1:x}], s31')
         + bundle(f's1: sld s30, [smem:0x{CLOCK_SAVE:x}]')
@@ -336,11 +336,11 @@ class KernelClock:
         self.probe = LccProbe(num_cores)
         self.readers: dict[tuple[int, int], Callable[[jax.Array], jax.Array]] = {}
 
-    def instrument(self, compiled: Compiled, points: list[int]) -> Compiled:
-        """在原 bundle 编号 points[i] 之前插入第 i 次读数，返回装载后的 executable。同一个编号可以出现多次，读数按出现的顺序排列。"""
+    def instrument(self, compiled: Compiled, points: list[int], counter: str = 'lcc') -> Compiled:
+        """在原 bundle 编号 points[i] 之前插入第 i 次读数，返回装载后的 executable。同一个编号可以出现多次，读数按出现的顺序排列。counter='gtc' 时读 GTC。"""
         insertions: dict[int, str] = {}
         for index, pc in enumerate(points):
-            insertions[pc] = insertions.get(pc, '') + clock_read(index)
+            insertions[pc] = insertions.get(pc, '') + clock_read(index, counter)
         return load(insert_bundles(serialize(compiled), insertions), compiled)
 
     def time_ops(self, compiled: Compiled, call: Callable[[Compiled], Any], samples: int = 8) -> list[tuple[str, list[int]]]:

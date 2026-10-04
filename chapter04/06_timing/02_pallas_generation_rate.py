@@ -13,7 +13,7 @@ import tpuasm_tools
 TILES = (64, 576)  # 两个 kernel 各生成多少个 TC VREG
 
 def kernel_cycles(clock: tpuasm_tools.KernelClock, compiled) -> int:
-    """kernel 在 TensorCore 0 上的周期数：在 kernel 的起止标记处读 LCC（第三章第 4 节的 KernelClock）。"""
+    """kernel 在 TensorCore 0 上的周期数：在 kernel 的起止标记处读 LCC（第三章第 3 节的 KernelClock）。"""
     times = dict(clock.time_ops(compiled, lambda timed: timed().block_until_ready(), samples=8))
     (name,) = [name for name in times if name != 'module']
     return times[name][0]

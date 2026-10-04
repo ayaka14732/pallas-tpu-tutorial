@@ -41,7 +41,7 @@ o_vmem[...] = jnp.dot(lhs_vmem[...], rhs_vmem[...], preferred_element_type=jnp.f
 
 由此可见 MXU 适合的使用方式：一份 RHS 装入一次，然后连续乘很多块 LHS。装入 RHS 要 8 次 push 加 1 次 `vdwg`，而每多一块 LHS 只要 1 次 `vmatmul` 和 2 次 `vpop`。
 
-> 暂且可以理解为：`vmatmul` 之后要过一段时间，第一条依赖它的 `vpop` 才能发射；期间可以继续发射其他 `vmatmul`。第三章第 6 节测得：MXU0、MXU1 是 83 个周期（[研究报告 55](../../../pallas-tpu-readings-dev/research_reports/55_tpu_v4_mrf_latency.md) 测得 MXU2、MXU3 是 101 个周期）；同一个 MXU 每 8 个周期接收一个 8 行的 LHS TC VREG，即每周期一行；取回也是每 8 个周期一个。按这个速率，一个 TensorCore 的 4 个 MXU 每周期完成 4 × 128 × 128 = 65536 次乘加。
+> 暂且可以理解为：`vmatmul` 之后要过一段时间，第一条依赖它的 `vpop` 才能发射；期间可以继续发射其他 `vmatmul`。第三章第 5 节测得：MXU0、MXU1 是 83 个周期（[研究报告 55](../../../pallas-tpu-readings-dev/research_reports/55_tpu_v4_mrf_latency.md) 测得 MXU2、MXU3 是 101 个周期）；同一个 MXU 每 8 个周期接收一个 8 行的 LHS TC VREG，即每周期一行；取回也是每 8 个周期一个。按这个速率，一个 TensorCore 的 4 个 MXU 每周期完成 4 × 128 × 128 = 65536 次乘加。
 
 ## 只改 RHS 方向：push 时转置
 

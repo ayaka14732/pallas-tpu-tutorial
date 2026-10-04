@@ -17,8 +17,8 @@ XLU_LATENCY = {'vadd.xlane': 79, 'vmax.xlane': 79, 'vmax.index.xlane': 79, 'vmin
 INTERVAL = {'push erf': 2, 'push mrf': 8, 'pop mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
 # 同一单元上相邻两条指令的最小间隔，按助记符前缀匹配：vrng 每条让生成器走 8 步（第四章第 6 节）。
 UNIT_INTERVAL = {'vrng': 8}
-SLD_INTERVAL = 4  # 相邻两条 sld 至少相隔 4 个周期（第 4 节）。
-SLD_LATENCY = 4  # sld 的结果 4 个周期后才能被标量指令使用（第 4 节）。
+SLD_INTERVAL = 4  # 相邻两条 sld 至少相隔 4 个周期（第 3 节）。
+SLD_LATENCY = 4  # sld 的结果 4 个周期后才能被标量指令使用（第 3 节）。
 
 def parse(text: str) -> list[list[str]]:
     """把清单文本拆成 bundle，每个 bundle 是若干 `槽位: 指令` 字符串。"""
