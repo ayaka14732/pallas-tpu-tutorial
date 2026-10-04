@@ -134,6 +134,9 @@ ROOT %append.1 = f32[64,128]{1,0:T(8,128)} custom-call(%args_0_.1, %copy.4.args_
 
 本小节实验[源码](02_jax_concatenate.py)、[输出](02_jax_concatenate.txt)。
 
-XLA 对四组拼接都生成一个名为 `pad_maximum_fusion` 的 fusion：先把两个输入分别填充到输出的大小，再逐元素取最大值；为了不影响结果，填充值必须不大于任何输入。对齐的情况下，清单中除了 load/store，还有 `vlt`、`vsel` 生成和选择填充值，以及一条 `vmax`；不对齐的情况分别多出 14 条 `vrot.slane.down` 或一次 XLU 循环移位，与 Pallas 在 TC VMEM 中拼接的做法相同，再加上填充和取最大值的指令。
+XLA 把拼接改写成 `pad + maximum`：先把两个输入分别填充到输出的大小，再逐元素取最大值；四组拼接的 fusion 都叫 `pad_maximum_fusion`。但编译出来的指令因情况而异：
 
-`pad + maximum` 是一种统一的改写，对任何拼接都正确，但即使在最简单的对齐情况下也多出了比较、选择和取最大值。手写时，对齐的拼接应当直接交给 DMA；只有列方向不对齐时，才需要 XLU。
+- 对齐的两组：清单中只有 2 条 `vld`、2 条 `vst` 和 3 次 DMA，与 Pallas 在 TC VMEM 中拼接完全相同。填充和取最大值在编译时就被化简掉了。
+- 不对齐的两组：分别有 14 条 `vrot.slane.down` 或一次 XLU 循环移位，与 Pallas 的做法相同；此外还留有一条 `vmax` 和生成、选择填充值的 `vge`、`vsel`（各 4 条 `vsel`，Pallas 是 2 条）。填充值必须不大于任何输入，取最大值才不影响结果。
+
+所以在 TC VMEM 中拼接这条路上，XLA 与 Pallas 相差不多。差别在于 XLA 总要把数据搬进 TC VMEM 再搬出来；手写时，对齐的拼接可以直接交给 DMA，完全不经过向量单元。只有列方向不对齐时，才需要 XLU。

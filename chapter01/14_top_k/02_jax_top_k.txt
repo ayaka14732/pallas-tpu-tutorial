@@ -1,9 +1,9 @@
-## top-1，f32[8,128]：值一致 True，下标一致 True；HLO 段共 1131 个 bundle
+## top-1，f32[8,128]：值一致 True，下标一致 True；HLO 段共 1100 个 bundle
   %copy = copy(%a.1)；%custom-call = custom-call(%copy)
 
-## top-8，f32[8,128]：值一致 True，下标一致 True；HLO 段共 582 个 bundle
+## top-8，f32[8,128]：值一致 True，下标一致 True；HLO 段共 558 个 bundle
   %iota = iota()；%sort = sort(%copy-done, %iota)
 
-## top-8，每行只有 3 个有限值：值一致 True，下标一致 True；HLO 段共 582 个 bundle
+## top-8，每行只有 3 个有限值：值一致 True，下标一致 True；HLO 段共 558 个 bundle
   %iota = iota()；%sort = sort(%copy-done, %iota)
 

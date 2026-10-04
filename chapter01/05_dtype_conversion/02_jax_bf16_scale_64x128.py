@@ -1,6 +1,6 @@
 """原生 XLA 在单芯片上把 bf16[64,128] 乘以 2，观察 XLA 怎样把 f32 结果打包写回。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax
 import jax.numpy as jnp

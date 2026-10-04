@@ -1,6 +1,6 @@
 """原生 XLA 的同一批 f32 逐元素运算：对照 Pallas 版本，看 XLA 选用的计算指令与误差。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax
 import jax.numpy as jnp

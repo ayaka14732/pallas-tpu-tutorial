@@ -3,40 +3,56 @@
 # fusion 段的指令统计
 dma.strided: 2
 por: 8
-sadd.s32: 10
+sadd.s32: 8
 sand.u32: 4
 shalt: 4
 simm.s32: 4
-sld: 1
 slt.s32: 8
 sne.s32: 4
-sshll.u32: 1
-vld.8x128: 2
-vmul.8x128.f32: 4
-vpackc.8x128.f32.f16: 4
-vst.8x128: 4
+vld.8x128: 4
+vmul.8x128.f32: 8
+vpackc.8x128.f32.f16: 8
+vst.8x128: 8
 vsyncadd.s32: 2
 vsyncpa.u1: 3
-vunpackl.8x128.f16.f32: 2
-vunpacku.8x128.f16.f32: 2
+vunpackl.8x128.f16.f32: 4
+vunpacku.8x128.f16.f32: 4
 vwait.ge: 2
 
 # 向量指令
   vld: vld.8x128 v0, [vmem:0x0] ;  # [sublane mask fusion: 0x0f | 0x0f]
   va0: vunpackl.8x128.f16.f32 v1, v0 ;
   va1: vunpacku.8x128.f16.f32 v2, v0 ;
-  vld: vld.8x128 v3, [vmem:0x8] ;  # [sublane mask fusion: 0x0f | 0x0f]
+  vld: vld.8x128 v3, [vmem:0x8] }  # [sublane mask fusion: 0x0f | 0x0f]
   va0: vunpackl.8x128.f16.f32 v4, v3 ;
-  va1: vunpacku.8x128.f16.f32 v5, v3 }
-  va0: vmul.8x128.f32 v6, 2.0, v1 ;
-  va0: vmul.8x128.f32 v7, 2.0, v2 }
-  va0: vmul.8x128.f32 v9, 2.0, v4 ;
-  va1: vpackc.8x128.f32.f16 v8, 0.0, v6 }
-{ va0: vmul.8x128.f32 v11, 2.0, v5 ;
-  va1: vpackc.8x128.f32.f16 v10, 0.0, v7 }
-{ va0: vpackc.8x128.f32.f16 v12, 0.0, v9 ;
-  vst: vst.8x128 [vmem:0x10, sm=15], v8 }
-{ va0: vpackc.8x128.f32.f16 v13, 0.0, v11 ;
-  vst: vst.8x128 [vmem:0x14, sm=15], v10 }
-{ vst: vst.8x128 [vmem:0x18, sm=15], v12 }
-{ vst: vst.8x128 [vmem:0x1c, sm=15], v13 }
+  va1: vunpacku.8x128.f16.f32 v5, v3 ;
+  vld: vld.8x128 v6, [vmem:0x10] ;  # [sublane mask fusion: 0x0f | 0x0f]
+  va0: vmul.8x128.f32 v7, 2.0, v1 ;
+  va1: vunpackl.8x128.f16.f32 v8, v6 ;
+  vld: vld.8x128 v15, [vmem:0x18] }  # [sublane mask fusion: 0x0f | 0x0f]
+  va0: vmul.8x128.f32 v9, 2.0, v2 ;
+  va1: vunpacku.8x128.f16.f32 v10, v6 }
+  va0: vmul.8x128.f32 v12, 2.0, v4 ;
+  va1: vpackc.8x128.f32.f16 v11, 0.0, v7 }
+{ va0: vmul.8x128.f32 v14, 2.0, v5 ;
+  va1: vpackc.8x128.f32.f16 v13, 0.0, v9 }
+{ va0: vmul.8x128.f32 v17, 2.0, v8 ;
+  va1: vpackc.8x128.f32.f16 v16, 0.0, v12 ;
+  vst: vst.8x128 [vmem:0x20, sm=15], v11 }
+{ va0: vmul.8x128.f32 v19, 2.0, v10 ;
+  va1: vpackc.8x128.f32.f16 v18, 0.0, v14 ;
+  vst: vst.8x128 [vmem:0x24, sm=15], v13 }
+{ va0: vpackc.8x128.f32.f16 v20, 0.0, v17 ;
+  va1: vunpackl.8x128.f16.f32 v21, v15 ;
+  vst: vst.8x128 [vmem:0x28, sm=15], v16 }
+{ va0: vpackc.8x128.f32.f16 v22, 0.0, v19 ;
+  va1: vunpacku.8x128.f16.f32 v23, v15 ;
+  vst: vst.8x128 [vmem:0x2c, sm=15], v18 }
+{ va0: vmul.8x128.f32 v24, 2.0, v21 ;
+  vst: vst.8x128 [vmem:0x30, sm=15], v20 }
+{ va0: vmul.8x128.f32 v25, 2.0, v23 ;
+  vst: vst.8x128 [vmem:0x34, sm=15], v22 }
+{ va0: vpackc.8x128.f32.f16 v26, 0.0, v24 }
+{ va0: vpackc.8x128.f32.f16 v27, 0.0, v25 }
+{ vst: vst.8x128 [vmem:0x38, sm=15], v26 }
+{ vst: vst.8x128 [vmem:0x3c, sm=15], v27 }

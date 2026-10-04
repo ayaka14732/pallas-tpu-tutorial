@@ -11,5 +11,5 @@
   cld.8x128×1、vadd.8x128.f32×8、vadd.xlane.0.8x128.f32×1、vmov.8x128×1、vpop.8x128×2、vrot.slane.down.8x128.u32×7
 
 ## sum(x, axis=0)，f32[64,128]：与 CPU 结果一致 True；HLO 段：%reduce_sum.7 = reduce(%copy-done, %constant.1)
-  cld.8x128×4、vadd.8x128.f32×12、vmov.8x128×1、vpop.8x128×4、vrot.slane.down.8x128.u32×7
+  cld.8x128×8、vadd.8x128.f32×15、vmov.8x128×1、vpop.8x128×8、vrot.slane.down.8x128.u32×7
 

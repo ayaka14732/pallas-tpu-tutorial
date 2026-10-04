@@ -182,10 +182,10 @@ def kernel(u_hbm: Ref, r_hbm: Ref, t_hbm: Ref, u_vmem: Ref, r_smem: Ref, sem: Re
 
 | 操作 | HLO 段 bundle 数 | 要点 |
 | --- | ---: | --- |
-| 按行 take：`table[rows]` | 214 | 拆成 5 个 fusion，含索引截断与比较 |
-| lane gather：`take_along_axis` | 568 | 64 条 `vperm`、130 条 `vpop` |
-| lane scatter（索引为排列） | 2087 | 256 条 `vst.msk`、257 条 `veq`，没有 `vperm` |
+| 按行 take：`table[rows]` | 138 | 拆成 5 个 fusion，含索引截断与比较 |
+| lane gather：`take_along_axis` | 537 | 64 条 `vperm`、130 条 `vpop` |
+| lane scatter（索引为排列） | 1939 | 256 条 `vst.msk`、257 条 `veq`，只有 4 条 `vperm` |
 
-XLA 对 lane gather 没有使用一次 `vperm` 完成整个 TC VREG 的写法，而是更通用、更长的展开。对 scatter，即使通过 `unique_indices=True` 告诉它索引互不重复，XLA 也没有把它改写成逆排列的 gather，而是逐个位置比较、用带掩码的 store 写回，产生了 2087 个 bundle 的程序。
+XLA 对 lane gather 没有使用一次 `vperm` 完成整个 TC VREG 的写法，而是更通用、更长的展开。对 scatter，即使通过 `unique_indices=True` 告诉它索引互不重复，XLA 也没有把它改写成逆排列的 gather，而是逐个位置比较、用带掩码的 store 写回，产生了 1939 个 bundle 的程序。
 
 这三个对照都说明同一件事：XLA 的通用实现必须对任意索引正确，代价可能比手写版本高出一到两个数量级。手写 kernel 的价值，就在于利用 XLA 不知道的结构，例如“索引在一个 tile 内”或“索引构成排列”。

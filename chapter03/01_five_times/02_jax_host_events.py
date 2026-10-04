@@ -52,9 +52,9 @@ def main() -> None:
                 occurrences[(event['name'], seen[event['name']])].append((event['ts'] - start, event['dur']))
                 seen[event['name']] += 1
     print(f'## 主机：{CALLS} 次调用，每次的中位数（开始时刻相对调用开始）')
-    print(f'  整个调用（call 区间）：{xprof_tools.host_cycles(statistics.median(end - start for start, end in windows) / 1e6)}')
+    print(f'  整个调用（call 区间）：{xprof_tools.microseconds(statistics.median(end - start for start, end in windows) / 1e6)}')
     for (name, index), values in sorted(occurrences.items(), key=lambda item: statistics.median(value[0] for value in item[1])):
-        print(f'  {name} 第 {index + 1} 次：开始 {xprof_tools.host_cycles(statistics.median(value[0] for value in values) / 1e6)}，持续 {xprof_tools.host_cycles(statistics.median(value[1] for value in values) / 1e6)}')
+        print(f'  {name} 第 {index + 1} 次：开始 {xprof_tools.microseconds(statistics.median(value[0] for value in values) / 1e6)}，持续 {xprof_tools.microseconds(statistics.median(value[1] for value in values) / 1e6)}')
     device = xprof_tools.device_events(raw)
     print('## 设备')
     for track in ('XLA Modules', 'XLA Ops'):

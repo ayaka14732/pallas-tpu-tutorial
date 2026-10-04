@@ -217,18 +217,18 @@ vst     [vmem:0x28, sm=3], v15               # 只写第 0、1 个 sublane
 
 本小节 XLA 实验[源码](02_jax_bf16_scale_64x128.py)、[输出](02_jax_bf16_scale_64x128.txt)；Pallas 版本即上一节的[实验](../04_vector_layout/01_pallas_scale_64x128.py)。
 
-`bf16[64,128] × 2` 在 XLA 和 Pallas 中都是 load、unpack、f32 乘法、pack、store，差别在 pack 和 store。XLA 把 64 行分给两个 TensorCore，下表把 Pallas 的计数也折算到 32 行，便于对照：
+`bf16[64,128] × 2` 在 XLA 和 Pallas 中都是 load、unpack、f32 乘法、pack、store，差别在 pack 和 store：
 
-| 每 32 行 | `vld` | unpack | `vmul` | `vpackc` | `vst` |
+| | `vld` | unpack | `vmul` | `vpackc` | `vst` |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| XLA | 2 | 4 | 4 | 4 | 4（`sm=15`） |
-| Pallas | 2 | 4 | 4 | 2 | 2 |
+| XLA | 4 | 8 | 8 | 8 | 8（`sm=15`） |
+| Pallas | 4 | 8 | 8 | 4 | 4 |
 
 XLA 的写法是：
 
 ```text
-vpackc.8x128.f32.f16 v8, 0.0, v6
-vst [vmem:0x10, sm=15], v8
+vpackc.8x128.f32.f16 v11, 0.0, v7
+vst [vmem:0x20, sm=15], v11
 ```
 
 每个 f32 TC VREG 单独与常数 0.0 打包，结果只占第 0–3 个 sublane，于是用 `sm=15`（二进制 `1111`）只写这 4 个 sublane。Pallas 则把相邻两个 f32 TC VREG 合成一个满的打包 TC VREG，一次写满 8 个 sublane。两者都正确；Pallas 的写法少一半 pack 和 store。

@@ -124,7 +124,7 @@ return jnp.dot(x, upper, precision=precision, preferred_element_type=jnp.float32
 
 XLA 把 `jnp.cumsum` 降低为 `reduce-window`：
 
-- 沿 sublane（axis=0）：51 个 bundle，做法与上一小节完全相同，即 `ss=0` 广播 load、逐行累加、单 sublane 的 store。
-- 沿 lane（axis=1）：237 个 bundle。XLA 先把 `8×128` 转置，在 sublane 方向逐行累加 128 次（129 条 `vadd`），再转置回来；没有用 Hillis–Steele 的 7 轮循环移位。
+- 沿 sublane（axis=0）：48 个 bundle，做法与上一小节完全相同，即 `ss=0` 广播 load、逐行累加、单 sublane 的 store。
+- 沿 lane（axis=1）：234 个 bundle。XLA 先把 `8×128` 转置，在 sublane 方向逐行累加 128 次（129 条 `vadd`），再转置回来；没有用 Hillis–Steele 的 7 轮循环移位。
 
 这里 XLA 的选择有一半值得借鉴：沿 sublane 的逐行广播是很好的做法；沿 lane 的方向，按算法的 log 轮数设计、利用 XLU 的循环移位，指令数少得多。

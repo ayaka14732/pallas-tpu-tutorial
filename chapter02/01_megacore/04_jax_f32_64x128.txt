@@ -1,0 +1,98 @@
+数值检查通过
+
+# fusion 段的指令统计
+dma.strided: 2
+por: 8
+sadd.s32: 10
+sand.u32: 4
+shalt: 4
+simm.s32: 4
+sld: 1
+slt.s32: 8
+sne.s32: 4
+sshll.u32: 1
+vld.8x128: 4
+vmul.8x128.f32: 4
+vst.8x128: 4
+vsyncadd.s32: 2
+vsyncpa.u1: 3
+vwait.ge: 2
+
+# fusion 段
+# entry bundle: %broadcast_multiply_fusion = fusion(%x.1)
+{ misc: vsyncpa.u1 [sflag:52], 0 }
+{ s0: sadd.s32 s15, 64, s0 ;
+  s1: sld s6, [smem:0x1] ;
+  misc: vsyncpa.u1 [sflag:53], 0 }
+{ s0: sshll.u32 s7, s6, 0x5 }
+{ s0: sadd.s32 s10, s7, s0 }
+{ s0: sand.u32 s11, 0x7fffffff, s10 }
+{ s0: sadd.s32 s12, 32, s11 ;
+  s1: slt.s32 p1, s11, s0 }
+{ s0: sne.s32 p0, s11, s12 ;
+  s1: slt.s32 p2, s15, s12 }
+{ s0: por p3, p2, p1 }
+{ s0: por p4, !p3, !p0 }
+{ s0: @!p4 shalt }  # BoundsCheck 0 [deref of opnd#0] for dma.hbm_to_vmem\nhlo: broadcast_multiply_fusion
+{ s0: simm.s32 s0, 2147483647 ;  # materialized constant
+  s1: simm.s32 s20, 0 ;  # materialized constant
+  .encoding { s1.y = lo(imm2) } }
+{ s0: sand.u32 s18, 0x0, s0 ;
+  s1: sadd.s32 s21, 32, s20 ;
+  .encoding { s0.y = lo(imm0) } }
+{ s0: sadd.s32 s19, 32, s18 ;
+  s1: slt.s32 p6, s18, 0 ;
+  .encoding { s1.y = lo(imm0) } }
+{ s0: sne.s32 p5, s18, s19 ;
+  s1: slt.s32 p7, s21, s19 }
+{ s0: por p8, p7, p6 }
+{ s0: por p9, !p8, !p5 }
+{ s0: @!p9 shalt }  # BoundsCheck 0 [deref of opnd#2] for dma.hbm_to_vmem\nhlo: broadcast_multiply_fusion
+{ s0: simm.s32 s22, 8 }  # materialized constant
+{ s0: dma.strided [vmem:s20], [hbm:s10], length=32, dst_stride=s22, src_stride=s22, elements_per_stride=s22, dst_flag=[sflag:52] }  # base_bounds: (8, 1)\ndynamic_base_bounds: (8, 1)\nwindow_bounds: (4, 1)\niteration_bounds: (1, 1)\nstrides: (4, 1)\npad_low: (0, 0)\npad_high: (0, 0)\nelement_size_in_bytes: 4096\nsecond_minor_factor: 1
+{ misc: vwait.ge [sflag:52], 32 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ s0: sadd.s32 s25, s7, s1 ;
+  s1: sand.u32 s26, 0x20, s0 ;
+  vld: vld.8x128 v0, [vmem:0x0] ;
+  misc: vsyncadd.s32 [sflag:52], -32 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 ; s1.y = lo(imm0) } }
+{ s0: sadd.s32 s27, 32, s26 ;
+  s1: simm.s32 s28, 32 ;  # materialized constant
+  va0: vmul.8x128.f32 v1, 2.0, v0 ;
+  vld: vld.8x128 v2, [vmem:0x8] ;
+  .encoding { s0.y = const(32) ; s1.y = lo(imm0) } }
+{ s0: sne.s32 p10, s26, s27 ;
+  s1: sadd.s32 s29, 32, s28 ;
+  va0: vmul.8x128.f32 v3, 2.0, v2 ;
+  vld: vld.8x128 v4, [vmem:0x10] }
+{ s0: slt.s32 p11, s26, 32 ;
+  s1: slt.s32 p12, s29, s27 ;
+  va0: vmul.8x128.f32 v5, 2.0, v4 ;
+  vst: vst.8x128 [vmem:0x20], v1 ;
+  vld: vld.8x128 v6, [vmem:0x18] ;
+  .encoding { s0.y = lo(imm0) ; vst.offset = imm2 } }
+{ s0: por p13, p12, p11 ;
+  va0: vmul.8x128.f32 v7, 2.0, v6 ;
+  vst: vst.8x128 [vmem:0x28], v3 }
+{ s0: por p14, !p13, !p10 ;
+  vst: vst.8x128 [vmem:0x30], v5 }
+{ vst: vst.8x128 [vmem:0x38], v7 }
+{ s0: @!p14 shalt }  # BoundsCheck 9 [deref of opnd#0] for dma.vmem_to_hbm\nhlo: broadcast_multiply_fusion
+{ s0: sand.u32 s30, 0x7fffffff, s25 ;
+  s1: sadd.s32 s5, 64, s1 }
+{ s0: sadd.s32 s2, 32, s30 ;
+  s1: slt.s32 p1, s30, s1 }
+{ s0: sne.s32 p0, s30, s2 ;
+  s1: slt.s32 p2, s5, s2 }
+{ s0: por p3, p2, p1 }
+{ s0: por p4, !p3, !p0 }
+{ s0: @!p4 shalt }  # BoundsCheck 9 [deref of opnd#2] for dma.vmem_to_hbm\nhlo: broadcast_multiply_fusion
+{ s0: dma.strided [hbm:s25], [vmem:s28], length=32, dst_stride=s22, src_stride=s22, elements_per_stride=s22, dst_flag=[sflag:53] }  # base_bounds: (8, 1)\ndynamic_base_bounds: (8, 1)\nwindow_bounds: (4, 1)\niteration_bounds: (1, 1)\nstrides: (4, 1)\npad_low: (0, 0)\npad_high: (0, 0)\nelement_size_in_bytes: 4096\nsecond_minor_factor: 1
+{ misc: vwait.ge [sflag:53], 32 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncadd.s32 [sflag:53], -32 ;  # pipeline-emitter-dma-wait
+  .encoding { misc.value = imm2 } }
+{ misc: vsyncpa.u1 [sflag:52], 1 ;
+  .encoding { misc.value = imm2 } }
+# exit bundle: %broadcast_multiply_fusion = fusion(%x.1)

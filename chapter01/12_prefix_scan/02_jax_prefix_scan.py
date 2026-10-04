@@ -1,6 +1,6 @@
 """原生 XLA 的前缀和对照：jnp.cumsum 沿 lane 与沿 sublane。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax.numpy as jnp
 import numpy as np

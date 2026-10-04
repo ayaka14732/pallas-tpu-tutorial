@@ -1,6 +1,6 @@
 """原生 XLA 在单芯片上把 f32[8,128] 乘以 2；打印完整清单的结构概览和 fusion 段，与 Pallas 版本对照。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax
 import jax.numpy as jnp

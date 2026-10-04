@@ -1,6 +1,6 @@
 """原生 XLA 的同一组转置，用与 Pallas 版本相同的方式统计 XLU 的提交与取回。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax
 import jax.numpy as jnp

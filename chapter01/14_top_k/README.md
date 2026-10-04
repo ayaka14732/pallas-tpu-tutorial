@@ -177,7 +177,7 @@ def f(x):
 
 | 运算 | XLA 的实现 | HLO 段 bundle 数 |
 | --- | --- | ---: |
-| top-1 | `custom-call`（TopK） | 1131 |
-| top-8 | `sort`（连同下标 iota 一起排序） | 582 |
+| top-1 | `custom-call`（TopK） | 1100 |
+| top-8 | `sort`（连同下标 iota 一起排序） | 558 |
 
 XLA 对 top-1 调用一个通用的 TopK 实现，对 top-8 则把整行连同下标一起排序再取前 8 个。两者的结果都正确，包括 `-inf` 的边界情况（XLA 的 `top_k` 默认 `is_stable=True`）。但对于“每行 128 个数中取最大的几个”，Pallas 中一次 `vmax.xlane` 加一次 `vmax.index.xlane` 的 argmax，比 XLA 的上千个 bundle 少得多；只是要自己处理上一小节的边界情况。

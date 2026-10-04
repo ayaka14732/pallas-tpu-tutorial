@@ -69,7 +69,13 @@ TPU runtime 在 JAX 第一次访问设备时读取这些变量，所以必须在
 
 `check_vma=False` 关闭 `shard_map` 对“值在各 device 之间是否不同”的类型检查。打开这项检查（`check_vma=True`）时，Pallas 要求在 `out_type` 的 `jax.ShapeDtypeStruct` 上用 `manual_axis_type` 声明输出沿哪些 mesh 轴变化，否则报错。本教程不使用这项检查。
 
-原生 XLA 的 baseline 不需要这一层：它只在 runtime 层限定一颗芯片，由编译器自己决定怎样使用两个 TensorCore。
+原生 XLA 的 baseline 不需要这一层，但也要限定为一个 TensorCore，否则编译器会自己把工作分给两个 TensorCore，与本章的 Pallas kernel 不可比。做法是在 runtime 层再加一个参数，让一颗芯片的两个 TensorCore 各作为一个 device 出现（称为 split-chip）；XLA 的程序默认在第 0 个 device 上运行，也就只用 TensorCore 0。本章的 XLA 实验都调用 `tpu_init.initialise_one_core()`，它在 `initialise_one_chip()` 的基础上多设一个环境变量：
+
+```python
+os.environ['LIBTPU_INIT_ARGS'] = '--deepsea_chip_config_name=legacy'
+```
+
+这样编译出的 XLA 程序是纯粹的单 TensorCore 程序。本章的 Pallas kernel 仍用默认模式加 `num_cores=1`；第二章第 1 节比较这两种组织方式。
 
 ## 第三层：pl.kernel 的参数
 

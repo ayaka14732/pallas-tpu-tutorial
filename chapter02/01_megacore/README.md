@@ -6,7 +6,14 @@
 
 TPU v4 的一颗芯片有两个 TensorCore。默认情况下，runtime 把一颗芯片作为一个 device 交给 JAX，`device.num_cores` 为 2；这种组织方式称为 Megacore。两个 TensorCore 执行同一份程序，各有自己的 TC VMEM、TC VREG、SMEM 和标量寄存器，共享这颗芯片的 HBM。第一章第 2 节的清单中，`sld s6, [smem:0x1]` 读出的就是当前 TensorCore 的编号 0 或 1。
 
-第一章第 3 节已经看到，原生 XLA 会自动利用这一点：它读出 TensorCore 编号，乘以 32 作为行偏移，两个 TensorCore 各算一半。
+原生 XLA 会自动利用这一点。第一章的 XLA baseline 为了只用一个 TensorCore，特意换了一种 runtime 模式（第一章第 1 节）；回到默认模式，同样的 `f32[64,128] × 2`（[源码](04_jax_f32_64x128.py)、[输出](04_jax_f32_64x128.txt)）编译出的 fusion 中，DMA 的长度从 64 变成 32，`vld`、`vmul`、`vst` 从各 8 条变成各 4 条，开头多了两条指令：
+
+```text
+{ s1: sld s6, [smem:0x1] }
+{ s0: sshll.u32 s7, s6, 0x5 }
+```
+
+XLA 读出 TensorCore 编号后乘以 32（左移 5 位），作为 HBM 地址的 granule 偏移：TensorCore 0 处理第 0–31 行，TensorCore 1 处理第 32–63 行。清单中的计数是每个 TensorCore 各执行一份。
 
 ## 写法：num_cores=2 与 axis_index
 
@@ -94,7 +101,7 @@ patched = tpuasm_tools.edit_bundles(serialized, edits)
 
 本小节实验[源码](03_pallas_split_chip.py)、[输出](03_pallas_split_chip.txt)。
 
-TPU v4 的 runtime 还有一种模式：在 TPU 初始化之前，给 libtpu 传入参数 `--deepsea_chip_config_name=legacy`，一颗芯片就作为两个 device 出现，每个 device 只有一个 TensorCore：
+第一章的 XLA baseline 已经用过 runtime 的另一种模式：在 TPU 初始化之前，给 libtpu 传入参数 `--deepsea_chip_config_name=legacy`，一颗芯片就作为两个 device 出现，每个 device 只有一个 TensorCore。那里只用了第 0 个 device；这里把两个都用上：
 
 ```python
 tpu_init.initialise_one_chip()
@@ -118,4 +125,4 @@ mesh = jax.sharding.Mesh(np.array(devices), ('device',))
 - Megacore：一个 kernel 内部可以让两个 TensorCore 分工，并且在第 3、4 节中看到，它们可以共享 Megacore Shared CMEM、相互发起 DMA。代价是编译器插入的跨核汇合。
 - split-chip：每个 TensorCore 的程序最简单，适合两个 TensorCore 完全独立的工作；它们之间的协作要像两个 device 一样，通过集合通信完成（第 5–7 节）。
 
-这个参数是 libtpu 的运行时模式，不是公开稳定的接口，换 libtpu 版本后需要重新确认 `device.num_cores`。本教程其余部分都使用默认的 Megacore 模式。
+这个参数是 libtpu 的运行时模式，不是公开稳定的接口，换 libtpu 版本后需要重新确认 `device.num_cores`。除第一章的 XLA baseline 外，本教程都使用默认的 Megacore 模式。

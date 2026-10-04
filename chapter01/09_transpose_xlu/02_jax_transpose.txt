@@ -34,41 +34,44 @@
   提交到 trf0（vxpose.0.start.8x128）：1
 
 ## f32[256,256]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
-  vld.8x128：32
-  vst.8x128：32
-  从 trf0 取回：16
-  从 trf1 取回：16
-  提交到 trf0（vxpose.0.8x128）：7
-  提交到 trf0（vxpose.0.end.8x128）：1
-  提交到 trf0（vxpose.2.8x128）：7
-  提交到 trf0（vxpose.2.start.8x128）：1
-  提交到 trf1（vxpose.1.8x128）：7
-  提交到 trf1（vxpose.1.end.8x128）：1
-  提交到 trf1（vxpose.3.8x128）：7
-  提交到 trf1（vxpose.3.start.8x128）：1
+  vld.8x128：64
+  vst.8x128：64
+  从 trf0 取回：32
+  从 trf1 取回：32
+  提交到 trf0（vxpose.0.8x128）：14
+  提交到 trf0（vxpose.0.end.8x128）：2
+  提交到 trf0（vxpose.2.8x128）：14
+  提交到 trf0（vxpose.2.start.8x128）：2
+  提交到 trf1（vxpose.1.8x128）：14
+  提交到 trf1（vxpose.1.end.8x128）：2
+  提交到 trf1（vxpose.3.8x128）：14
+  提交到 trf1（vxpose.3.start.8x128）：2
 
 ## f32[129,129]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
-  vld.8x128：17
-  vst.8x128：32
-  从 trf0 取回：16
-  从 trf1 取回：16
-  提交到 trf0（vxpose.0.8x128）：7
-  提交到 trf0（vxpose.0.end.8x128）：1
-  提交到 trf0（vxpose.2.8x128）：7
-  提交到 trf0（vxpose.2.start.8x128）：1
-  提交到 trf1（vxpose.1.8x128）：7
-  提交到 trf1（vxpose.1.end.8x128）：1
-  提交到 trf1（vxpose.3.8x128）：7
-  提交到 trf1（vxpose.3.start.8x128）：1
+  vld.8x128：34
+  vst.8x128：34
+  从 trf0 取回：17
+  从 trf1 取回：17
+  提交到 trf0（vxpose.0.8x128）：14
+  提交到 trf0（vxpose.0.end.8x128）：2
+  提交到 trf0（vxpose.2.8x128）：14
+  提交到 trf0（vxpose.2.start.8x128）：2
+  提交到 trf1（vxpose.1.8x128）：14
+  提交到 trf1（vxpose.1.end.8x128）：2
+  提交到 trf1（vxpose.3.8x128）：14
+  提交到 trf1（vxpose.3.start.8x128）：2
 
 ## bf16[129,129]：数值检查通过；HLO 段：%copy = copy(%xs_0_.1)
-  vld.8x128：9
-  vpackc.8x128.f32.f16：16
-  vst.8x128：16
-  vunpackl.8x128.f16.f32：9
-  vunpacku.8x128.f16.f32：8
+  vand.8x128.u32：17
+  vld.8x128：17
+  vpack.8x128.f32.f16：32
+  vpackc.8x128.f32.f16：17
+  vshll.8x128.s32：17
+  vst.8x128：17
+  vunpackl.8x128.f16.f32：17
+  vunpacku.8x128.f16.f32：17
   从 trf0 取回：16
-  从 trf1 取回：16
+  从 trf1 取回：1
   提交到 trf0（vxpose.0.8x128）：7
   提交到 trf0（vxpose.0.end.8x128）：1
   提交到 trf0（vxpose.2.8x128）：7

@@ -194,15 +194,6 @@ def kernel(x_hbm: Ref, y_hbm: Ref, o_hbm: Ref, x_vmem: Ref, y_vmem: Ref, sems: R
 
 本小节实验[源码](06_jax_f32_64x128.py)、[输出](06_jax_f32_64x128.txt)。
 
-XLA baseline 直接编译 `lambda x: x * 2.0`，输入为 `f32[64,128]`，不写任何 DMA。XLA 对 `f32[64,128] × 2` 生成的 fusion 中，DMA 是 `dma.strided ... length=32`，而 `vld`、`vmul.8x128.f32`、`vst` 各只有 4 条，正好是全部 8 个 tile 的一半。开头的指令解释了原因：
+XLA baseline 直接编译 `lambda x: x * 2.0`，输入为 `f32[64,128]`，不写任何 DMA。XLA 生成的 fusion 与本节第一个 Pallas kernel 结构相同：一次 HBM → TC VMEM 的 DMA（`length=64`），8 条 `vld`、8 条 `vmul.8x128.f32`、8 条 `vst`，一次 TC VMEM → HBM 的 DMA。
 
-```text
-{ s1: sld s6, [smem:0x1] }
-{ s0: sshll.u32 s7, s6, 0x5 }
-```
-
-XLA 读出 TensorCore 编号后乘以 32（左移 5 位），作为 HBM 地址的 granule 偏移：TensorCore 0 处理第 0–31 行，TensorCore 1 处理第 32–63 行。与第 2 节只有一个 tile 的例子不同，这次 XLA 让两个 TensorCore 各算一半，清单中的计数是每个 TensorCore 各执行一份。
-
-> 暂且可以理解为：XLA 会自动把一颗芯片上的工作分给两个 TensorCore。第二章第 1 节详细介绍这种分工，以及 Pallas 中如何显式地做到同样的事。
-
-另外，XLA 的每次 DMA 都带越界检查（`shalt`），并把行窗口写成 `dma.strided`，而 Pallas 对连续的窗口直接用 `dma.simple`。
+不同之处有两点：XLA 的每次 DMA 都带越界检查（`shalt`）；它把整块数组的搬运也写成 `dma.strided`，stride 与每段的长度相同（三个参数都是同一个寄存器），效果与 `dma.simple` 一样，而 Pallas 对连续的窗口直接用 `dma.simple`。

@@ -71,8 +71,8 @@ def main() -> None:
             done = time.perf_counter()
             dispatch.append(returned - start)
             synchronized.append(done - start)
-        print(f'1. 调用返回：中位数 {xprof_tools.host_cycles(statistics.median(dispatch))}')
-        print(f'2. 调用并等到结果：中位数 {xprof_tools.host_cycles(statistics.median(synchronized))}')
+        print(f'1. 调用返回：中位数 {xprof_tools.microseconds(statistics.median(dispatch))}')
+        print(f'2. 调用并等到结果：中位数 {xprof_tools.microseconds(statistics.median(synchronized))}')
         # 连续调用而不等结果：每次调用的输入都是上一次的输出。
         calls = []
         result = x
@@ -83,7 +83,7 @@ def main() -> None:
             calls.append(time.perf_counter() - start)
         result.block_until_ready()
         total = time.perf_counter() - begin
-        print(f'3. 连续调用 {CALLS} 次：第 1–30 次每次中位数 {xprof_tools.host_cycles(statistics.median(calls[:30]))}，第 35–64 次每次中位数 {xprof_tools.host_cycles(statistics.median(calls[34:]))}；从开始到等到最后一个结果，平均每次 {xprof_tools.host_cycles(total / CALLS)}')
+        print(f'3. 连续调用 {CALLS} 次：第 1–30 次每次中位数 {xprof_tools.microseconds(statistics.median(calls[:30]))}，第 35–64 次每次中位数 {xprof_tools.microseconds(statistics.median(calls[34:]))}；从开始到等到最后一个结果，平均每次 {xprof_tools.microseconds(total / CALLS)}')
         events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(x).block_until_ready() for _ in range(8)], Path('/tmp/pallas_tpu_tutorial/xprof')))
         for device in sorted({event['device'] for event in events}):
             for track in ('XLA Modules', 'XLA Ops'):

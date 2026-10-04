@@ -28,7 +28,7 @@ print(tpuasm_tools.listing_outline(compiled))  # 完整清单的结构概览
 print(tpuasm_tools.kernel_listing(compiled))   # 只含 kernel 的清单
 ```
 
-本章 Pallas 实验的指令全部由 TensorCore 0 执行。XLA baseline 则可能把工作分给两个 TensorCore；遇到这种情况时，清单中的计数是每个 TensorCore 各执行一份，正文会单独说明。
+本章 Pallas 实验的指令全部由 TensorCore 0 执行。XLA baseline 在 split-chip 模式下编译（第 1 节），同样只用 TensorCore 0。
 
 ## 完整清单的结构
 
@@ -130,11 +130,11 @@ kernel 段分为三个区间。第一个区间判断由谁执行：
 
 ## 对照：原生 XLA 的同一运算
 
-XLA baseline 的 fusion 段有 38 个 bundle（Pallas kernel 主体区间是 9 个），计算核心同样是 1 条 `vld`、1 条 `vmul.8x128.f32`、1 条 `vst` 和 2 条 `dma.simple`。它开头也读取 TensorCore 编号，并让编号非 0 的 TensorCore 跳过 fusion：这个只有一个 tile 的运算，XLA 也只交给 TensorCore 0 执行。
+XLA baseline 的 fusion 段有 33 个 bundle（Pallas kernel 主体区间是 9 个），计算核心同样是 1 条 `vld`、1 条 `vmul.8x128.f32`、1 条 `vst` 和 2 条 `dma.simple`。split-chip 模式下程序只属于一个 TensorCore，所以它开头没有读取 TensorCore 编号、让另一个 TensorCore 跳过的那几条指令。
 
 多出来的代码主要有两类：
 
 - 每次 DMA 之前，都有一串 `sadd/slt/sne/por` 和一条带谓词的 `shalt`。这是越界检查：地址超出 buffer 时让 TensorCore 停机。Pallas 实验用 `disable_bounds_checks=True` 关掉了这类检查。
 - `vsyncpa.u1` 在进入和离开 fusion 时设置 DMA 同步标志的状态。
 
-XLA 的 fusion 没有 Pallas kernel 末尾的跨核汇合区间。这正是本教程的出发点：读 XLA 生成的清单，弄清它实际做了什么，再决定手写版本在哪里可以做得不同。
+XLA 的 fusion 也没有 Pallas kernel 末尾的跨核汇合区间。这正是本教程的出发点：读 XLA 生成的清单，弄清它实际做了什么，再决定手写版本在哪里可以做得不同。

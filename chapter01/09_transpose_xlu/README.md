@@ -153,4 +153,4 @@ XLA 中转置是一条改变 layout 的 `copy`。同样的七个条件中，有�
 - bf16：XLA 先 unpack 成 f32，按 16 个 b32 TC VREG 提交，再 pack 写回（8 次 `vunpackl`、8 次 `vunpacku`、16 次提交、8 次 `vpackc`）。Pallas 直接以打包格式提交 8 次，XLU 的工作量是 XLA 的一半。
 - 多个矩阵：XLA 为每个矩阵生成一条独立的 `copy`，三个矩阵的 48 次提交全部进入 `trf0`，第二个 XLU 闲置。Pallas 在同一个 kernel 中把它们分给两个 XLU。
 
-`f32[256,256]` 和两个 `129×129` 的条件下，XLA 清单中的 `vld` 只有 Pallas 的一半左右（32、17、9 次）。XLA 把这些转置分给了两个 TensorCore，清单中的计数是每个 TensorCore 各执行一份，与 Pallas 单个 TensorCore 的计数不能直接比较。
+`f32[256,256]` 和 `f32[129,129]` 的条件下，XLA 与 Pallas 一样把四个区域分给 `trf0` 和 `trf1`，提交和取回的次数相同。

@@ -1,6 +1,6 @@
 """原生 XLA 的矩阵乘法对照：bf16[16,128] @ bf16[128,128]、RHS 以 (N,K) 存放、f32 输入、bf16[128,128] @ bf16[128,128]。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialise_one_core()
 
 import jax
 import jax.numpy as jnp

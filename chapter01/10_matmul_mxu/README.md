@@ -159,4 +159,4 @@ fixed = tpuasm_tools.insert_bundles(
 
 本小节实验[源码](04_jax_dot.py)、[输出](04_jax_dot.txt)。
 
-XLA 的矩阵乘法同样是 push、`vdwg`、`vmatmul`、`vpop`，RHS 转置时同样用 `vmatpush.packed.xpose` 和 `gsft0`，f32 输入同样先打包成 bf16。区别在于 XLA 把 16 行 LHS 分给两个 TensorCore，每个只处理 8 行：清单中的 `vmatmul` 是 `vmatmul.8x128.f32`，先把 LHS unpack 成 f32 再送入。`[128,128] @ [128,128]` 时，XLA 每个 TensorCore 用 4 个 MXU 各乘 1 块，Pallas 单个 TensorCore 用 4 个 MXU 各乘 2 块。
+XLA 的矩阵乘法与 Pallas 是同一套做法：push、`vdwg`、`vmatmul.packed`、`vpop`，RHS 转置时同样用 `vmatpush.packed.xpose` 和 `gsft0`，f32 输入同样先打包成 bf16（9 条 `vpackc`：8 条给 RHS，1 条给 LHS）。`[16,128] @ [128,128]` 是 8 次 push、1 次 `vmatmul.packed`、2 次 `vpop`；`[128,128] @ [128,128]` 时用 4 个 MXU，各装入一份 RHS、各乘 2 块、各取回 4 次。在矩阵乘法上，手写 kernel 相对 XLA 的余地不在单次乘法的指令，而在数据怎样送到 MXU 跟前（第二章第 9 节）。

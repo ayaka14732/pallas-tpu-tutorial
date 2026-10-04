@@ -56,10 +56,10 @@ def main() -> None:
     print('## 方法 1：每次调用并等到结果，固定同一个输入')
     for name, compiled in candidates.items():
         compiled(x).block_until_ready()
-        print(f'  {name}：{xprof_tools.host_cycles(synchronized(compiled, [x] * SAMPLES))}')
+        print(f'  {name}：{xprof_tools.microseconds(synchronized(compiled, [x] * SAMPLES))}')
     print('## 方法 2：每次调用并等到结果，每次一个新的输入数组')
     for name, compiled in candidates.items():
-        print(f'  {name}：{xprof_tools.host_cycles(synchronized(compiled, fresh))}')
+        print(f'  {name}：{xprof_tools.microseconds(synchronized(compiled, fresh))}')
     print('## 方法 3：XProf，每次一个新的输入数组')
     for name, compiled in candidates.items():
         events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(array).block_until_ready() for array in fresh[:16]], Path('/tmp/pallas_tpu_tutorial/xprof')))
@@ -79,13 +79,13 @@ def main() -> None:
             looped(x).block_until_ready()
             times[count] = synchronized(looped, [x] * 10)
             if count == 32:
-                print(f'  {name}：每次 {xprof_tools.host_cycles((times[32] - times[16]) / 16)}；循环版本的 HLO 中 {memory_notes(looped)}')
+                print(f'  {name}：每次 {xprof_tools.microseconds((times[32] - times[16]) / 16)}；循环版本的 HLO 中 {memory_notes(looped)}')
     print('## 方法 5：方法 2 按 AB/BA 交替做 4 轮')
     for round_index in range(4):
         names = list(candidates)
         order = names if round_index % 2 == 0 else names[::-1]
         results = {name: synchronized(candidates[name], fresh) for name in order}
-        print(f'  第 {round_index + 1} 轮（{"、".join(order)}）：' + '，'.join(f'{name} {xprof_tools.host_cycles(results[name])}' for name in names))
+        print(f'  第 {round_index + 1} 轮（{"、".join(order)}）：' + '，'.join(f'{name} {xprof_tools.microseconds(results[name])}' for name in names))
 
 if __name__ == '__main__':
     main()

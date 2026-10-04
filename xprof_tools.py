@@ -37,6 +37,6 @@ def duration_cycles(event: dict) -> float:
     """事件在设备上的持续时间，按 1.05 GHz 换算成 TensorCore 的周期数。"""
     return duration_us(event) * CYCLES_PER_US
 
-def host_cycles(seconds: float) -> str:
-    """主机时钟测得的一段时间，按 1.05 GHz 换算成周期数，并附上原始的微秒数。"""
-    return f'{seconds * 1e6 * CYCLES_PER_US:.0f} 个周期（{seconds * 1e6:.1f} µs）'
+def microseconds(seconds: float) -> str:
+    """主机时钟测得的一段时间，写成微秒。"""
+    return f'{seconds * 1e6:.1f} µs'
