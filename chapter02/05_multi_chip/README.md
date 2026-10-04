@@ -92,7 +92,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 { ... misc: vwait.ge [sflag:8], 0 }
 ```
 
-**四方汇合。** 循环中的四次 `pl.semaphore_signal(ready, 1, device_id={'device': rank, 'tc': 0})` 变成四条 `vsyncadd.remote`，目标的编号是常数：32776、294920、819208、557064，即十六进制的 `0x08008`、`0x48008`、`0xC8008`、`0x88008`。拆开看，低位的 `8` 是汇合用的信号量 `sflag 8`（`get_barrier_semaphore`，第 4 节），`0x8000` 是一个固定的位，第 18 位起是芯片编号：0、1、3、2，正是 mesh 位置 0–3 对应的芯片。rank 是常数，编译器在编译时就查好了表。`pl.semaphore_wait(ready, 4)` 变成两条指令：先把本地的 `sflag 8` 减 4，再等它不小于 0，即四个信号都已到达。
+**四方汇合。** 循环中的四次 `pl.semaphore_signal(ready, 1, device_id={'device': rank, 'tc': 0})` 变成四条 `vsyncadd.remote`，目标的编号是常数：32776、294920、819208、557064，即十六进制的 `0x08008`、`0x48008`、`0xC8008`、`0x88008`。按第 1 节的格式拆开：低位的 `8` 是汇合用的信号量 `sflag 8`（`get_barrier_semaphore`，第 4 节），`0x8000` 是 `(2 + TensorCore 编号) << 14`，即目标芯片的 TensorCore 0，第 18 位起是芯片编号：0、1、3、2，正是 mesh 位置 0–3 对应的芯片。rank 是常数，编译器在编译时就查好了表。`pl.semaphore_wait(ready, 4)` 变成两条指令：先把本地的 `sflag 8` 减 4，再等它不小于 0，即四个信号都已到达。
 
 ```text
 { s0: sadd.s32 s0, 1, s20 ; ... }       # me + 1
@@ -105,7 +105,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 { misc: vwait.ge [sflag:54], 8 }        # wait_recv
 ```
 
-**目标芯片与 remote DMA。** `(me + 1) % 4` 在运行时才知道，于是先算出 mesh 位置，再用 `sld` 从表中查出芯片编号，与常数 `0x88008000` 合成 `ici_dest`。第 6 节会看到，这个常数的第 26–28 位指定由目标芯片上的哪个 TensorCore 接收。DMA 本身是一条 `dma.general`，两端都是 TC VMEM，长度 8 个 granule（4 KiB）。`src_flag` 是本地的 `sems.at[1]`（`sflag 53`），数据发完后它增加，`wait_send` 就等它；`dst_flag` 是 `0x4000 | 54`，指向接收方的 `sems.at[2]`，数据到达对方后对方的这个信号量增加，`wait_recv` 等的是本地同一个编号的信号量，即别的芯片发给自己的那一次。
+**目标芯片与 remote DMA。** `(me + 1) % 4` 在运行时才知道，于是先算出 mesh 位置，再用 `sld` 从表中查出芯片编号，与常数 `0x88008000` 合成 `ici_dest`。第 6 节会看到，这个常数的第 26–28 位指定由目标芯片上的哪个 TensorCore 接收。DMA 本身是一条 `dma.general`，两端都是 TC VMEM，长度 8 个 granule（4 KiB）。`src_flag` 是本地的 `sems.at[1]`（`sflag 53`），数据发完后它增加，`wait_send` 就等它；`dst_flag` 是 `0x4000 | 54`，即 `(2 + TensorCore 编号) << 13 | 54`（第 4 节），指向接收方 TensorCore 0 的 `sems.at[2]`，数据到达对方后对方的这个信号量增加，`wait_recv` 等的是本地同一个编号的信号量，即别的芯片发给自己的那一次。
 
 同一颗芯片内的 remote DMA（第 4 节）与跨芯片的写法完全相同，只是 `ici_dest` 中的芯片编号就是自己。
 

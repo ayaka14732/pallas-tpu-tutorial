@@ -61,14 +61,19 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
 { s1: sld s6, [smem:0x1] }                       # 自己的编号
 { s1: sld s7, [smem:0x0] }                       # 芯片的编号
 { s0: sadd.s32 s8, 1, s6 }
-{ s0: sand.u32 s9, 0x1, s8 }                     # 对方的编号：(自己 + 1) mod 2
-...                                              # 拼出对方 sflag 45 的地址
+{ s0: sand.u32 s9, 0x1, s8 ; s1: sand.u32 s10, 0xfff, s7 }   # 对方的编号：(自己 + 1) mod 2
+{ s0: sand.u32 s11, 0x3, s9 ; s1: sshll.u32 s13, s10, 0x12 } # 芯片编号 << 18
+{ s0: sshll.u32 s12, s11, 0x10 }
+{ s0: sadd.s32 s14, 131072, s12 }
+{ s0: sshrl.u32 s15, s14, 0x2 }                  # (2 + 对方的编号) << 14
+{ s0: sor.u32 s16, 0x2d, s15 }                   # 低位是同步标志的编号 45
+{ s0: sor.u32 s17, s16, s13 }
 { misc: vsyncadd.remote.s32 [sflag:s17], 1 }     # 给对方的 sflag 45 加 1
 { misc: vwait.ge [sflag:45], 1 }                 # 等自己的 sflag 45 被对方加到 1
 { misc: vsyncadd.s32 [sflag:45], -1 }            # 减回 0
 ```
 
-`vsyncadd.remote` 修改的不是自己的同步标志，而是另一个 TensorCore 的。两个 TensorCore 各给对方加 1，再各等自己的标志变成 1：先到的一方停在 `vwait.ge`，直到后到的一方也执行了 `vsyncadd.remote`。这是一个两方的汇合（barrier）：执行完这一段时，两个 TensorCore 都已经到达这里。
+`vsyncadd.remote` 修改的不是自己的同步标志，而是另一个 TensorCore 的。它的地址操作数由三部分拼成：`芯片编号 << 18`、`(2 + TensorCore 编号) << 14` 和同步标志的编号。`131072` 是 `2 << 16`，加上 `对方的编号 << 16` 再右移 2 位，就是中间那一项；TensorCore 0 时它是 `0x8000`，TensorCore 1 时是 `0xc000`。这里目标就在本芯片上，芯片编号取自己的；第 5 节换成别的芯片的编号，同一条指令就能给另一颗芯片上的 TensorCore 发信号。两个 TensorCore 各给对方加 1，再各等自己的标志变成 1：先到的一方停在 `vwait.ge`，直到后到的一方也执行了 `vsyncadd.remote`。这是一个两方的汇合（barrier）：执行完这一段时，两个 TensorCore 都已经到达这里。
 
 `num_cores=1` 时，kernel 出口也有这样一段汇合，只是入口没有，因为 TensorCore 1 什么都不做。
 

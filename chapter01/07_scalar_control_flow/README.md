@@ -44,6 +44,15 @@ def kernel(x_hbm: Ref, s_hbm: Ref, o_hbm: Ref, x_vmem: Ref, s_smem: Ref, sem: Re
 
 - 标量参与向量运算前，要先用 `vmov` 把它广播成一个 TC VREG（`vmov.8x128 v2, s16`），再做向量乘法。与之对照，常数 2.0 可以直接写成 `vmul` 的立即数操作数，不需要广播。
 
+SMEM 的容量是 1 MiB，即 262144 个 32 bit 字，其中最高的一小段由 runtime 使用（[源码](05_pallas_smem_capacity.py)、[输出](05_pallas_smem_capacity.txt)）：
+
+```text
+pltpu.SMEM((131072,), f32)，512 KiB：数值检查通过
+pltpu.SMEM((262144,), f32)，1024 KiB：编译失败：... Used 1.00M of 1.00M smem. Exceeded smem capacity by 136B.
+```
+
+前面清单中读 TensorCore 编号的 `[smem:0x1]`，就是 runtime 放在 SMEM 最低处的值。
+
 ## 循环：pl.loop
 
 本小节实验[源码](02_pallas_loops.py)、[输出](02_pallas_loops.txt)。

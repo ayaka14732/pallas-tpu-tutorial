@@ -1,0 +1,3 @@
+pltpu.VMEM((16384, 128), f32)，8 MiB：数值检查通过；{ vst: vst.8x128 [vmem:0x3ff8], v1 }
+pltpu.VMEM((32768, 128), f32)，16 MiB：数值检查通过；{ vst: vst.8x128 [vmem:0x7ff8], v1 }
+pltpu.VMEM((34816, 128), f32)，17 MiB：编译失败：RESOURCE_EXHAUSTED: Allocation (size=17825792) would exceed memory (size=16777216)

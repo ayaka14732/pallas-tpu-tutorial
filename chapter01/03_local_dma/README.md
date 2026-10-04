@@ -155,6 +155,27 @@ result = tpuasm_tools.load(patched, carrier)(x)
 
 这个例子说明：Mosaic 拒绝一个窗口，是因为它只会为一个窗口生成一条 DMA；DMA 引擎本身可以以单个 granule 为粒度选择起点和长度，用多条 DMA 拼出任意的行窗口。
 
+## 只改 buffer 大小：TC VMEM 有多大
+
+本小节实验[源码](07_pallas_vmem_capacity.py)、[输出](07_pallas_vmem_capacity.txt)。
+
+第 1 节的最小 kernel，只把 scratch buffer 改大（`pltpu.VMEM((rows, 128), x.dtype)`），并只用它的最后 8 行：
+
+```python
+last = x_vmem.at[pl.ds(rows - 8, 8)]
+pltpu.async_copy(x_hbm, last, sem).wait()
+last[...] = last[...] * 2.0
+pltpu.async_copy(last, o_hbm, sem).wait()
+```
+
+```text
+pltpu.VMEM((16384, 128), f32)，8 MiB：数值检查通过；{ vst: vst.8x128 [vmem:0x3ff8], v1 }
+pltpu.VMEM((32768, 128), f32)，16 MiB：数值检查通过；{ vst: vst.8x128 [vmem:0x7ff8], v1 }
+pltpu.VMEM((34816, 128), f32)，17 MiB：编译失败：RESOURCE_EXHAUSTED: Allocation (size=17825792) would exceed memory (size=16777216)
+```
+
+每个 TensorCore 的 TC VMEM 是 16 MiB，即 4096 个 f32 TC VREG 的数据。地址以 512 B 为单位（第 4 节），最后一个 tile 在 `0x7ff8`，整个地址空间是 `0x8000` 个单位。这 16 MiB 由 kernel 的全部 scratch buffer 共用，编译器存放放不进寄存器的中间值也要占用其中一部分。超过这个大小的数据只能分块：一次搬一部分进来，算完写回，再搬下一部分。第二章第 2 节讨论怎样组织这样的流水。
+
 ## 只改信号量数量：等待可以合并
 
 本小节实验[源码](05_pallas_two_inputs_async.py)、[输出](05_pallas_two_inputs_async.txt)。
@@ -180,8 +201,8 @@ def kernel(x_hbm: Ref, y_hbm: Ref, o_hbm: Ref, x_vmem: Ref, y_vmem: Ref, sems: R
 ```text
 { s0: dma.simple [vmem:s10], [hbm:s0], length=64, dst_flag=[sflag:52] }
 { s0: dma.simple [vmem:s13], [hbm:s1], length=64, dst_flag=[sflag:52] }
-{ misc: vwait.ge [sflag:52], 128 ;
-  misc: vsyncadd.s32 [sflag:52], -128 }
+{ misc: vwait.ge [sflag:52], 128 }
+{ misc: vsyncadd.s32 [sflag:52], -128 }
 ```
 
 同步标志只是一个计数器：它统计已到达的 granule 总数，不记录是哪一次 DMA 送来的。共用信号量时，TensorCore 无法只等 x 而不等 y。需要“x 一到就开始计算”时，就要给 x 单独的信号量。第二章会用这一点组织软件流水线。

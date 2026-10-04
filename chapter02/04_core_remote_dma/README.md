@@ -38,24 +38,33 @@ pltpu.async_copy(recv_vmem, o_hbm.at[core], sems.at[3]).wait()
 
 ```text
 { s0: ssub.s32 s23, 1, s6 }                       # 对方编号 1 − core
-...                                               # 拼出对方信号量 8 的地址
+{ s0: sand.u32 s24, 0x3, s23 }
+{ s0: sshll.u32 s25, s24, 0x10 }
+{ s0: sadd.s32 s26, 131072, s25 }
+{ s0: sshrl.u32 s27, s26, 0x2 }                   # (2 + 对方编号) << 14
+{ s0: sor.u32 s28, 0x8, s27 }                     # 低位是信号量的编号 8
 { misc: vsyncadd.remote.s32 [sflag:s28], 1 }      # semaphore_signal：给对方的 sflag 8 加 1
 { misc: vsyncadd.s32 [sflag:8], -1 }              # semaphore_wait：先减 1
 { misc: vwait.ge [sflag:8], 0 }                   #                再等它回到 0 以上
 ```
 
-barrier 信号量就是 `sflag:8`。`semaphore_wait(ready, 1)` 的写法是先减 1、再等它不小于 0：对方的信号先到时，计数从 1 减到 0，立即通过；后到时，计数先变成 −1，等对方加 1。这与第 1 节编译器插入的汇合是同一组指令。
+barrier 信号量就是 `sflag:8`。地址的拼法与第 1 节编译器插入的汇合相同，只是 `device_id` 没有指定芯片，芯片字段留作 0。`semaphore_wait(ready, 1)` 的写法是先减 1、再等它不小于 0：对方的信号先到时，计数从 1 减到 0，立即通过；后到时，计数先变成 −1，等对方加 1。这与第 1 节编译器插入的汇合是同一组指令。
 
 remote DMA 是一条 `dma.general`：
 
 ```text
+{ s0: sshll.u32 s29, s23, 0x1a ; s1: sshll.u32 s30, s23, 0xd }     # 对方编号 << 26；对方编号 << 13
+{ s0: sadd.s32 s2, 134217728, s29 ; s1: sadd.s32 s3, 16384, s30 }  # (2 + 对方编号) << 26；(2 + 对方编号) << 13
+{ s0: sor.u32 s4, 0x80008000, s2 ; s1: sor.u32 s0, 0x36, s3 }      # ici_dest；dst_flag = … | 54
+{ s0: sand.u32 s5, 0xfffff000, s4 ; s1: simm.s32 s7, 8 }
+{ s0: simm.s32 s8, 53 }
 { s0: dma.general [vmem:s7], [vmem:s22], length=8, stride_descriptor=[smem:0x0], stride_count=0,
-      src_flag=[sflag:s8], dst_flag=[sflag:s0], ici_dest=... }
+      src_flag=[sflag:s8], dst_flag=[sflag:s0], ici_dest=s5 }
 { misc: vwait.ge [sflag:53], 8 }                  # wait_send：等自己的发送信号量
 { misc: vwait.ge [sflag:54], 8 }                  # wait_recv：等自己的接收信号量
 ```
 
-源和目的都是 `[vmem:...]`，目的地址指的是对方 TensorCore 的 TC VMEM。`src_flag` 是发送信号量（`sflag:53`），数据发出后它在本方加 8；`dst_flag` 是对方的接收信号量（地址由寄存器 `s0` 给出，其中编码了对方的编号），数据到达后它在对方加 8。双方执行同样的指令，所以每方的接收信号量 `sflag:54` 由对方的 DMA 填满。第一章第 3 节 HBM → HBM 复制时出现过的 `dma.general` 与 `ici_dest`，在这里有了用途：它们描述的是目的地在哪个 TensorCore、哪颗芯片。
+源和目的都是 `[vmem:...]`，目的地址指的是对方 TensorCore 的 TC VMEM。`src_flag` 是发送信号量（`sflag:53`），数据发出后它在本方加 8；`dst_flag` 是对方的接收信号量 `(2 + 对方编号) << 13 | 54`，数据到达后它在对方加 8。`ici_dest` 是 `0x80008000 | (2 + 对方编号) << 26`，低 12 位留给芯片编号，这里为 0。三处都用“2 + TensorCore 编号”表示目标 TensorCore，只是所在的位不同。双方执行同样的指令，所以每方的接收信号量 `sflag:54` 由对方的 DMA 填满。第一章第 3 节 HBM → HBM 复制时出现过的 `dma.general` 与 `ici_dest`，在这里有了用途：它们描述的是目的地在哪个 TensorCore、哪颗芯片。
 
 > 暂且可以理解为：`ici_dest` 编码了目的 TensorCore 所在的芯片与编号，同一颗芯片内与跨芯片使用同样的格式。第 5、6 节会看到跨芯片的情况，并用 tpuasm 改写其中的字段。
 
