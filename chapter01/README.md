@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | 第 3 节 | 多列 tile 数组的非对齐行窗口被 Mosaic 拒绝 | 用 tpuasm 改写为两条 `dma.strided` |
 | 第 6 节 | 无符号整数的 `maximum` 无法编译；32 bit 整数乘法要 33 条指令 | 改用有符号比较；设计算法时避开整数乘法 |
-| 第 8 节 | sublane 方向的 gather 被拒绝 | 用 sublane 循环移位与选择合成 |
+| 第 8 节 | 子通道方向的 gather 被拒绝 | 用子通道循环移位与选择合成 |
 | 第 10 节 | `matmul_push_rhs`/`matmul_lhs_fifo` 在 TPU v4 上结果错误；int8 矩阵乘法无法编译 | 用 tpuasm 插入 `vdwg` 修正；int8 尚未处理 |
 | 第 12 节 | `jnp.cumsum` 无法降低 | 手写扫描，或用 `stride=0` 的逐行广播 |
 | 第 14 节 | `top_k` 在有效值少于 k 个时返回重复下标 | 手写：用掩码记录已选位置，开销与 `top_k` 相当 |

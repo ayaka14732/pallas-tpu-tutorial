@@ -33,7 +33,7 @@ prng_seed(7,)：状态与主机上的 threefry2x32(key=(7, 7), 计数器=(i, i))
 prng_seed(7, 1)：状态与主机上的 threefry2x32(key=(1, 7), 计数器=(i, i)) 两个输出字的异或一致：True
 ```
 
-所以 `prng_seed` 的展开可以完整写出：第 i 个元素（`vlaneseq` 给出的序号，i = sublane × 128 + lane）以 `(i, i)` 为计数器做一次 threefry2x32，key 是倒序的两个种子，只有一个种子时两个字相同；两个输出字异或，得到的 TC VREG 交给 `setrngseed`。`setrngseed` 只取前两个 sublane（第 1 节），所以真正用到的是 i = 0–255 这 256 个值，正好是 64 个生成器各 128 位的状态。
+所以 `prng_seed` 的展开可以完整写出：第 i 个元素（`vlaneseq` 给出的序号，i = sublane × 128 + lane）以 `(i, i)` 为计数器做一次 threefry2x32，key 是倒序的两个种子，只有一个种子时两个字相同；两个输出字异或，得到的 TC VREG 交给 `setrngseed`。`setrngseed` 只取前两个子通道（第 1 节），所以真正用到的是 i = 0–255 这 256 个值，正好是 64 个生成器各 128 位的状态。
 
 之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
 
@@ -68,7 +68,7 @@ prng_seed(0)：输出中 0 的个数 0 / 1024
 prng_seed(7, core)：两个 TensorCore 的输出相同 False
 ```
 
-与第 2 节的硬件行为一致：`prng_seed` 的混合运算只用 lane 编号和种子，不会自动加入核编号。多个 TensorCore 要得到不同的序列，必须像 `prng_seed(7, core)` 这样把 `jax.lax.axis_index('tc')` 写进种子；多颗芯片同理，加入 `jax.lax.axis_index('device')`。
+与第 2 节的硬件行为一致：`prng_seed` 的混合运算只用通道编号和种子，不会自动加入核编号。多个 TensorCore 要得到不同的序列，必须像 `prng_seed(7, core)` 这样把 `jax.lax.axis_index('tc')` 写进种子；多颗芯片同理，加入 `jax.lax.axis_index('device')`。
 
 `prng_seed` 之后，状态随每条 `vrng` 推进，结果取决于此前生成了多少次。在循环中生成时，只在循环之前设一次种子；每次迭代都设同一个种子，每次迭代就会得到相同的随机数。
 

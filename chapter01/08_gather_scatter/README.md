@@ -12,7 +12,7 @@
 x_vmem[...] = f(x_vmem[...], i_vmem[...])
 ```
 
-第一个 `f` 是沿 lane 的 gather，每个输出位置从同一行的任意一列取值：
+第一个 `f` 是沿通道的 gather，每个输出位置从同一行的任意一列取值：
 
 ```python
 f = lambda x, i: jnp.take_along_axis(x, i, axis=1)   # y[s,l] = x[s, i[s,l]]
@@ -46,7 +46,7 @@ f = lambda x, i: jnp.take_along_axis(x, i, axis=0)   # y[s,l] = x[i[s,l], l]
 Sublane gather not supported by this TPU generation
 ```
 
-TPU v4 的 XLU 只能沿 lane 方向按索引重排。但沿 sublane 方向有另一条指令：`vrot.slane.down` 把 8 个 sublane 循环移动一位，第 s 个 sublane 的内容移到第 s − 1 个，第 0 个绕到第 7 个。有了“整体移动”和“逐元素选择”，就能合成任意的 sublane gather：第 k 轮把 x 这样移动 k 次，这时第 s 行第 l 列放的是 `x[(s+k)%8, l]`；凡是 `i[s,l] == (s+k)%8` 的位置，就选这一轮的值。
+TPU v4 的 XLU 只能沿通道方向按索引重排。但沿子通道方向有另一条指令：`vrot.slane.down` 把 8 个子通道循环移动一位，第 s 个子通道的内容移到第 s − 1 个，第 0 个绕到第 7 个。有了“整体移动”和“逐元素选择”，就能合成任意的 sublane gather：第 k 轮把 x 这样移动 k 次，这时第 s 行第 l 列放的是 `x[(s+k)%8, l]`；凡是 `i[s,l] == (s+k)%8` 的位置，就选这一轮的值。
 
 ```python
 def sublane_gather_by_rotation(x, indices):
@@ -61,7 +61,7 @@ def sublane_gather_by_rotation(x, indices):
 
 `jax.lax.broadcasted_iota(dtype, shape, axis)` 生成沿 axis 递增的序号，这里得到每个位置的行号。`pltpu.roll(x, shift, axis)` 是循环移位，语义与 `np.roll` 相同：`out[s] = x[(s - shift) % 8]`，`shift=7` 时 `out[s] = x[(s + 1) % 8]`，正是一条 `vrot.slane.down`。
 
-这个函数数值正确，共 40 条计算指令，其中 7 条 `vrot.slane.down`、8 条 `vsel`，其余是比较和行号计算。与 lane gather 的 3 条 XLU 指令相比，开销高出一个数量级。它说明了本教程反复出现的一种情况：编译器拒绝，不代表硬件做不到；但硬件没有直接支持的操作，合成出来通常很贵。设计数据布局时，应当让需要按索引重排的轴落在 lane 方向。
+这个函数数值正确，共 40 条计算指令，其中 7 条 `vrot.slane.down`、8 条 `vsel`，其余是比较和行号计算。与 lane gather 的 3 条 XLU 指令相比，开销高出一个数量级。它说明了本教程反复出现的一种情况：编译器拒绝，不代表硬件做不到；但硬件没有直接支持的操作，合成出来通常很贵。设计数据布局时，应当让需要按索引重排的轴落在通道方向。
 
 ## 固定位移的循环移位
 
@@ -72,14 +72,14 @@ f = lambda x, i: pltpu.roll(x, 5, axis=1)   # lane 方向移动 5 位
 f = lambda x, i: pltpu.roll(x, 3, axis=0)   # sublane 方向移动 3 位
 ```
 
-lane 方向的移位是一次 XLU 操作，位移量放在标量寄存器中：
+通道方向的移位是一次 XLU 操作，位移量放在标量寄存器中：
 
 ```text
 { vx0: vrot.0.8x128 trf0, v0, s16 }
 { vr0: vpop.8x128 v1, trf0 }
 ```
 
-sublane 方向则是 5 条 `vrot.slane.down.8x128.u32`。这条指令没有位移量操作数，每次只能把内容移到编号小 1 的 sublane，也没有反方向的指令；`roll(x, 3, axis=0)` 要把内容移到编号大 3 的 sublane，等于朝反方向移 5 次，于是要 5 条。上面合成 sublane gather 时，每轮的 `roll(rotated, 7, axis=0)` 只需一条。
+子通道方向则是 5 条 `vrot.slane.down.8x128.u32`。这条指令没有位移量操作数，每次只能把内容移到编号小 1 的 sublane，也没有反方向的指令；`roll(x, 3, axis=0)` 要把内容移到编号大 3 的 sublane，等于朝反方向移 5 次，于是要 5 条。上面合成 sublane gather 时，每轮的 `roll(rotated, 7, axis=0)` 只需一条。
 
 ## 按行 gather：每行一次 DMA
 
@@ -127,7 +127,7 @@ x_vmem[...] = jnp.zeros(x.shape, x.dtype).at[rows, i_vmem[...]].set(x_vmem[...])
 Unimplemented primitive in Pallas TPU lowering for tc: scatter.
 ```
 
-这与硬件一致。XLU 的 `vperm` 为每个输出位置指定“从哪个 lane 读”，是 gather 的形式；它回答不了“多个写者写同一个位置”的问题，所以不存在一条 scatter 指令。
+这与硬件一致。XLU 的 `vperm` 为每个输出位置指定“从哪个通道读”，是 gather 的形式；它回答不了“多个写者写同一个位置”的问题，所以不存在一条 scatter 指令。
 
 有一种重要的特殊情况：每行的索引恰好是 0–127 的一个排列，没有重复。这时先求出逆排列 `inverse[s, i[s,l]] = l`，scatter 就变成 gather：
 

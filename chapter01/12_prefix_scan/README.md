@@ -1,6 +1,6 @@
 # 前缀扫描
 
-前缀和把每个位置换成它和它之前所有元素之和：`y[i] = x[0] + … + x[i]`。归约只要最后一个数，前缀和要保留每一步的中间结果，所以不能直接套用上一节的 XLU 归约或二叉树。本节先看 Pallas 能否直接写 `jnp.cumsum`，再分别沿 lane 和沿 sublane 设计实现，并说明为什么同一个算法在两个方向上的开销不同。
+前缀和把每个位置换成它和它之前所有元素之和：`y[i] = x[0] + … + x[i]`。归约只要最后一个数，前缀和要保留每一步的中间结果，所以不能直接套用上一节的 XLU 归约或二叉树。本节先看 Pallas 能否直接写 `jnp.cumsum`，再分别沿通道和沿子通道设计实现，并说明为什么同一个算法在两个方向上的开销不同。
 
 ## jnp.cumsum 不能用
 
@@ -14,9 +14,9 @@ Unimplemented primitive in Pallas TPU lowering for tc: cumsum.
 
 Mosaic 没有为前缀和提供降低规则，只能用已有的操作自己拼。下面是两种基本思路。
 
-## 沿 lane：Hillis–Steele 扫描
+## 沿通道：Hillis–Steele 扫描
 
-Hillis–Steele 扫描分 log₂(n) 轮：第 d 轮，每个位置加上它左边第 2^d 个位置的值（左边不够的不加）。128 个 lane 需要 7 轮：
+Hillis–Steele 扫描分 log₂(n) 轮：第 d 轮，每个位置加上它左边第 2^d 个位置的值（左边不够的不加）。128 个通道需要 7 轮：
 
 ```python
 def hillis_steele_lanes(x):
@@ -31,9 +31,9 @@ def hillis_steele_lanes(x):
 
 bf16 输入先 unpack 成 f32，其余相同。
 
-## 沿 sublane：方向决定开销
+## 沿子通道：方向决定开销
 
-同样的算法改为沿 sublane，3 轮即可（8 = 2³）：
+同样的算法改为沿子通道，3 轮即可（8 = 2³）：
 
 ```python
 for d in range(3):
@@ -51,13 +51,13 @@ for d in range(3):
     x = x + jnp.where(sublane < 8 - shift, pltpu.roll(x, 8 - shift, axis=0), 0)
 ```
 
-结果正确，只用 7 条移位。前缀和与后缀和在数学上对称，在 TPU v4 上开销却差一倍多。需要沿 sublane 扫描时，可以先把数据的行序颠倒存放，再做后缀和。
+结果正确，只用 7 条移位。前缀和与后缀和在数学上对称，在 TPU v4 上开销却差一倍多。需要沿子通道扫描时，可以先把数据的行序颠倒存放，再做后缀和。
 
-## 沿 sublane 的另一种做法：逐行广播
+## 沿子通道的另一种做法：逐行广播
 
 本小节实验[源码](03_pallas_row_serial_scan.py)、[输出](03_pallas_row_serial_scan.txt)。
 
-8 行很少，也可以逐行串行地累加：维护一个 8 个 sublane 都相同的累加值，每次把下一行广播到 8 个 sublane 再加上：
+8 行很少，也可以逐行串行地累加：维护一个 8 个子通道都相同的累加值，每次把下一行广播到 8 个子通道再加上：
 
 ```python
 total = jnp.zeros(x_vmem.shape, x_vmem.dtype)
@@ -77,7 +77,7 @@ va1: vadd.8x128.f32 v2, v1, v0            # 前两行之和
 vst: vst.8x128 [vmem:0x9, sm=1], v2       # 输出第 1 行
 ```
 
-`ss` 是 `vld` 的 sublane 行距，与第 4 节的 sublane 掩码 `sm` 一样是 load/store 地址的一部分。共 8 条 load、7 条加法、8 条只写一个 sublane 的 store，没有任何移位。
+`ss` 是 `vld` 的子通道行距，与第 4 节的子通道掩码 `sm` 一样是 load/store 地址的一部分。共 8 条 load、7 条加法、8 条只写一个子通道的 store，没有任何移位。
 
 同样的广播若写成 `jnp.broadcast_to(x_vmem[pl.ds(k, 1), :], x_vmem.shape)`，结果也正确，但编译器先把 8 行逐行搬到一块临时的 TC VMEM，再从那里做 `ss=0` 的 load，load 和 store 各多出 8 条。直接在 Ref 上写出行距，就能直接用上 load 指令的这项能力。
 
@@ -87,22 +87,22 @@ vst: vst.8x128 [vmem:0x9, sm=1], v2       # 输出第 1 行
 
 | 写法 | bundle 数 | 实测 R2 − R0 | 模型 | 关键路径 |
 | --- | ---: | ---: | ---: | --- |
-| 沿 lane，Hillis–Steele | 35 | 526 | 519 | 7 轮，每轮一次 XLU 循环移位（提交后 69 个周期才能取回）加比较、选择、加法 |
-| 沿 sublane，前缀和 | 27 | 58 | 55 | 17 条 `vrot.slane.down` 串行，每条的结果 2 个周期后可用 |
-| 沿 sublane，后缀和 | 17 | 38 | 35 | 7 条 `vrot.slane.down` |
-| 沿 sublane，逐行广播 | 14 | 30 | 27 | 7 条加法串行 |
+| 沿通道，Hillis–Steele | 35 | 526 | 519 | 7 轮，每轮一次 XLU 循环移位（提交后 69 个周期才能取回）加比较、选择、加法 |
+| 沿子通道，前缀和 | 27 | 58 | 55 | 17 条 `vrot.slane.down` 串行，每条的结果 2 个周期后可用 |
+| 沿子通道，后缀和 | 17 | 38 | 35 | 7 条 `vrot.slane.down` |
+| 沿子通道，逐行广播 | 14 | 30 | 27 | 7 条加法串行 |
 
 > 暂且可以理解为：R2 − R0 是从这段指令之前到它们全部发射完之后的周期数，其中 13 个周期是读数与排空的固定开销；模型按每条指令的结果延迟和各单元的发射间隔逐个 bundle 推算。第三章第 3–5 节介绍这种测法和模型。
 
 扣除 13 个周期，四种写法分别是 513、45、25、17 个周期。模型比实测少 3–7 个周期，没有包含的部分本节没有查明，但四种写法的先后和量级与模型一致。
 
-沿 lane 的 Hillis–Steele 每轮的指令最少，单个 TC VREG 的等待却最长，是逐行广播的 30 倍：每一轮都要等上一轮的 XLU 结果取回，才能发出下一轮的移位。XLU 的提交指令每 8 个周期可以发射一条，所以同时扫描许多个 TC VREG 时，各个 TC VREG 的轮次可以交错，平均到每个 TC VREG 的时间会小得多；只扫描一个 TC VREG 时，这段等待无法掩盖。
+沿通道的 Hillis–Steele 每轮的指令最少，单个 TC VREG 的等待却最长，是逐行广播的 30 倍：每一轮都要等上一轮的 XLU 结果取回，才能发出下一轮的移位。XLU 的提交指令每 8 个周期可以发射一条，所以同时扫描许多个 TC VREG 时，各个 TC VREG 的轮次可以交错，平均到每个 TC VREG 的时间会小得多；只扫描一个 TC VREG 时，这段等待无法掩盖。
 
-## 只改硬件单元：沿 lane 的前缀和交给 MXU
+## 只改硬件单元：沿通道的前缀和交给 MXU
 
 本小节实验[源码](04_pallas_scan_by_matmul.py)、[输出](04_pallas_scan_by_matmul.txt)。
 
-沿 lane 的前缀和是一个线性变换：`y[s, l] = Σ_{k ≤ l} x[s, k]`，即 `y = x @ U`，`U` 是上三角全 1 的 `128×128` 矩阵。所以它也可以交给 MXU（第 10 节），一次 `vmatmul` 完成 8 行：
+沿通道的前缀和是一个线性变换：`y[s, l] = Σ_{k ≤ l} x[s, k]`，即 `y = x @ U`，`U` 是上三角全 1 的 `128×128` 矩阵。所以它也可以交给 MXU（第 10 节），一次 `vmatmul` 完成 8 行：
 
 ```python
 row = jax.lax.broadcasted_iota(jnp.int32, (128, 128), 0)
@@ -128,7 +128,7 @@ return jnp.dot(x, upper, precision=precision, preferred_element_type=jnp.float32
 
 XLA 把 `jnp.cumsum` 降低为 `reduce-window`：
 
-- 沿 sublane（axis=0）：48 个 bundle，做法与上一小节完全相同，即 `ss=0` 广播 load、逐行累加、单 sublane 的 store。
-- 沿 lane（axis=1）：234 个 bundle。XLA 先把 `8×128` 转置，在 sublane 方向逐行累加 128 次（129 条 `vadd`），再转置回来；没有用 Hillis–Steele 的 7 轮循环移位。
+- 沿子通道（axis=0）：48 个 bundle，做法与上一小节完全相同，即 `ss=0` 广播 load、逐行累加、单 sublane 的 store。
+- 沿通道（axis=1）：234 个 bundle。XLA 先把 `8×128` 转置，在子通道方向逐行累加 128 次（129 条 `vadd`），再转置回来；没有用 Hillis–Steele 的 7 轮循环移位。
 
-这里 XLA 的选择有一半值得借鉴：沿 sublane 的逐行广播是很好的做法；沿 lane 的方向，按算法的 log 轮数设计、利用 XLU 的循环移位，指令数少得多。
+这里 XLA 的选择有一半值得借鉴：沿子通道的逐行广播是很好的做法；沿通道的方向，按算法的 log 轮数设计、利用 XLU 的循环移位，指令数少得多。

@@ -6,7 +6,7 @@
 
 本小节实验[源码](01_pallas_scale_64x128.py)、[输出](01_pallas_scale_64x128.txt)。
 
-TPU v4 TensorCore 的一个向量寄存器（TC VREG）由 8 个 sublane（子通道）、每个 sublane 128 个 lane（通道）组成，每个位置 32 bit，共 4096 B：
+TPU v4 TensorCore 的一个向量寄存器（TC VREG）由 8 个子通道（sublane）、每个子通道 128 个通道（lane）组成，每个位置 32 bit，共 4096 B：
 
 ![8 行 128 列的 b32 TC VREG](00_b32_tc_vreg_grid.svg)
 
@@ -14,7 +14,7 @@ TPU v4 TensorCore 的一个向量寄存器（TC VREG）由 8 个 sublane（子�
 
 实验沿用第 1 节的最小 kernel，只把输入改为 `f32[64,128]`。`f32[64,128]` 有 8 个 tile，清单中 `vld.8x128`、`vmul.8x128.f32`、`vst.8x128` 各 8 条，每个 tile 一组。助记符中的 `8x128` 就是指令处理的形状：一条向量指令一次处理一整个 TC VREG。
 
-TC VMEM 的地址也按这个结构编排。8 个 `vld` 的地址依次是 `[vmem:0x0]`、`[vmem:0x8]`、……、`[vmem:0x38]`：相邻 tile 相差 8，一个地址单位是一个 sublane 的 128 个 32 bit，即 512 B。这与第 3 节 DMA 的 granule 大小相同，但两者属于不同的指令，不要混用。
+TC VMEM 的地址也按这个结构编排。8 个 `vld` 的地址依次是 `[vmem:0x0]`、`[vmem:0x8]`、……、`[vmem:0x38]`：相邻 tile 相差 8，一个地址单位是一个子通道的 128 个 32 bit，即 512 B。这与第 3 节 DMA 的 granule 大小相同，但两者属于不同的指令，不要混用。
 
 ## 只改 dtype：bf16 两个元素共用一个 32 bit 位置
 
@@ -63,7 +63,7 @@ u32 第 s 个 sublane 的高 16 bit 来自 bf16 的第 [1, 3, 5, 7, 9, 11, 13, 1
 列号不变
 ```
 
-即第 s 个 sublane 装第 `2s` 行（低 16 bit）和第 `2s+1` 行（高 16 bit）。数组从 HBM 经 DMA 原样进入 TC VMEM，这也是 bf16 数组在 HBM 中的格式。由此可以推出 unpack 的含义：`vunpackl` 展开第 0–3 个 sublane，得到第 0–7 行的 f32；`vunpacku` 展开第 4–7 个 sublane，得到第 8–15 行。第 5 节的 bf16→f32 转换实验把这两个结果分别写成输出的第 0–7 行和第 8–15 行，数值与 XLA 完全一致，印证了这个推论。
+即第 s 个子通道装第 `2s` 行（低 16 bit）和第 `2s+1` 行（高 16 bit）。数组从 HBM 经 DMA 原样进入 TC VMEM，这也是 bf16 数组在 HBM 中的格式。由此可以推出 unpack 的含义：`vunpackl` 展开第 0–3 个子通道，得到第 0–7 行的 f32；`vunpacku` 展开第 4–7 个子通道，得到第 8–15 行。第 5 节的 bf16→f32 转换实验把这两个结果分别写成输出的第 0–7 行和第 8–15 行，数值与 XLA 完全一致，印证了这个推论。
 
 ## 硬件有两种打包格式
 
@@ -85,7 +85,7 @@ vpack ：sublane s 的 (低 16 bit, 高 16 bit) = [(0, 8), (1, 9), (2, 10), (3, 
 ```
 
 - `vpackc` 把相邻两行放进同一个位置。这是 Mosaic 在 TC VMEM 和 HBM 中使用的格式，与上一小节的读数一致。
-- `vpack` 把相隔 8 行的两行放进同一个位置：装第 0–7 行的 f32 TC VREG（`v0`）的第 s 个 sublane 进入低 16 bit，装第 8–15 行的（`v1`）的第 s 个 sublane 进入高 16 bit。
+- `vpack` 把相隔 8 行的两行放进同一个位置：装第 0–7 行的 f32 TC VREG（`v0`）的第 s 个子通道进入低 16 bit，装第 8–15 行的（`v1`）的第 s 个子通道进入高 16 bit。
 
 两种格式的位置对应关系不同，混用会把行打乱。手写 kernel 时，只要数据既不来自也不去往 Mosaic 管理的内存（例如只在寄存器内部打包、交给另一条指令使用），就可以选择对下游更方便的格式。
 
@@ -115,7 +115,7 @@ vst.msk [vmem:0x18, sm=1], vm2, v10
 
 这里出现了两种掩码：
 
-- `sm=` 是 sublane 掩码，按 bit 选择 8 个 sublane 中的哪些参与 load/store。`sm=1` 只选第 0 个 sublane，即第 9 行（下标 8）。完整的 tile 不写 `sm`，等价于 8 个 sublane 全选。
+- `sm=` 是子通道掩码，按 bit 选择 8 个子通道中的哪些参与 load/store。`sm=1` 只选第 0 个子通道，即第 9 行（下标 8）。完整的 tile 不写 `sm`，等价于 8 个子通道全选。
 - `vm0`、`vm2` 是向量掩码寄存器，每个元素一个 bit，`vst.msk` 只写掩码为 1 的元素。
 
 掩码由前面几条向量指令现场生成：
