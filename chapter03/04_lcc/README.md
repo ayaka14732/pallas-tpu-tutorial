@@ -1,6 +1,6 @@
 # LCC：指令级计时
 
-主机计时（第 1、2 节）只能看到整个程序的时间。XProf 的区域（第 3 节）能标出 kernel 内部的几段，但它改变了调度，单个区间还有一两个周期的误差。要知道 kernel 中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，用它验证第一章第 2 节的说法“没有等待时，TensorCore 每个周期发射一个 bundle”，并测出标量单元中哪些指令会让发射停下来。
+主机计时（第 1、2 节）只能看到整个程序的时间，而且淹没在主机的开销里。要知道一个 kernel、或其中某几个 bundle 花了多少周期，需要在 kernel 内部读一个周期计数器。这是本教程首选的计时方法：读数就是周期，没有换算，也不依赖 profiler。TensorCore 有一个本地周期计数器 LCC（local cycle counter），每个周期加 1，标量单元可以用一条指令读出它的值。本节写出读取 LCC 的方法，用它验证第一章第 2 节的说法“没有等待时，TensorCore 每个周期发射一个 bundle”，并测出标量单元中哪些指令会让发射停下来。
 
 ## 读 LCC 的指令
 
@@ -127,6 +127,71 @@ sadd s23 = s24 + 100，再 vmov，d = 1、2、3：[107, 107, 107]
 `sld` 有两个限制：连续两条 `sld` 至少相隔 4 个周期，使用 `sld` 结果的指令最早在它之后 4 个周期发射。两种情况下，标量发射都会停下来等待，后面所有的 bundle 一起推迟。但间隔中可以放别的标量指令：“`sld` + 3 条无关的 `sadd`”每组恰好 4 个 bundle，读数与没有任何等待时相同。`sst` 则每周期一条，紧随其后的 `sld` 读同一地址也只按 `sld` 自己的规则等待。
 
 这解释了第一章第 7 节清单中的一个现象：编译器把两个标量参数的 `sld` 放在相邻两个 bundle 中，第二条要等 4 个周期；如果标量参数很多，按每个 4 个周期估算读入的时间，或者把它们的读取与其他标量工作交错。反过来把标量放进 TC VREG 再取出并不划算：向量到标量要经过 `vpush`/`spop`，等待 43 个周期（第 6 节）。
+
+## 给整个 kernel 计时：KernelClock
+
+本小节实验[源码](03_tpuasm_kernel_clock.py)、[输出](03_tpuasm_kernel_clock.txt)。
+
+`LccProbe` 测的是插进载体的手写片段。要测一个真实的 kernel，或 kernel 中的一段，读数可以照样插入，问题是读数怎样带出来：被测的程序没有多余的输出可用。办法来自 SMEM 的一个性质：它的内容在程序之间保留。实验让程序 A 把一个数写进 SMEM 的某个地址，再让另一个程序 B 去读：
+
+```text
+程序 A 写入 0 之后，程序 B 读到：[0, 0]（两个 TensorCore）
+程序 A 写入 20261004 之后，程序 B 读到：[20261004, 20261004]
+```
+
+于是读数可以先留在 SMEM 中，等被测的程序运行结束，再用一个专门的读取程序取回。[`tpuasm_tools.KernelClock`](../../tpuasm_tools.py) 就是这样做的。每次读数是插入的 8 个 bundle（`clock_read`）：
+
+```text
+{ s1: sst [smem:0x20100], s30 }                     # 借用 s30、s31，原值先存起来
+{ s1: sst [smem:0x20101], s31 }
+{ s0: sfence }                                      # 等此前的向量工作全部发射（第 5 节）
+{ s0: srdreg.lcclo s30 ; s1: srdreg.lcchi s31 }     # 读数
+{ s1: sst [smem:0x20000], s30 }                     # 第 i 个读数存进 0x20000 + 2i、+ 2i + 1
+{ s1: sst [smem:0x20001], s31 }
+{ s1: sld s30, [smem:0x20100] }                     # 恢复
+{ s1: sld s31, [smem:0x20101] }
+```
+
+地址 `0x20000` 在 SMEM 的中部，远离 kernel 的 scratch（从低地址分配）和 runtime 使用的最高一段。被测程序的寄存器、输出都不受影响，所以它可以是任何已编译的程序，包括原生 XLA 的程序。
+
+`KernelClock` 的用法是三步：
+
+```python
+clock = tpuasm_tools.KernelClock(num_cores=2)
+timed = clock.instrument(compiled, [pc0, pc1, ...])    # 在原 bundle 编号 pc_i 之前插入第 i 次读数
+timed(x).block_until_ready()
+readings = clock.read(count)                           # (TensorCore 数, count) 的 64 位读数
+```
+
+### 在哪里读：程序与 kernel 的起止标记
+
+第一章第 2 节的清单中，kernel 段以 `vtrace 0x80000000` 开始、以 `vtrace 0x90000000` 结束。这是编译器为每条 HLO 指令放置的起止标记，整个程序也有一对，序号是 `0xfffffff`（第 3 节解释它们的编码）。`tpuasm_tools.hlo_ops` 把它们找出来：
+
+```text
+[('module', 460, 550), ('wait.1', 503, 535)]
+```
+
+实验用第 1 节那个设备时间已知的 kernel（`vdelay` 10500 或 1050000 个周期），在这四个位置读数；kernel 的起点和终点各连读两次，看读数自身占多少周期：
+
+```python
+timed = clock.instrument(compiled, [module_start, start, start, end + 1, end + 1, module_end + 1])
+```
+
+| | 程序开始 → kernel 开始 | 相邻两次读数 | kernel | kernel 结束 → 程序结束 |
+| --- | ---: | ---: | ---: | ---: |
+| `pl.delay(10000)`，TensorCore 0 | 57956、21670、30863 | 20 | 11402、11400、11398 | 94 |
+| `pl.delay(10000)`，TensorCore 1 | 103 | 20 | 11422、11420、11418 | 35 |
+| `pl.delay(1000000)`，TensorCore 0 | 38205、20392、30946 | 20 | 1050900、1051104、1050996 | 94 |
+| `pl.delay(1000000)`，TensorCore 1 | 103 | 20 | 1050920、1051124、1051016 | 35 |
+
+三次运行的读数：
+
+- **读数自身的开销恰好是 20 个周期。** 紧挨着的两次读数总是相差 20：前一次读数之后的两条 `sst`、两条 `sld`，加上后一次读数之前的两条 `sst` 和 `sfence`。任何区间的读数差减去 20，就是这段程序本身的周期数；`KernelClock.time_ops` 把这些步骤包在一起，直接返回程序和每条 HLO 指令扣除开销后的周期数。
+- **kernel 是 11380 和 1050880 个周期左右**（扣除 20 之后），比 `vdelay` 多约 880 个周期，是两次小 DMA 和计算；各次运行之间相差几个到两百个周期，来自 DMA。
+- **TensorCore 1 的 kernel 比 TensorCore 0 多 20 个周期。** 它跳过了 kernel 主体，但要在出口等 TensorCore 0 汇合（第二章第 1 节），而 TensorCore 0 在到达出口之前还要做一次读数。
+- **TensorCore 0 在 kernel 之前有 2–6 万个周期的 runtime 代码**，每次运行都不一样；TensorCore 1 只有 103 个周期。比较两个程序时，用 TensorCore 1 的整个程序，或者只比较 kernel。
+
+读数用了 `sfence`，所以每个读数都是“此前的向量工作全部发射之后”的时刻；kernel 结束处，输出 DMA 已经被 `vwait` 等到。要测 kernel 中的一段，把 `find_bundles` 找到的 bundle 编号交给 `instrument` 即可；插入点在循环中时，SMEM 中留下的是最后一次迭代的读数。
 
 ## LCC 的适用范围
 

@@ -19,12 +19,8 @@ bundle  128: trampoline:program-start
 bundle  549: entry bundle: %fusion = fusion(%copy-done, %rhs.1)
 bundle 8863: exit bundle: %fusion = fusion(%copy-done, %rhs.1)
 bundle 9000: 清单结束（共 9000 个 bundle）
-## XProf，16 对新输入的中位数
-  /device:TPU:0 XLA Modules module：99.16 µs
-  /device:TPU:0 XLA Ops copy-done：8.87 µs
-  /device:TPU:0 XLA Ops copy-start：0.00 µs
-  /device:TPU:0 XLA Ops fusion：71.18 µs
-  /device:TPU:1 XLA Modules module：80.15 µs
-  /device:TPU:1 XLA Ops copy-done：8.89 µs
-  /device:TPU:1 XLA Ops copy-start：0.00 µs
-  /device:TPU:1 XLA Ops fusion：71.15 µs
+## 设备上的周期数（LCC），16 对新输入的中位数
+  module：TensorCore 0 107317 个周期，TensorCore 1 84317 个周期
+  copy-start：TensorCore 0 17 个周期，TensorCore 1 8 个周期
+  copy-done：TensorCore 0 9415 个周期，TensorCore 1 9445 个周期
+  fusion：TensorCore 0 74750 个周期，TensorCore 1 74711 个周期

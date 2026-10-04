@@ -22,14 +22,19 @@ def inputs(seed: int) -> tuple[jax.Array, jax.Array]:
     rhs = rng.integers(-2, 3, (SIZE, SIZE)).astype(np.float32)
     return jnp.asarray(lhs, jnp.bfloat16), jnp.asarray(rhs, jnp.bfloat16)
 
-def device_times(compiled, pairs: list[tuple[jax.Array, jax.Array]]) -> dict[tuple[str, str, str], float]:
-    """XProf 中每个 (device, track, name) 事件的中位数（µs）。"""
+def clock_times(clock: tpuasm_tools.KernelClock, compiled, pairs: list[tuple[jax.Array, jax.Array]]) -> list[tuple[str, list[int]]]:
+    """整个程序与每条 HLO 指令在两个 TensorCore 上的周期数：设备上的 LCC 读数，每对输入运行一次，取中位数。"""
+    inputs = iter(pairs)
+    return clock.time_ops(compiled, lambda timed: timed(*next(inputs)).block_until_ready(), samples=len(pairs))
+
+def xprof_times(compiled, pairs: list[tuple[jax.Array, jax.Array]]) -> list[tuple[str, list[int]]]:
+    """同样的量改由 XProf 的设备事件给出（按 1.05 GHz 换算成周期），用于无法改写的程序。"""
     events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(lhs, rhs).block_until_ready() for lhs, rhs in pairs], Path('/tmp/pallas_tpu_tutorial/xprof')))
-    durations = defaultdict(list)
+    durations = defaultdict(lambda: defaultdict(list))
     for event in events:
         name = 'module' if event['track'] == 'XLA Modules' else event['name']
-        durations[(event['device'], event['track'], name)].append(xprof_tools.duration_us(event))
-    return {key: statistics.median(values) for key, values in durations.items()}
+        durations[name][event['device']].append(xprof_tools.device_cycles(event))
+    return [(name, [round(statistics.median(cores[device])) for device in sorted(cores)]) for name, cores in durations.items()]
 
 def main() -> None:
     lhs, rhs = inputs(0)
@@ -48,9 +53,9 @@ def main() -> None:
     print('  ' + '，'.join(f'{name} {counts[name]}' for name in sorted(counts) if name.split('.')[0] in ('vmatmul', 'vmatpush', 'vdwg', 'cld', 'vpop', 'dma', 'vld', 'vst')))
     print(tpuasm_tools.listing_outline(compiled))
     pairs = [inputs(seed) for seed in range(1, 17)]
-    print('## XProf，16 对新输入的中位数')
-    for (device, track, name), value in sorted(device_times(compiled, pairs).items()):
-        print(f'  {device} {track} {name}：{value:.2f} µs')
+    print('## 设备上的周期数（LCC），16 对新输入的中位数')
+    for name, cycles in clock_times(tpuasm_tools.KernelClock(num_cores=2), compiled, pairs):
+        print(f'  {name}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
 
 if __name__ == '__main__':
     main()

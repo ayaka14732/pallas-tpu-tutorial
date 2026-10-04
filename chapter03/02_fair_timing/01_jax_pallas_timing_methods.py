@@ -1,4 +1,4 @@
-"""同一个比较用不同的计时方法：f32[32768,128] 的 y = 2x + 1，原生 XLA 对照第二章第 2 节的 Pallas 双缓冲 kernel。分别用固定输入、每次新输入、XProf、fori_loop 循环和 AB/BA 轮次计时，并检查编译后的 HLO 中输入放在哪一层内存。"""
+"""同一个比较用不同的计时方法：f32[32768,128] 的 y = 2x + 1，原生 XLA 对照第二章第 2 节的 Pallas 双缓冲 kernel。分别用固定输入、每次新输入、设备上的 LCC、fori_loop 循环和 AB/BA 轮次计时，并检查编译后的 HLO 中输入放在哪一层内存。"""
 import tpu_init
 tpu_init.initialise_one_chip()
 
@@ -13,7 +13,6 @@ import jax.numpy as jnp
 import numpy as np
 
 import tpuasm_tools
-import xprof_tools
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('pipeline', ROOT / 'chapter02/02_dma_pipeline/01_pallas_double_buffer.py')
@@ -56,21 +55,16 @@ def main() -> None:
     print('## 方法 1：每次调用并等到结果，固定同一个输入')
     for name, compiled in candidates.items():
         compiled(x).block_until_ready()
-        print(f'  {name}：{xprof_tools.microseconds(synchronized(compiled, [x] * SAMPLES))}')
+        print(f'  {name}：{synchronized(compiled, [x] * SAMPLES) * 1e6:.1f} µs')
     print('## 方法 2：每次调用并等到结果，每次一个新的输入数组')
     for name, compiled in candidates.items():
-        print(f'  {name}：{xprof_tools.microseconds(synchronized(compiled, fresh))}')
-    print('## 方法 3：XProf，每次一个新的输入数组')
+        print(f'  {name}：{synchronized(compiled, fresh) * 1e6:.1f} µs')
+    print('## 方法 3：设备上的 LCC（第 4 节的 KernelClock），每次一个新的输入数组')
+    clock = tpuasm_tools.KernelClock(num_cores=2)
     for name, compiled in candidates.items():
-        events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(array).block_until_ready() for array in fresh[:16]], Path('/tmp/pallas_tpu_tutorial/xprof')))
-        for device in sorted({event['device'] for event in events}):
-            modules = [xprof_tools.duration_cycles(event) for event in events if event['device'] == device and event['track'] == 'XLA Modules']
-            ops = {}
-            for event in events:
-                if event['device'] == device and event['track'] == 'XLA Ops':
-                    ops.setdefault(event['name'], []).append(xprof_tools.duration_cycles(event))
-            summary = '，'.join(f'{op} {statistics.median(values):.0f} 个周期' for op, values in ops.items())
-            print(f'  {name} {device}：module {statistics.median(modules):.0f} 个周期；op：{summary}')
+        inputs = iter(fresh)
+        for op, cycles in clock.time_ops(compiled, lambda timed: timed(next(inputs)).block_until_ready(), samples=16):
+            print(f'  {name}，{op}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
     print('## 方法 4：在一个 jit 中用 fori_loop 重复 N 次，(T(32) − T(16)) / 16')
     for name, function in functions.items():
         times = {}
@@ -79,13 +73,13 @@ def main() -> None:
             looped(x).block_until_ready()
             times[count] = synchronized(looped, [x] * 10)
             if count == 32:
-                print(f'  {name}：每次 {xprof_tools.microseconds((times[32] - times[16]) / 16)}；循环版本的 HLO 中 {memory_notes(looped)}')
+                print(f'  {name}：每次 {(times[32] - times[16]) / 16 * 1e6:.1f} µs；循环版本的 HLO 中 {memory_notes(looped)}')
     print('## 方法 5：方法 2 按 AB/BA 交替做 4 轮')
     for round_index in range(4):
         names = list(candidates)
         order = names if round_index % 2 == 0 else names[::-1]
         results = {name: synchronized(candidates[name], fresh) for name in order}
-        print(f'  第 {round_index + 1} 轮（{"、".join(order)}）：' + '，'.join(f'{name} {xprof_tools.microseconds(results[name])}' for name in names))
+        print(f'  第 {round_index + 1} 轮（{"、".join(order)}）：' + '，'.join(f'{name} {results[name] * 1e6:.1f} µs' for name in names))
 
 if __name__ == '__main__':
     main()

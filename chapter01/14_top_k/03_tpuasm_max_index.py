@@ -3,7 +3,6 @@ import tpu_init
 tpu_init.initialise_one_chip()
 
 from pathlib import Path
-import re
 import sys
 
 import jax
@@ -50,14 +49,6 @@ KERNELS = {
     '手写 top-8（掩码排除已选位置）': top_k_by_hand(8),
 }
 
-def compute_section(listing: str) -> list[str]:
-    """kernel 段中从输入 DMA 等待之后到第二次 DMA 等待之前的 bundle，去掉标量指令与信号量指令（只剩这些的 bundle 变成空 bundle）。"""
-    lines = [line.split('#')[0].rstrip() for line in listing.splitlines()]
-    text = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', ' '.join(line for line in lines if line.strip()))
-    bundles = [body.strip() for body in re.findall(r'\{(.*?)\}', text)]
-    first, second = [index for index, body in enumerate(bundles) if 'vwait' in body][:2]
-    return [' ; '.join(item.strip() for item in body.split(';') if not item.strip().startswith(('s0:', 's1:', 'misc:'))) for body in bundles[first + 1:second]]
-
 def main() -> None:
     probe = tpuasm_tools.LccProbe()
 
@@ -79,11 +70,10 @@ def main() -> None:
     x = np.stack([np.random.default_rng(0).permutation(128) for _ in range(8)]).astype(np.float32)
     for name, f in KERNELS.items():
         _, listing = run(f, x)
-        section = compute_section(listing)
+        section = tpuasm_tools.compute_section(listing)
         xlu = sum(text.count('xlane') for text in section)
-        program = read_lcc(20) + ''.join(bundle(text) for text in section) + END
-        (r1, r2), = {tuple(row) for row in probe.run(program + tpuasm_tools.reload_saved(), setup=tpuasm_tools.spill_saved()).tolist()}
-        reads = issue_model.replay(issue_model.parse(program))
+        _, r2 = probe.time_section(section)
+        reads = issue_model.replay(issue_model.parse(tpuasm_tools.section_program(section)))
         print(f'  {name}：{len(section)} 个 bundle，{xlu} 次 XLU 归约；实测 R2 − R0 = {r2}，模型 {reads[22] - reads[20]}')
 
 if __name__ == '__main__':

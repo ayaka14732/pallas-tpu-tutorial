@@ -1,9 +1,6 @@
-"""逐 tile 计算 y = 2x + 1：f32[32768,128] 切成 f32[512,128] 的 tile。比较串行、输入双缓冲、输入输出都双缓冲三种调度的数值、清单与每遍时间；再只改 tile 大小。"""
+"""逐 tile 计算 y = 2x + 1：f32[32768,128] 切成 f32[512,128] 的 tile。比较串行、输入双缓冲、输入输出都双缓冲三种调度的数值、清单与每遍的周期数；再只改 tile 大小。"""
 import tpu_init
 tpu_init.initialise_one_chip()
-
-import statistics
-import time
 
 import jax
 from jax import Ref
@@ -101,24 +98,19 @@ def build(style: str, repeats: int = 1, tile_rows: int = 512, out_hbm: bool = Tr
 
     return mesh, transform
 
-def pass_time(style: str, x: jax.Array, tile_rows: int = 512) -> float:
-    """每遍流水线的时间（微秒）：kernel 内部重复 8 遍与 4 遍的主机计时之差除以 4，抵消调用 kernel 的固定开销。"""
-    times = {}
+def pass_cycles(clock: tpuasm_tools.KernelClock, style: str, x: jax.Array, tile_rows: int = 512) -> float:
+    """每遍流水线的周期数：kernel 内部重复 8 遍与 4 遍，各用 LCC 读出 kernel 的周期数（第三章第 4 节的 KernelClock），相减除以 4，消去 kernel 中只做一次的部分。"""
+    cycles = {}
     for repeats in (4, 8):
         mesh, transform = build(style, repeats, tile_rows)
         compiled = tpuasm_tools.compile(transform, x, mesh=mesh)
-        jax.block_until_ready(compiled(x))
-        samples = []
-        for _ in range(20):
-            start = time.perf_counter()
-            jax.block_until_ready(compiled(x))
-            samples.append(time.perf_counter() - start)
-        times[repeats] = statistics.median(samples)
-    return (times[8] - times[4]) / 4 * 1e6
+        cycles[repeats] = clock.kernel_cycles(compiled, lambda timed: jax.block_until_ready(timed(x)))
+    return (cycles[8] - cycles[4]) / 4
 
 def main() -> None:
     x = jnp.arange(ROWS * 128, dtype=jnp.float32).reshape(ROWS, 128) / 1024
     expected = np.asarray(x) * 2.0 + 1.0
+    clock = tpuasm_tools.KernelClock(num_cores=1)
     for style in ('串行', '输入双缓冲', '输入输出双缓冲'):
         mesh, transform = build(style)
         compiled = tpuasm_tools.compile(transform, x, mesh=mesh)
@@ -126,14 +118,14 @@ def main() -> None:
         listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
         counts = tpuasm_tools.count_mnemonics(listing)
         dma = '、'.join(line.split('#')[0].strip() for line in listing.splitlines() if 'dma.' in line)
-        print(f'## {style}：数值检查通过；每遍约 {pass_time(style, x):.1f} µs')
+        print(f'## {style}：数值检查通过；每遍 {pass_cycles(clock, style, x):.0f} 个周期')
         print(f'  DMA 指令 {counts["dma.simple"] + counts["dma.strided"]} 条，vwait.ge {counts["vwait.ge"]} 条，vld {counts["vld.8x128"]}、vst {counts["vst.8x128"]}')
         print(listing)
         print()
 
     # 只改 tile 大小：输入输出双缓冲，每个 tile 的字节数从 256 KiB 增加到 1 MiB。
     for tile_rows in (512, 1024, 2048):
-        print(f'## 输入输出双缓冲，tile 为 f32[{tile_rows},128]（{tile_rows * 128 * 4 // 1024} KiB）：每遍约 {pass_time("输入输出双缓冲", x, tile_rows):.1f} µs')
+        print(f'## 输入输出双缓冲，tile 为 f32[{tile_rows},128]（{tile_rows * 128 * 4 // 1024} KiB）：每遍 {pass_cycles(clock, "输入输出双缓冲", x, tile_rows):.0f} 个周期')
 
 if __name__ == '__main__':
     main()

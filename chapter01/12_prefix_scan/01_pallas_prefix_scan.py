@@ -2,37 +2,12 @@
 import tpu_init
 tpu_init.initialise_one_chip()
 
-import jax
-from jax.experimental.pallas import tpu as pltpu
 import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 
 import scan_common
-
-def hillis_steele_lanes(x: jax.Array) -> jax.Array:
-    """沿 lane 的包含式前缀和：第 d 轮把 lane l 加上 lane l - 2^d 的值，共 7 轮。"""
-    lane = jax.lax.broadcasted_iota(jnp.int32, x.shape, 1)
-    for d in range(7):
-        shift = 1 << d
-        x = x + jnp.where(lane >= shift, pltpu.roll(x, shift, axis=1), 0)
-    return x
-
-def hillis_steele_sublanes(x: jax.Array) -> jax.Array:
-    """沿 sublane 的包含式前缀和：第 d 轮把 sublane s 加上 sublane s - 2^d 的值，共 3 轮。"""
-    sublane = jax.lax.broadcasted_iota(jnp.int32, x.shape, 0)
-    for d in range(3):
-        shift = 1 << d
-        x = x + jnp.where(sublane >= shift, pltpu.roll(x, shift, axis=0), 0)
-    return x
-
-def suffix_sublanes(x: jax.Array) -> jax.Array:
-    """沿 sublane 的后缀和：第 d 轮把 sublane s 加上 sublane s + 2^d 的值；roll 位移取 8 - 2^d。"""
-    sublane = jax.lax.broadcasted_iota(jnp.int32, x.shape, 0)
-    for d in range(3):
-        shift = 1 << d
-        x = x + jnp.where(sublane < 8 - shift, pltpu.roll(x, 8 - shift, axis=0), 0)
-    return x
+from scan_common import hillis_steele_lanes, hillis_steele_sublanes, suffix_sublanes
 
 def main() -> None:
     rng = np.random.default_rng(0)

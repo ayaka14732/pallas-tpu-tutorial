@@ -81,7 +81,7 @@ def device_medians(compiled, x: jax.Array) -> dict[tuple[str, str, str], float]:
     durations = defaultdict(list)
     for event in events:
         name = 'module' if event['track'] == 'XLA Modules' else event['name']
-        durations[(event['device'], event['track'], name)].append(xprof_tools.duration_cycles(event))
+        durations[(event['device'], event['track'], name)].append(xprof_tools.device_cycles(event))
     return {key: statistics.median(values) for key, values in durations.items()}
 
 def main() -> None:

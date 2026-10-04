@@ -178,6 +178,18 @@ def read_gtc(low: int) -> str:
 
 SAVED = range(20, 31)
 
+def compute_section(listing: str) -> list[str]:
+    """kernel 清单中从输入 DMA 等待之后到下一次 DMA 等待之前的 bundle（每个是一段不带花括号的文本），去掉标量指令与信号量指令；只剩这些指令的 bundle 变成空 bundle。"""
+    lines = [line.split('#')[0].rstrip() for line in listing.splitlines()]
+    text = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', ' '.join(line for line in lines if line.strip()))
+    bundles = [body.strip() for body in re.findall(r'\{(.*?)\}', text)]
+    first, second = [index for index, body in enumerate(bundles) if 'vwait' in body][:2]
+    return [' ; '.join(item.strip() for item in body.split(';') if not item.strip().startswith(('s0:', 's1:', 'misc:'))) for body in bundles[first + 1:second]]
+
+def section_program(section: list[str]) -> str:
+    """把 compute_section 的结果包成 LccProbe 的片段：R0、这些 bundle、R1、sfence、R2。"""
+    return read_lcc(20) + ''.join(bundle(text) for text in section) + read_lcc(21) + bundle('s0: sfence') + read_lcc(22)
+
 def spill_saved(address: int = 0x80) -> str:
     """LccProbe 的 setup 用：把保存着载体标量寄存器的 v20–v30 写进 TC VMEM 从 address 起的 11 个 tile，供会改写这些 TC VREG 的片段使用。"""
     return ''.join(bundle(f'vst: vst.8x128 [vmem:0x{address + 8 * index:x}], v{register}') for index, register in enumerate(SAVED))
@@ -267,7 +279,104 @@ class LccProbe:
         function = self._load(body, 0, setup)
         return np.array([np.asarray(function(self.x)).reshape(self.num_cores, 9, 8, 128)[:, 1:] for _ in range(repeats)])
 
+    def time_section(self, section: list[str]) -> tuple[int, int]:
+        """把一段编译器生成的计算 bundle 原样插进载体执行，返回 (R1 − R0, R2 − R0)。这段代码可以改写任何 TC VREG：v20–v30 先存进 TC VMEM，读数之后读回。"""
+        (first, second), = {tuple(row) for row in self.run(section_program(section) + reload_saved(), setup=spill_saved()).tolist()}
+        return first, second
+
     def run(self, body: str, repeats: int = 8, setup: str = '') -> np.ndarray:
         """返回 (repeats, 2) 的数组：每次运行的 R1 − R0 与 R2 − R0（R0、R1、R2 是第 0、1、2 次读数）。"""
         counters = self.run_raw(body, 3, repeats, setup)[:, 0].astype(np.int64)
         return counters[:, 1:] - counters[:, :1]
+
+CLOCK_BASE = 0x20000  # SMEM 中存放 KernelClock 读数的位置：第 i 个读数的低、高 32 位在 CLOCK_BASE + 2i 与 + 2i + 1
+CLOCK_SAVE = 0x20100  # 读数时借用 s30、s31，原值暂存在这里
+CLOCK_OVERHEAD = 20  # 相邻两次 clock_read 之间，读数自身占用的周期数（第三章第 4 节实测）
+
+def clock_read(index: int) -> str:
+    """读一次 LCC 并存进 SMEM 的一段清单：先 sfence 等此前的向量工作全部发射，再在同一个 bundle 中读 LCC 的两半。借用的 s30、s31 读完后恢复。"""
+    return (
+        bundle(f's1: sst [smem:0x{CLOCK_SAVE:x}], s30')
+        + bundle(f's1: sst [smem:0x{CLOCK_SAVE + 1:x}], s31')
+        + bundle('s0: sfence')
+        + bundle('s0: srdreg.lcclo s30 ; s1: srdreg.lcchi s31')
+        + bundle(f's1: sst [smem:0x{CLOCK_BASE + 2 * index:x}], s30')
+        + bundle(f's1: sst [smem:0x{CLOCK_BASE + 2 * index + 1:x}], s31')
+        + bundle(f's1: sld s30, [smem:0x{CLOCK_SAVE:x}]')
+        + bundle(f's1: sld s31, [smem:0x{CLOCK_SAVE + 1:x}]')
+    )
+
+def hlo_bounds(serialized: bytes) -> dict[int, tuple[int, int]]:
+    """程序中每条 HLO 指令的 vtrace 起止标记所在的 bundle 编号：{指令序号: (vtrace 0x8… 的 bundle, vtrace 0x9… 的 bundle)}。"""
+    (_, _, image), = executable_programs(serialized)
+    lines = format_assembly(image, target=TARGET, encoding='canonical').splitlines()
+    marks: dict[int, dict[int, int]] = {}
+    for pc, (start, end) in enumerate(_bundle_spans(lines)):
+        for kind, number in re.findall(r'vtrace 0x([89])([0-9a-f]{7})\b', '\n'.join(lines[start:end + 1])):
+            marks.setdefault(int(number, 16), {})[int(kind)] = pc
+    return {number: (found[8], found[9]) for number, found in sorted(marks.items()) if len(found) == 2}
+
+MODULE = 0xFFFFFFF  # 整个程序（XProf 中的 module）的 vtrace 标记所用的序号
+
+def hlo_ops(compiled: Compiled) -> list[tuple[str, int, int]]:
+    """按执行顺序列出 (名称, 起始标记的 bundle, 结束标记的 bundle)：每条有 vtrace 标记的 HLO 指令一项，整个程序一项（名称为 module）。HLO 指令的序号就是它在编译后入口函数中的次序（参数不计），名称由此取得。"""
+    text = compiled.as_text()
+    entry = text[text.index('\nENTRY'):].split('\n}')[0]
+    names = [name for name, opcode in re.findall(r'^\s*(?:ROOT )?%([\w.\-]+) = .*?\s([\w\-]+)\((?:%|\d|\))', entry, re.MULTILINE) if opcode != 'parameter']
+    result = [('module' if number == MODULE else names[number] if number < len(names) else f'op{number}', start, end) for number, (start, end) in hlo_bounds(serialize(compiled)).items()]
+    return sorted(result, key=lambda item: item[1])
+
+class KernelClock:
+    """给任意已编译的程序计时：在指定的 bundle 之前插入 clock_read，读数留在每个 TensorCore 的 SMEM 中，程序运行之后再用一个读取程序取回。
+
+    SMEM 的内容在程序之间保留，所以被计时的程序不需要为读数增加任何输出。每个 TensorCore 各有自己的 SMEM 和 LCC，读数只能在同一个 TensorCore 内相减。插入点在循环中时，留下的是最后一次迭代的读数。
+    """
+
+    def __init__(self, num_cores: int = 2) -> None:
+        self.probe = LccProbe(num_cores)
+        self.readers: dict[tuple[int, int], Callable[[jax.Array], jax.Array]] = {}
+
+    def instrument(self, compiled: Compiled, points: list[int]) -> Compiled:
+        """在原 bundle 编号 points[i] 之前插入第 i 次读数，返回装载后的 executable。同一个编号可以出现多次，读数按出现的顺序排列。"""
+        insertions: dict[int, str] = {}
+        for index, pc in enumerate(points):
+            insertions[pc] = insertions.get(pc, '') + clock_read(index)
+        return load(insert_bundles(serialize(compiled), insertions), compiled)
+
+    def time_ops(self, compiled: Compiled, call: Callable[[Compiled], Any], samples: int = 8) -> list[tuple[str, list[int]]]:
+        """给整个程序和其中每条 HLO 指令计时：在各自 vtrace 起止标记的位置插入读数，call(executable) 运行一次程序，共运行 samples 次。返回 [(名称, 每个 TensorCore 的周期数)]，取各次运行的中位数，已扣除读数自身的开销（区间内每次读数 20 个周期）。"""
+        ops = hlo_ops(compiled)
+        # 读数按 bundle 编号的先后执行；起始标记之前读一次，结束标记之后读一次。
+        points = sorted([(start, 2 * k) for k, (_, start, _) in enumerate(ops)] + [(end + 1, 2 * k + 1) for k, (_, _, end) in enumerate(ops)])
+        order = {tag: position for position, (_, tag) in enumerate(points)}
+        timed = self.instrument(compiled, [pc for pc, _ in points])
+        runs = []
+        for _ in range(samples):
+            call(timed)
+            runs.append(self.read(len(points)).astype(np.int64))
+        readings = np.median(np.array(runs), axis=0).astype(np.int64)
+        result = []
+        for k, (name, _, _) in enumerate(ops):
+            first, last = order[2 * k], order[2 * k + 1]
+            result.append((name, (readings[:, last] - readings[:, first] - CLOCK_OVERHEAD * (last - first)).tolist()))
+        return result
+
+    def kernel_cycles(self, compiled: Compiled, call: Callable[[Compiled], Any], samples: int = 8, core: int = 0) -> int:
+        """程序中的 kernel 在第 core 个 TensorCore 上的周期数。kernel 指除整个程序之外第一条有起止标记的 HLO 指令；它之后若还有 XLA 追加的 copy，不计在内。"""
+        return [cycles for name, cycles in self.time_ops(compiled, call, samples) if name != 'module'][0][core]
+
+    def read(self, count: int) -> np.ndarray:
+        """取回最近一次运行留下的前 count 个读数：返回 (TensorCore 数, count) 的 64 位周期计数。"""
+        words = []
+        for first in range(0, 2 * count, 8):
+            last = min(first + 8, 2 * count)
+            if (first, last) not in self.readers:
+                body = ''
+                for tile, word in enumerate(range(first, last), 1):
+                    body += bundle(f's1: sld s24, [smem:0x{CLOCK_BASE + word:x}]') + bundle('va0: vmov.8x128 v12, s24') + bundle('misc: vnop') * 8 + bundle(f'vst: vst.8x128 [vmem:0x{tile * 8:x}], v12')
+                # 读取程序只装载一次，之后重复使用。
+                self.readers[(first, last)] = self.probe._load(body, 0, '')
+            tiles = np.asarray(self.readers[(first, last)](self.probe.x)).reshape(self.probe.num_cores, 9, 8, 128)[:, 1:]
+            words.append(tiles[:, :last - first, 0, 0].astype(np.uint64))
+        halves = np.concatenate(words, axis=1).reshape(self.probe.num_cores, count, 2)
+        return halves[:, :, 0] | (halves[:, :, 1] << np.uint64(32))

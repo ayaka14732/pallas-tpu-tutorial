@@ -1,0 +1,4 @@
+沿 lane，Hillis–Steele：35 个 bundle；实测 R2 − R0 = 526，模型 519
+沿 sublane，前缀和：27 个 bundle；实测 R2 − R0 = 58，模型 55
+沿 sublane，后缀和：17 个 bundle；实测 R2 − R0 = 38，模型 35
+沿 sublane，逐行广播（stride=0）：14 个 bundle；实测 R2 − R0 = 30，模型 27

@@ -1,11 +1,11 @@
-硬件 vrng：64 个 TC VREG 1.03 µs，576 个 5.11 µs；每个 TC VREG 实测 8.4 个周期，约 514 GB/s；清单中每个 TC VREG 2.0 条计算指令，两个向量 ALU 槽需要 1.0 个周期
-vrng → 均匀分布（stateful_uniform）：64 个 TC VREG 1.05 µs，576 个 5.25 µs；每个 TC VREG 实测 8.6 个周期，约 499 GB/s；清单中每个 TC VREG 6.0 条计算指令，两个向量 ALU 槽需要 3.0 个周期
-vrng → 伯努利（整数阈值）：64 个 TC VREG 1.04 µs，576 个 5.18 µs；每个 TC VREG 实测 8.5 个周期，约 506 GB/s；清单中每个 TC VREG 5.1 条计算指令，两个向量 ALU 槽需要 2.6 个周期
-vrng → 指数分布：64 个 TC VREG 1.13 µs，576 个 6.01 µs；每个 TC VREG 实测 10.0 个周期，约 430 GB/s；清单中每个 TC VREG 10.0 条计算指令，两个向量 ALU 槽需要 5.0 个周期
-vrng → Gumbel 分布：64 个 TC VREG 1.23 µs，576 个 6.83 µs；每个 TC VREG 实测 11.5 个周期，约 374 GB/s；清单中每个 TC VREG 14.0 条计算指令，两个向量 ALU 槽需要 7.0 个周期
-vrng → 正态分布（stateful_normal）：64 个 TC VREG 2.77 µs，576 个 20.75 µs；每个 TC VREG 实测 36.9 个周期，约 117 GB/s；清单中每个 TC VREG 71.1 条计算指令，两个向量 ALU 槽需要 35.6 个周期
-vrng → 正态分布（Box–Muller）：64 个 TC VREG 4.35 µs，576 个 34.95 µs；每个 TC VREG 实测 62.8 个周期，约 69 GB/s；清单中每个 TC VREG 120.9 条计算指令，两个向量 ALU 槽需要 60.4 个周期
+硬件 vrng：64 个 TC VREG 1083 个周期，576 个 5374 个周期；每个 TC VREG 实测 8.4 个周期，约 513 GB/s；清单中每个 TC VREG 2.0 条计算指令，两个向量 ALU 槽需要 1.0 个周期
+vrng → 均匀分布（stateful_uniform）：64 个 TC VREG 1103 个周期，576 个 5521 个周期；每个 TC VREG 实测 8.6 个周期，约 498 GB/s；清单中每个 TC VREG 6.0 条计算指令，两个向量 ALU 槽需要 3.0 个周期
+vrng → 伯努利（整数阈值）：64 个 TC VREG 1098 个周期，576 个 5448 个周期；每个 TC VREG 实测 8.5 个周期，约 506 GB/s；清单中每个 TC VREG 5.1 条计算指令，两个向量 ALU 槽需要 2.6 个周期
+vrng → 指数分布：64 个 TC VREG 1196 个周期，576 个 6315 个周期；每个 TC VREG 实测 10.0 个周期，约 430 GB/s；清单中每个 TC VREG 10.0 条计算指令，两个向量 ALU 槽需要 5.0 个周期
+vrng → Gumbel 分布：64 个 TC VREG 1293 个周期，576 个 7180 个周期；每个 TC VREG 实测 11.5 个周期，约 374 GB/s；清单中每个 TC VREG 14.0 条计算指令，两个向量 ALU 槽需要 7.0 个周期
+vrng → 正态分布（stateful_normal）：64 个 TC VREG 2916 个周期，576 个 21795 个周期；每个 TC VREG 实测 36.9 个周期，约 117 GB/s；清单中每个 TC VREG 72.1 条计算指令，两个向量 ALU 槽需要 36.1 个周期
+vrng → 正态分布（Box–Muller）：64 个 TC VREG 4573 个周期，576 个 36702 个周期；每个 TC VREG 实测 62.8 个周期，约 69 GB/s；清单中每个 TC VREG 120.9 条计算指令，两个向量 ALU 槽需要 60.4 个周期
   threefry2x32 kernel 段按槽统计：va0 vadd 310，va1 vshll 208，va1 vshrl 201，va0 vor 179，va0 vxor 144，va1 vxor 73，va1 vadd 66，va1 vor 21，va0 vmov 8，va0 vlaneseq 2
-threefry2x32，每次 64 行：64 个 TC VREG 7.82 µs，576 个 66.21 µs；每个 TC VREG 实测 119.7 个周期，约 36 GB/s；清单中每个 TC VREG 139.2 条计算指令，两个向量 ALU 槽需要 69.6 个周期
-threefry2x32，每次 16 行：64 个 TC VREG 18.35 µs，576 个 161.22 µs；每个 TC VREG 实测 293.0 个周期，约 15 GB/s；清单中每个 TC VREG 193.5 条计算指令，两个向量 ALU 槽需要 96.8 个周期
-philox4x32，每次 64 行：64 个 TC VREG 8.91 µs，576 个 76.08 µs；每个 TC VREG 实测 137.7 个周期，约 31 GB/s；清单中每个 TC VREG 268.6 条计算指令，两个向量 ALU 槽需要 134.3 个周期
+threefry2x32，每次 64 行：64 个 TC VREG 8211 个周期，576 个 69524 个周期；每个 TC VREG 实测 119.8 个周期，约 36 GB/s；清单中每个 TC VREG 139.2 条计算指令，两个向量 ALU 槽需要 69.6 个周期
+threefry2x32，每次 16 行：64 个 TC VREG 19272 个周期，576 个 169289 个周期；每个 TC VREG 实测 293.0 个周期，约 15 GB/s；清单中每个 TC VREG 193.5 条计算指令，两个向量 ALU 槽需要 96.8 个周期
+philox4x32，每次 64 行：64 个 TC VREG 9364 个周期，576 个 79893 个周期；每个 TC VREG 实测 137.8 个周期，约 31 GB/s；清单中每个 TC VREG 268.6 条计算指令，两个向量 ALU 槽需要 134.3 个周期

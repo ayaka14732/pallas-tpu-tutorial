@@ -2,8 +2,6 @@
 import tpu_init
 tpu_init.initialise_local_chips()
 
-import statistics
-import time
 
 import jax
 from jax import Ref
@@ -190,24 +188,19 @@ def ring(mesh: jax.sharding.Mesh, rows: int, repeats: int, directions: int = 1):
 def bidirectional(mesh: jax.sharding.Mesh, rows: int, repeats: int):
     return ring(mesh, rows, repeats, directions=2)
 
-def time_per_call(build, mesh: jax.sharding.Mesh, rows: int, x: jax.Array) -> float:
-    """每次 all-reduce 的时间（微秒）：kernel 内部重复 64 次与 32 次的主机计时之差除以 32。"""
-    times = {}
+def cycles_per_call(clock: tpuasm_tools.KernelClock, build, mesh: jax.sharding.Mesh, rows: int, x: jax.Array) -> float:
+    """每次 all-reduce 的周期数：kernel 内部重复 64 次与 32 次，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 4 节的 KernelClock），相减除以 32。"""
+    cycles = {}
     for repeats in (32, 64):
         compiled = tpuasm_tools.compile(build(mesh, rows, repeats), x, mesh=mesh)
-        jax.block_until_ready(compiled(x))
-        samples = []
-        for _ in range(20):
-            start = time.perf_counter()
-            jax.block_until_ready(compiled(x))
-            samples.append(time.perf_counter() - start)
-        times[repeats] = statistics.median(samples)
-    return (times[64] - times[32]) / 32 * 1e6
+        cycles[repeats] = clock.kernel_cycles(compiled, lambda timed: jax.block_until_ready(timed(x)))
+    return (cycles[64] - cycles[32]) / 32
 
 def main() -> None:
     devices = {device.id: device for device in jax.devices()}
     # 物理环 0 → 1 → 3 → 2（第 5 节）。
     mesh = jax.sharding.Mesh(np.array([devices[i] for i in (0, 1, 3, 2)]), ('device',))
+    clock = tpuasm_tools.KernelClock(num_cores=1)
     for rows in (32, 256, 2048):
         host = np.random.default_rng(rows).integers(-100, 100, (CHIPS, rows, 128)).astype(np.float32)
         x = jax.device_put(jnp.asarray(host), jax.NamedSharding(mesh, P('device')))
@@ -217,8 +210,8 @@ def main() -> None:
         for name, build in (('一次交换', one_shot), ('一次交换，对角线最后发起', last), ('环形', ring), ('双向环形', bidirectional)):
             compiled = tpuasm_tools.compile(build(mesh, rows, 1), x, mesh=mesh)
             np.testing.assert_array_equal(np.asarray(compiled(x)), expected)
-            print(f'  {name}：数值检查通过；每次约 {time_per_call(build, mesh, rows, x):.1f} µs')
-    print(f'## 只有四方汇合：每次约 {time_per_call(barrier_only, mesh, rows, x):.1f} µs')
+            print(f'  {name}：数值检查通过；每次 {cycles_per_call(clock, build, mesh, rows, x):.0f} 个周期')
+    print(f'## 只有四方汇合：每次 {cycles_per_call(clock, barrier_only, mesh, rows, x):.0f} 个周期')
     # 物理环的 mesh 中，me + 1、me + 3 是相邻芯片，me + 2 是对角线芯片。
     # 偏移的顺序就是 DMA 发起的顺序。
     variants = (
@@ -241,7 +234,7 @@ def main() -> None:
             compiled = tpuasm_tools.compile(build(mesh, rows, 1), x, mesh=mesh)
             expected = host + sum(np.roll(host, offset, axis=0) for offset in offsets)
             np.testing.assert_array_equal(np.asarray(compiled(x)), expected)
-            print(f'  {name}（偏移 {list(offsets)}）：数值检查通过；每次约 {time_per_call(build, mesh, rows, x):.1f} µs')
+            print(f'  {name}（偏移 {list(offsets)}）：数值检查通过；每次 {cycles_per_call(clock, build, mesh, rows, x):.0f} 个周期')
 
 if __name__ == '__main__':
     main()

@@ -2,9 +2,6 @@
 import tpu_init
 tpu_init.initialise_one_chip()
 
-import statistics
-import time
-
 import jax
 from jax import Ref
 from jax.experimental import pallas as pl
@@ -71,27 +68,22 @@ def build(pattern: str, tile_rows: int, repeats: int):
 
     return mesh, copy
 
-def cycles_per_tile(pattern: str, tile_rows: int, x: jax.Array) -> float:
-    """每个 tile 的周期数：kernel 内部重复 8 遍与 4 遍的主机计时之差，除以 4 遍的 tile 数，按 1.05 GHz 换算。"""
-    times = {}
+def cycles_per_tile(clock: tpuasm_tools.KernelClock, pattern: str, tile_rows: int, x: jax.Array) -> float:
+    """每个 tile 的周期数：kernel 内部重复 8 遍与 4 遍，各用 LCC 读出 kernel 的周期数，相减再除以 4 遍的 tile 数。"""
+    cycles = {}
     for repeats in (4, 8):
         mesh, copy = build(pattern, tile_rows, repeats)
         compiled = tpuasm_tools.compile(copy, x, mesh=mesh)
-        jax.block_until_ready(compiled(x))
-        samples = []
-        for _ in range(20):
-            start = time.perf_counter()
-            jax.block_until_ready(compiled(x))
-            samples.append(time.perf_counter() - start)
-        times[repeats] = statistics.median(samples)
-    return (times[8] - times[4]) / (4 * ROWS // tile_rows) * 1.05e9
+        cycles[repeats] = clock.kernel_cycles(compiled, lambda timed: jax.block_until_ready(timed(x)))
+    return (cycles[8] - cycles[4]) / (4 * ROWS // tile_rows)
 
 def main() -> None:
     x = jnp.arange(ROWS * 128, dtype=jnp.float32).reshape(ROWS, 128)
+    clock = tpuasm_tools.KernelClock(num_cores=1)
     for tile_rows in (512, 2048):
         print(f'## tile 为 f32[{tile_rows},128]（{tile_rows // 2} KiB）')
         for pattern in PATTERNS:
-            print(f'  {pattern}：每个 tile 约 {cycles_per_tile(pattern, tile_rows, x):.0f} 个周期')
+            print(f'  {pattern}：每个 tile {cycles_per_tile(clock, pattern, tile_rows, x):.0f} 个周期')
 
 if __name__ == '__main__':
     main()

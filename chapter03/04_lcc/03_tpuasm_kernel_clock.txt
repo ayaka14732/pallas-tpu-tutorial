@@ -1,0 +1,17 @@
+## SMEM 的内容在程序之间保留
+  程序 A 写入 0 之后，程序 B 读到：[0, 0]（两个 TensorCore）
+  程序 A 写入 20261004 之后，程序 B 读到：[20261004, 20261004]
+## pl.delay(10000)：vtrace 标记所在的 bundle：[('module', 460, 550), ('wait.1', 503, 535)]
+  第 1 次运行，TensorCore 0：程序开始 → kernel 开始 57956，相邻两次读数 20，kernel 11402，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 1 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 11422，相邻两次读数 20，kernel 结束 → 程序结束 35
+  第 2 次运行，TensorCore 0：程序开始 → kernel 开始 21670，相邻两次读数 20，kernel 11400，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 2 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 11420，相邻两次读数 20，kernel 结束 → 程序结束 35
+  第 3 次运行，TensorCore 0：程序开始 → kernel 开始 30863，相邻两次读数 20，kernel 11398，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 3 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 11418，相邻两次读数 20，kernel 结束 → 程序结束 35
+## pl.delay(1000000)：vtrace 标记所在的 bundle：[('module', 460, 550), ('wait.1', 503, 535)]
+  第 1 次运行，TensorCore 0：程序开始 → kernel 开始 38205，相邻两次读数 20，kernel 1050900，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 1 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 1050920，相邻两次读数 20，kernel 结束 → 程序结束 35
+  第 2 次运行，TensorCore 0：程序开始 → kernel 开始 20392，相邻两次读数 20，kernel 1051104，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 2 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 1051124，相邻两次读数 20，kernel 结束 → 程序结束 35
+  第 3 次运行，TensorCore 0：程序开始 → kernel 开始 30946，相邻两次读数 20，kernel 1050996，相邻两次读数 20，kernel 结束 → 程序结束 94
+  第 3 次运行，TensorCore 1：程序开始 → kernel 开始 103，相邻两次读数 20，kernel 1051016，相邻两次读数 20，kernel 结束 → 程序结束 35

@@ -46,7 +46,7 @@ f = lambda x, i: jnp.take_along_axis(x, i, axis=0)   # y[s,l] = x[i[s,l], l]
 Sublane gather not supported by this TPU generation
 ```
 
-TPU v4 的 XLU 只能沿 lane 方向按索引重排。但沿 sublane 方向有另一条指令：`vrot.slane.down` 把 8 个 sublane 循环移动一位。有了“整体移动”和“逐元素选择”，就能合成任意的 sublane gather：第 k 轮把 x 向上循环移动 k 行，这时第 s 行第 l 列放的是 `x[(s+k)%8, l]`；凡是 `i[s,l] == (s+k)%8` 的位置，就选这一轮的值。
+TPU v4 的 XLU 只能沿 lane 方向按索引重排。但沿 sublane 方向有另一条指令：`vrot.slane.down` 把 8 个 sublane 循环移动一位，第 s 个 sublane 的内容移到第 s − 1 个，第 0 个绕到第 7 个。有了“整体移动”和“逐元素选择”，就能合成任意的 sublane gather：第 k 轮把 x 这样移动 k 次，这时第 s 行第 l 列放的是 `x[(s+k)%8, l]`；凡是 `i[s,l] == (s+k)%8` 的位置，就选这一轮的值。
 
 ```python
 def sublane_gather_by_rotation(x, indices):
@@ -59,7 +59,7 @@ def sublane_gather_by_rotation(x, indices):
     return result
 ```
 
-`jax.lax.broadcasted_iota(dtype, shape, axis)` 生成沿 axis 递增的序号，这里得到每个位置的行号。`pltpu.roll(x, shift, axis)` 是循环移位，语义与 `np.roll` 相同：`out[s] = x[(s - shift) % 8]`，`shift=7` 即向上移动一行。
+`jax.lax.broadcasted_iota(dtype, shape, axis)` 生成沿 axis 递增的序号，这里得到每个位置的行号。`pltpu.roll(x, shift, axis)` 是循环移位，语义与 `np.roll` 相同：`out[s] = x[(s - shift) % 8]`，`shift=7` 时 `out[s] = x[(s + 1) % 8]`，正是一条 `vrot.slane.down`。
 
 这个函数数值正确，共 40 条计算指令，其中 7 条 `vrot.slane.down`、8 条 `vsel`，其余是比较和行号计算。与 lane gather 的 3 条 XLU 指令相比，代价高出一个数量级。它说明了本教程反复出现的一种情况：编译器拒绝，不代表硬件做不到；但硬件没有直接支持的操作，合成出来通常很贵。设计数据布局时，应当让需要按索引重排的轴落在 lane 方向。
 
@@ -79,7 +79,7 @@ lane 方向的移位是一次 XLU 操作，位移量放在标量寄存器中：
 { vr0: vpop.8x128 v1, trf0 }
 ```
 
-sublane 方向则是 5 条 `vrot.slane.down.8x128.u32`。这条指令没有位移量操作数，每次只向下循环移动一个 sublane；向上移动 3 行等于向下移动 5 行，于是要 5 条。上面合成 sublane gather 时，每轮 `roll(rotated, 7, axis=0)` 正好是向下移动一行，所以只需一条。
+sublane 方向则是 5 条 `vrot.slane.down.8x128.u32`。这条指令没有位移量操作数，每次只能把内容移到编号小 1 的 sublane，也没有反方向的指令；`roll(x, 3, axis=0)` 要把内容移到编号大 3 的 sublane，等于朝反方向移 5 次，于是要 5 条。上面合成 sublane gather 时，每轮的 `roll(rotated, 7, axis=0)` 只需一条。
 
 ## 按行 gather：每行一次 DMA
 

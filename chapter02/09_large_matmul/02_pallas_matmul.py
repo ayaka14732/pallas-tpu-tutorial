@@ -142,6 +142,7 @@ def main() -> None:
     lhs, rhs = baseline.inputs(0)
     reference = np.asarray(lhs, np.float32) @ np.asarray(rhs, np.float32)
     pairs = [baseline.inputs(seed) for seed in range(1, 17)]
+    clock = tpuasm_tools.KernelClock(num_cores=2)
     for name, (panels, staged, split_last, chunk) in VARIANTS.items():
         mesh, matmul = build(panels, staged, split_last, chunk)
         compiled = tpuasm_tools.compile(matmul, lhs, rhs, mesh=mesh)
@@ -149,14 +150,16 @@ def main() -> None:
         try:
             listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
         except jax.errors.JaxRuntimeError as error:
-            # 程序太大时，executable 连同编译器元数据无法序列化，也就读不到清单。
+            # 程序太大时，executable 连同编译器元数据无法序列化：读不到清单，也无法插入 LCC 读数，只能用 XProf。
             print(f'## {name}：数值检查通过；无法序列化 executable：{str(error).splitlines()[0]}')
+            times, method = baseline.xprof_times(compiled, pairs), 'XProf'
         else:
             counts = tpuasm_tools.count_mnemonics(listing)
             bundles = sum(line.startswith('{') for line in listing.splitlines())
             print(f'## {name}：数值检查通过；kernel 段 {bundles} 个 bundle；' + '，'.join(f'{mnemonic} {counts[mnemonic]}' for mnemonic in sorted(counts) if mnemonic.split('.')[0] in ('vmatmul', 'vmatpush', 'vdwg', 'dma')))
-        for (device, track, event), value in sorted(baseline.device_times(compiled, pairs).items()):
-            print(f'  XProf {device} {track} {event}：{value:.2f} µs')
+            times, method = baseline.clock_times(clock, compiled, pairs), 'LCC'
+        for op, cycles in times:
+            print(f'  {method}，{op}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
 
 if __name__ == '__main__':
     main()

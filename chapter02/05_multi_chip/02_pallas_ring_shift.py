@@ -3,8 +3,6 @@ import tpu_init
 tpu_init.initialise_local_chips()
 
 import re
-import statistics
-import time
 
 import jax
 from jax import Ref
@@ -60,19 +58,13 @@ def build(mesh: jax.sharding.Mesh, rounds: int):
 
     return shift
 
-def round_time(mesh: jax.sharding.Mesh, x: jax.Array) -> float:
-    """每一轮的时间（微秒）：kernel 内部 64 轮与 32 轮的主机计时之差除以 32。"""
-    times = {}
+def round_cycles(clock: tpuasm_tools.KernelClock, mesh: jax.sharding.Mesh, x: jax.Array) -> float:
+    """每一轮的周期数：kernel 内部 64 轮与 32 轮，各用 LCC 读出 kernel 在 device 0 上的周期数（第三章第 4 节的 KernelClock），相减除以 32。"""
+    cycles = {}
     for rounds in (32, 64):
         compiled = tpuasm_tools.compile(build(mesh, rounds), x, mesh=mesh)
-        jax.block_until_ready(compiled(x))
-        samples = []
-        for _ in range(20):
-            start = time.perf_counter()
-            jax.block_until_ready(compiled(x))
-            samples.append(time.perf_counter() - start)
-        times[rounds] = statistics.median(samples)
-    return (times[64] - times[32]) / 32 * 1e6
+        cycles[rounds] = clock.kernel_cycles(compiled, lambda timed: jax.block_until_ready(timed(x)))
+    return (cycles[64] - cycles[32]) / 32
 
 def main() -> None:
     devices = {device.id: device for device in jax.devices()}
@@ -80,6 +72,7 @@ def main() -> None:
         'jax.make_mesh 的顺序': [device.id for device in jax.make_mesh((4,), ('device',)).devices.flat],
         '物理环的顺序': [0, 1, 3, 2],
     }
+    clock = tpuasm_tools.KernelClock(num_cores=1)
     for name, order in orders.items():
         mesh = jax.sharding.Mesh(np.array([devices[i] for i in order]), ('device',))
         coords = [tuple(devices[i].coords[:2]) for i in order]
@@ -88,7 +81,7 @@ def main() -> None:
         compiled = tpuasm_tools.compile(build(mesh, 1), x, mesh=mesh)
         np.testing.assert_array_equal(np.asarray(compiled(x)), np.roll(np.asarray(x), 1, axis=0))
         print(f'## {name}：mesh 中依次为 device {order}，坐标 {coords}；环上每一步的跳数 {hops}')
-        print(f'  一轮数值检查通过；每轮约 {round_time(mesh, x):.2f} µs')
+        print(f'  一轮数值检查通过；每轮 {round_cycles(clock, mesh, x):.0f} 个周期')
     print('## 物理环、1 轮时的 kernel 段清单（去掉源码注释与编码约束）')
     listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
     text = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', '\n'.join(line.split('#')[0].rstrip() for line in listing.splitlines()))
