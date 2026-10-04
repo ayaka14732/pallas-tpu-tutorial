@@ -14,7 +14,7 @@ PUSH_LATENCY = {'erf': 7, 'mrf': 83, 'trf': 6, 'crf': 53, 'v2sf': 42}
 # vmax.index.xlane 与 vmin.xlane 由第一章第 14 节测得。
 XLU_LATENCY = {'vadd.xlane': 79, 'vmax.xlane': 79, 'vmax.index.xlane': 79, 'vmin.xlane': 79, 'vrot.': 69, 'vperm.': 69}
 # 同一个队列上，相邻两条提交（push）或取回（pop）指令的最小发射间隔，未列出的为 1。
-INTERVAL = {'push erf': 2, 'push mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
+INTERVAL = {'push erf': 2, 'push mrf': 8, 'pop mrf': 8, 'push trf': 8, 'pop trf': 8, 'push crf': 2, 'pop crf': 2}
 # 同一单元上相邻两条指令的最小间隔，按助记符前缀匹配：vrng 每条让生成器走 8 步（第四章第 6 节）。
 UNIT_INTERVAL = {'vrng': 8}
 SLD_INTERVAL = 4  # 相邻两条 sld 至少相隔 4 个周期（第 4 节）。

@@ -55,6 +55,10 @@ def main() -> None:
     print('## MXU：连续 k 次 vmatmul，再连续取回 k 次')
     for count in (1, 2, 4, 8, 16):
         show(probe, f'k = {count:2d}', read_lcc(20) + bundle('vx0: vmatmul.8x128.f32 mrf0, v10') * count + bundle('vr0: vpop.8x128 v11, mrf0') * count + END, MXU_SETUP)
+    print('## MXU：8 次 vmatmul，200 个 vnop 之后取回 j 次（其余的在读数之后取回）')
+    for count in (1, 2, 4, 8):
+        pops = bundle('vr0: vpop.8x128 v11, mrf0')
+        show(probe, f'j = {count}', read_lcc(20) + bundle('vx0: vmatmul.8x128.f32 mrf0, v10') * 8 + bundle('misc: vnop') * 200 + pops * count + END + pops * (8 - count), MXU_SETUP)
     print('## XLU：16 次 vxpose，提交之间插入 g 个 vnop')
     for gap in (0, 1, 2, 4, 8):
         submit = ''.join(bundle(xpose(index)) + bundle('misc: vnop') * gap for index in range(16))
