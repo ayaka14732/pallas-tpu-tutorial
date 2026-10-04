@@ -4,6 +4,29 @@
 
 本节实验：最小 kernel [源码](01_pallas_scale.py)、[输出](01_pallas_scale.txt)；值与 Ref [源码](02_pallas_values_and_refs.py)、[输出](02_pallas_values_and_refs.txt)；检查开关 [源码](03_pallas_checks.py)、[输出](03_pallas_checks.txt)。
 
+## 先认识硬件
+
+写 kernel 之前，先要知道数据放在哪里、由谁处理。本章只用到一颗 TPU v4 芯片上的一个 TensorCore，涉及的部件如下：
+
+```text
+一颗 TPU v4 芯片
+├─ HBM：芯片的主存。JAX 数组（jax.Array）的数据就放在这里
+└─ TensorCore（每颗芯片 2 个，本章只用第 0 个）
+   ├─ 标量单元：32 位的标量寄存器 s0–s31，做地址计算、循环和分支，并负责发起 DMA
+   ├─ 向量单元：做逐元素运算
+   │  └─ TC VREG：32 个向量寄存器 v0–v31，每个存放 8 行 × 128 列、每个位置 32 bit 的数据
+   ├─ TC VMEM：这个 TensorCore 私有的片上内存，16 MiB
+   └─ SMEM：标量单元使用的小内存，1 MiB
+```
+
+这些名字在后面各节都会详细介绍，这里只需要记住三件事：
+
+- **向量单元不能直接访问 HBM。** 它只能把 TC VMEM 中的数据读进 TC VREG（load），在 TC VREG 上运算，再写回 TC VMEM（store）。
+- **HBM 与 TC VMEM 之间的数据由 DMA 搬运。** DMA（direct memory access）是一个独立于向量单元的搬运机构：标量单元发出“把这一段从这里搬到那里”的请求之后，搬运在后台进行，TensorCore 可以继续执行别的指令。
+- **数据以 tile 为单位处理。** 一个 TC VREG 是 8 行 × 128 列，所以数组被切成 `8×128` 的块，每块称为一个 tile。本节的例子 `f32[8,128]` 恰好是一个 tile。行与列在硬件上分别叫 sublane 和 lane（本章第 4 节）。
+
+所以一个 kernel 最基本的形态就是三步：用 DMA 把输入从 HBM 搬到 TC VMEM，在 TC VMEM 与 TC VREG 之间读、算、写，再用 DMA 把结果搬回 HBM。下面的最小 kernel 正是这三步。
+
 ## 完整的程序
 
 下面的程序把一个 `f32[8,128]` 乘以 2，省略了 import 和数值检查：
@@ -42,6 +65,8 @@ def scale(x: jax.Array) -> jax.Array:
 x = jnp.arange(8 * 128, dtype=jnp.float32).reshape(8, 128)
 y = jax.jit(scale)(x)
 ```
+
+其中 `Ref` 是 `from jax import Ref`，`pl` 是 `jax.experimental.pallas`，`pltpu` 是 `jax.experimental.pallas.tpu`，`P` 是 `jax.sharding.PartitionSpec`。
 
 程序分为三层：最外层决定用几颗芯片，中间一层（`shard_map`）决定每颗芯片执行什么，最内层（`pl.kernel`）是 TensorCore 上运行的 kernel。下面逐层说明。
 
@@ -87,7 +112,7 @@ os.environ['LIBTPU_INIT_ARGS'] = '--deepsea_chip_config_name=legacy'
 | `mesh` | kernel 在哪个 mesh 上执行，这里是只含一个 TensorCore 的 `tc_mesh` |
 | `scratch_types` | kernel 运行期间临时使用的 buffer 和信号量，kernel 结束即释放 |
 | `name` | kernel 的名字，出现在 HLO 和机器清单中，方便查找 |
-| `compiler_params` | 传给 Mosaic 编译器的参数，见本节最后一小节 |
+| `compiler_params` | 传给 Mosaic 的参数，见本节最后一小节。Mosaic 是 Pallas 在 TPU 上使用的编译器，负责把 kernel 函数翻译成 TensorCore 的指令 |
 
 装饰后的 `kernel` 像普通 JAX 函数一样调用：`kernel(x)` 返回一个 `out_type` 形状的数组。
 
@@ -102,7 +127,7 @@ Ref 是一块内存的引用，不是数组的值。输入输出 Ref 指向的�
 `scratch_types` 中：
 
 - `pltpu.VMEM(shape, dtype)` 在 TC VMEM 中分配一个 buffer；
-- `pltpu.SemaphoreType.DMA` 分配一个 DMA 信号量，用于等待 DMA 完成；`pltpu.SemaphoreType.DMA((n,))` 分配 n 个。
+- `pltpu.SemaphoreType.DMA` 分配一个 DMA 信号量，用于等待 DMA 完成；`pltpu.SemaphoreType.DMA((n,))` 分配 n 个。信号量是硬件上的一个计数器：DMA 在后台进行，完成时给指定的计数器加上搬运的数量；kernel 等待这个计数器达到预期的值，就知道 DMA 已经完成。下一节在机器清单中会看到这个计数器。
 
 ## kernel 主体：DMA、读 Ref、写 Ref
 
@@ -114,7 +139,7 @@ kernel 主体只有三行。
 pltpu.async_copy(x_hbm, x_vmem, sem).wait()
 ```
 
-TensorCore 的向量单元只能读写 TC VMEM，不能直接访问 HBM，所以 HBM 中的数据必须先用 DMA 搬进来。`pltpu.async_copy(源, 目的, 信号量)` 发起一次 DMA 并立即返回一个描述符，DMA 在后台进行；`.wait()` 等到这次 DMA 完成。发起和等待可以分开写，中间插入其他工作，本章第 3 节会用到这一点。
+TensorCore 的向量单元只能读写 TC VMEM，不能直接访问 HBM，所以 HBM 中的数据必须先用 DMA 搬进来。`pltpu.async_copy(源, 目的, 信号量)` 发起一次 DMA 并立即返回一个描述符，DMA 在后台进行；`.wait()` 等到这次 DMA 完成。如果不等待就去读 `x_vmem`，读到的可能是还没有搬完的旧数据，所以每次 DMA 都要在使用它的结果之前等待。发起和等待可以分开写，中间插入不依赖这次 DMA 的其他工作，本章第 3 节会用到这一点。
 
 第二行是计算：
 
@@ -132,14 +157,14 @@ pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 
 ## 编译与调用
 
-调用 `jax.jit(scale)(x)` 时，JAX 先追踪 `scale` 得到计算图，Pallas 把 `kernel` 交给 Mosaic 编译成 TensorCore 程序，再嵌入整个 XLA 程序。实验打印的编译后 HLO 中，整个 kernel 是一条 `custom-call`：
+调用 `jax.jit(scale)(x)` 时，JAX 先追踪 `scale` 得到计算图，交给 XLA 编译。XLA 内部用 HLO 表示计算图：每条 HLO 指令是一个运算，例如一次加法、一次矩阵乘法。Pallas kernel 不由 XLA 展开成这些运算，而是由 Mosaic 单独编译成 TensorCore 程序，在 HLO 中作为一条不透明的 `custom-call` 指令出现；XLA 只负责在这条指令前后安排输入输出。实验打印的编译后 HLO 中，整个 kernel 就是这一条：
 
 ```text
 ENTRY %main.1 (x_hbm.1: f32[8,128]) -> f32[8,128] {
 ROOT %scale.1 = f32[8,128]{1,0:T(8,128)} custom-call(%x_hbm.1), custom_call_target="tpu_custom_call", ...
 ```
 
-输出的 layout 写作 `{1,0:T(8,128)}`：数组在 HBM 中按 `8×128` 的 tile 存放。本章第 3、4 节会反复用到这一点。
+输出的 layout 写作 `{1,0:T(8,128)}`：数组在 HBM 中也是按 `8×128` 的 tile 存放的，与 TC VREG 的形状一致，所以 DMA 搬进 TC VMEM 的数据可以直接一个 tile 一个 tile 地读进 TC VREG。本章第 3、4 节会反复用到这一点。
 
 实验脚本不直接调用 `jax.jit`，而是用 [`tpuasm_tools.compile`](../../tpuasm_tools.py)。两者的编译结果相同，后者在编译时保留源码位置，以便下一节读机器清单。
 
@@ -156,7 +181,7 @@ o_vmem[...] = y * x + y + x
 o_vmem[0:8, :] = x_vmem[8:16, :]
 ```
 
-清单中的向量指令只有：
+机器清单（下一节介绍怎样取得和阅读）中的向量指令只有下面 7 条，这里改写成便于阅读的形式，`vld` 是 load、`vst` 是 store：
 
 ```text
 vld  v0 ← [vmem:0x8]          # x 的第 8–15 行

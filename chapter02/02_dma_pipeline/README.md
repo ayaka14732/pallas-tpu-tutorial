@@ -15,7 +15,7 @@
 | Megacore Shared CMEM → TC VMEM | `311 + 0.5K` | 约 2150 GB/s |
 | TC VMEM → Megacore Shared CMEM | `309 + 1K` | 约 1080 GB/s |
 
-> 暂且可以理解为：这些数字是在 kernel 中直接读取 TensorCore 的周期计数器得到的，TensorCore 的时钟约为 1.05 GHz。第三章第 4–5 节介绍这种计时方法，第 7 节介绍时钟频率是怎样标定的。
+> 暂且可以理解为：这些数字是在 kernel 中直接读取 TensorCore 的周期计数器得到的，TensorCore 的时钟约为 1.05 GHz。第三章第 3–4 节介绍这种计时方法，第 7 节介绍时钟频率是怎样标定的。
 
 这张表给出两个设计原则：
 
