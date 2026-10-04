@@ -22,7 +22,7 @@
 | XLU：`vadd.xlane` → `trf0` | 79 | 8 | — | 本节 01 |
 | XLU：lane 循环移位 `vrot`、重排 `vperm` → `trf0` | 69 | 8 | — | 本节 01 |
 | CMEM：`cld` → `crf` | 53 | 2 | 2 | 第 4 节，第二章第 3 节 |
-| 向量 → 标量：`vpush` → `v2sf` → `spop` | 42，`spop` 在标量一侧等待 | — | — | 本节 01 |
+| 向量 → 标量：`vpush` → `v2sf` → `spop` | 42（从 `vpush` 向量发射算起；它最早在标量发射后 1 个周期向量发射，所以 `spop` 最早在 `vpush` 标量发射后 43 个周期执行），`spop` 在标量一侧等待 | — | — | 本节 01 |
 
 `mrf2`、`mrf3` 的结果比 `mrf0`、`mrf1` 晚 18 个周期，即 101（[研究报告 55](../../../pallas-tpu-readings-dev/research_reports/55_tpu_v4_mrf_latency.md)）。
 
