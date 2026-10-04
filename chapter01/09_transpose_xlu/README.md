@@ -150,7 +150,7 @@ TPU v4 的 TensorCore 有两个 XLU，结果分别进入 `trf0` 和 `trf1`。两
 
 XLA 中转置是一条改变 layout 的 `copy`。同样的七个条件中，有两处差别值得注意：
 
-- bf16：XLA 先 unpack 成 f32，按 16 个 b32 TC VREG 提交，再 pack 写回（8 次 `vunpackl`、8 次 `vunpacku`、16 次提交、8 次 `vpackc`）。Pallas 直接以打包格式提交 8 次，XLU 的工作量是 XLA 的一半。
+- bf16：XLA 先 unpack 成 f32，按 16 个 b32 TC VREG 提交，再 pack 写回（8 次 `vunpackl`、8 次 `vunpacku`、16 次提交、8 次 `vpackc`）。Pallas 直接以打包格式提交 8 次，省去全部 unpack 与 pack，提交和取回的指令条数是 XLA 的一半；XLU 占用的时间由行数决定（上文），两者相同。
 - 多个矩阵：XLA 为每个矩阵生成一条独立的 `copy`，三个矩阵的 48 次提交全部进入 `trf0`，第二个 XLU 闲置。Pallas 在同一个 kernel 中把它们分给两个 XLU。
 
 `f32[256,256]` 和 `f32[129,129]` 的条件下，XLA 与 Pallas 一样把四个区域分给 `trf0` 和 `trf1`，提交和取回的次数相同。

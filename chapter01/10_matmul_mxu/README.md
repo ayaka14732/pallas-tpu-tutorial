@@ -1,6 +1,6 @@
 # 矩阵乘法与 MXU
 
-矩阵乘法由 TensorCore 的矩阵单元 MXU 完成。本节从最小的 `bf16[16,128] @ bf16[128,128]` 出发，看清 MXU 的数据怎样进出、内部有哪些状态；再只改 RHS 的存放方向、dtype、M、N、K；最后用 Pallas 的低层接口显式控制 MXU，并用 tpuasm 查明和修正这条接口在 TPU v4 上的错误。
+矩阵乘法由 TensorCore 的矩阵单元 MXU 完成。本节把乘法写作 `lhs @ rhs`：左操作数 LHS 是 `M×K`，右操作数 RHS 是 `K×N`，结果是 `M×N`；M 是 LHS 的行数，K 是被求和消去的那个维度，N 是结果的列数。本节从最小的 `bf16[16,128] @ bf16[128,128]` 出发，看清 MXU 的数据怎样进出、内部有哪些状态；再只改 RHS 的存放方向、dtype、M、N、K；最后用 Pallas 的低层接口显式控制 MXU，并用 tpuasm 查明和修正这条接口在 TPU v4 上的错误。
 
 ![MXU 的数据流](00_mxu_dataflow.svg)
 

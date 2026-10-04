@@ -15,7 +15,7 @@
 | Megacore Shared CMEM → TC VMEM | `311 + 0.5K` | 约 2150 GB/s |
 | TC VMEM → Megacore Shared CMEM | `309 + 1K` | 约 1080 GB/s |
 
-> 暂且可以理解为：这些数字是在 kernel 中直接读取 TensorCore 的周期计数器得到的，TensorCore 的时钟约为 1.05 GHz。第三章第 3–4 节介绍这种计时方法，第 7 节介绍时钟频率是怎样标定的。
+> 暂且可以理解为：这些数字是在 kernel 中直接读取 TensorCore 的周期计数器得到的，TensorCore 的时钟约为 1.05 GHz。第三章第 3–4 节介绍这种计时方法，第三章第 6 节介绍时钟频率是怎样标定的。
 
 这张表给出两个设计原则：
 
@@ -145,8 +145,6 @@ for group in copies:
 上表的趋势可以用开头的代价表解释。这个流水线中，同一时刻只有一个输入 DMA 在进行：等到当前 tile 才发出下一个。所以每个 tile 至少要付一次完整的输入 DMA，包括约 480 个周期的固定开销；tile 越小，固定开销占的比例越大。1 MiB 的 tile 时，32 MiB 的读写在 43872 个周期内完成，每 KiB 约 1.34 个周期，约 800 GB/s，开始接近 HBM 的带宽（读写共用 HBM，每 KiB 约 1.05–1.1 个周期，约 1 TB/s）。
 
 要进一步隐藏固定开销，可以让同一方向同时有多个 DMA 在进行：latency-numbers 的测量表明，同时发出 4 个 DMA 再一起等待时，固定开销只付一次（`470.6 + 4.76K`，K 为每个 DMA 的 KiB 数）。流水线的深度（同时进行几个 DMA）和 tile 的大小是两个独立的设计参数，前者受 TC VMEM 容量的限制，后者还影响计算部分的组织。
-
-
 
 这里还有一个陷阱：如果不用 `pltpu.HBM(...)` 固定输出的内存空间，而在 XLA 的循环中反复调用 kernel 来计时，XLA 会把循环中传递的数组放进 Megacore Shared CMEM，kernel 的 DMA 也随之变成 CMEM 与 TC VMEM 之间的搬运，测到的就不是 HBM 的通路了。本节的 kernel 因此把输出固定为 `out_type=pltpu.HBM(x.shape, x.dtype)`，并把重复放在 kernel 内部。
 

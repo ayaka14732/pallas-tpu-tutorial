@@ -1,6 +1,7 @@
-"""本节脚本共用：从主机只读地读出一颗芯片 6 个 ICI 端口的 GTC 寄存器（角色与计数）。"""
+"""本节脚本共用：从主机只读地读出一颗芯片 6 个 ICI 端口的 GTC 寄存器（角色与计数），以及找出一个 JAX device 对应哪个 /dev/accel*。"""
 import mmap
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -26,3 +27,22 @@ def read_ports(chip: int) -> list[tuple[int, int]]:
 
 def describe(ports: list[tuple[int, int]]) -> str:
     return '、'.join(f'端口 {port} {ROLES[role]}' for port, (role, _) in enumerate(ports))
+
+def interrupt_counts() -> list[int]:
+    """本 host 四颗芯片各自的中断总数（/sys/class/accel/accel*/interrupt_counts 各行之和）。"""
+    return [sum(int(line.split(':')[1]) for line in Path(f'/sys/class/accel/accel{chip}/interrupt_counts').read_text().splitlines() if ':' in line) for chip in range(4)]
+
+def accel_index(device) -> int:
+    """JAX device 对应的 /dev/accel* 编号。device 没有给出这个编号的属性（local_hardware_id 不是它），所以实测：只在这个 device 上反复运行一个小程序，看哪颗芯片的中断数在增加。"""
+    import jax
+    import jax.numpy as jnp
+    x = jax.device_put(jnp.ones((8, 128), jnp.float32), device)
+    step = jax.jit(lambda x: x + 1.0)
+    step(x).block_until_ready()
+    before = interrupt_counts()
+    for _ in range(64):
+        x = step(x)
+    x.block_until_ready()
+    increases = [after - earlier for after, earlier in zip(interrupt_counts(), before)]
+    chip, = [chip for chip, increase in enumerate(increases) if increase >= 64]
+    return chip
