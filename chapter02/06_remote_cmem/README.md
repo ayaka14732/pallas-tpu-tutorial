@@ -91,7 +91,7 @@ canonical 格式改变了 99 个 bundle 的字节，结果仍然正确：改变�
 
 但这依赖汇编器对每一条指令的理解都完整、正确。只要有一条指令的某个字段没有体现在清单文本里，canonical 格式就会在重新汇编时把它丢掉，而且出错的可能是与改写毫无关系的 runtime 代码。本教程写作时就遇到过一次：tpuasm 曾把 mask 寄存器之间的移动（例如 `vm4 ← vm7`）显示成 `misc: vnop`，目的和源寄存器只留在 `.encoding` 约束里。canonical 格式丢掉约束后，runtime 代码中的一次 mask 移动变成了真正的空操作，这个实验因此挂起，直到在被改变的一百来个 bundle 中对半排查，才定位到这一个 bundle。逐字节精确的清单没有这个风险：没有被修改的 bundle 根本不经过重新编码。所以改写已编译的程序时，默认用精确格式，只改动必须改动的 bundle，其余部分保持编译器生成的原样；`edit_bundles` 和 `insert_bundles` 都是这样做的。
 
-## 代价
+## 开销
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/results/04_cmem.md) 测得，相邻芯片之间 CMEM → CMEM 的 remote DMA 为 `1840.7 + 24.77K` 个周期（K 为 KiB 数），比 TC VMEM → TC VMEM（`1941.1 + 24.77K`）的固定开销少约 100 个周期，每 KiB 开销相同：带宽由 ICI 链路决定，与两端是哪种内存无关。
 

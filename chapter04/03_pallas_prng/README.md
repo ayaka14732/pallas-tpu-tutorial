@@ -37,7 +37,7 @@ prng_seed(7, 1)：状态与主机上的 threefry2x32(key=(1, 7), 计数器=(i, i
 
 之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
 
-种子的个数几乎不影响代价，但最多只能有两个：
+种子的个数几乎不影响开销，但最多只能有两个：
 
 ```text
 prng_seed(7,)：118 条，其中 vshll 20

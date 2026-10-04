@@ -1,6 +1,6 @@
 # 多芯片：shard_map、拓扑与 ICI
 
-从这一节开始，程序跨越多颗芯片。芯片之间通过 ICI（芯片间互联）直接相连，上一节的 remote DMA 和信号量换一个 `device_id` 就能跨芯片使用。本节先看芯片在 JAX 中怎样编号、怎样排进 mesh，再看跨芯片 remote DMA 的代价，以及为什么 mesh 中的顺序不等于物理上的相邻关系。
+从这一节开始，程序跨越多颗芯片。芯片之间通过 ICI（芯片间互联）直接相连，上一节的 remote DMA 和信号量换一个 `device_id` 就能跨芯片使用。本节先看芯片在 JAX 中怎样编号、怎样排进 mesh，再看跨芯片 remote DMA 的开销，以及为什么 mesh 中的顺序不等于物理上的相邻关系。
 
 ## 本 host 的四颗芯片
 
@@ -111,7 +111,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 
 清单的最后，输出 DMA 之后，是第 1 节见过的出口汇合：从 `[smem:0x0]`、`[smem:0x1]` 拼出同一颗芯片上另一个 TensorCore 的 sflag 45 的地址，`vsyncadd.remote` 给它加 1，再等自己的 sflag 45。它与本节的四方汇合无关，跨芯片的 kernel 同样只在芯片内部两个 TensorCore 之间做这一次汇合。
 
-## 跨芯片的代价
+## 跨芯片的开销
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/results/04_remote.md) 测得，TC VMEM → 另一颗芯片的 TC VMEM（K 为 KiB 数，周期数从发起到确认完成）：
 

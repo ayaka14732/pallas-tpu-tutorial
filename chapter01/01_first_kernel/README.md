@@ -19,7 +19,7 @@
    └─ SMEM：标量单元使用的小内存，1 MiB
 ```
 
-这些名字在后面各节都会详细介绍，全书的术语和对应的英文列在[首页的术语对照表](../../README.md#术语中英文对照)中。这里只需要记住三件事：
+这些名字在后面各节都会详细介绍，全书的术语和对应的英文列在[附录的术语中英文对照](../../appendix_glossary/README.md)中。这里只需要记住三件事：
 
 - **向量单元不能直接访问 HBM。** 它只能把 TC VMEM 中的数据读进 TC VREG（load），在 TC VREG 上运算，再写回 TC VMEM（store）。
 - **HBM 与 TC VMEM 之间的数据由 DMA 搬运。** DMA（direct memory access）是一个独立于向量单元的搬运机构：标量单元发出“把这一段从这里搬到那里”的请求之后，搬运在后台进行，TensorCore 可以继续执行别的指令。
@@ -228,4 +228,6 @@ compiler_params=pltpu.CompilerParams(
 - 每次 DMA 之前，都有一串标量比较和一条带谓词的 `shalt`，注释为 `BoundsCheck ... for dma.hbm_to_vmem`。这是越界检查：DMA 的地址超出 buffer 时停机，而不是悄悄读写别处的内存。
 - kernel 结束前有一条 `shalt`，注释为 `Semaphore (scratch argument 1) has a nonzero value upon exit from a Mosaic kernel`。这是信号量检查：若退出时信号量不为 0，说明某次 DMA 没有等待，或者 signal 与 wait 没有配对。
 
-这两类检查在调试时有用，但它们是额外的标量指令和分支，与要研究的硬件操作无关。本教程关闭它们，使机器清单只剩下 kernel 本身。代价是：写错地址或漏写 `.wait()` 时，kernel 不会停机报错，而是读到错误的数据或在下一次运行时出错。新写的 kernel 出现异常结果时，应先打开这两项检查重新运行。
+这两类检查都是额外的标量指令和分支，kernel 每次运行都要执行，与要完成的计算无关。它们其实与 Pallas 自身的取向相悖：Pallas 为了不引入运行时开销，连负数下标都不支持，默认情况下却在每次 DMA 之前插入一串比较。所以这两个参数不是“调试时才关”的开关，而是应当始终设置：本教程的每个 kernel 都带着它们，机器清单中只剩下 kernel 本身。
+
+关闭之后，写错地址或漏写 `.wait()` 时，kernel 不会停机报错，而是读到错误的数据，或者在下一次运行时出错。这类错误不靠运行时检查来防：地址和等待是否正确，在机器清单中都看得见（DMA 的端点与长度、每个信号量的 `vwait` 与 `vsyncadd` 是否配对），再用数值检查确认结果。本教程的每个实验都是这样做的。

@@ -202,4 +202,4 @@ LCC 数的是本芯片时钟的周期，每个 TensorCore 各有一个。由此�
 
 所以 LCC 适合回答“这段代码在这个 TensorCore 上要多少周期”，这也是优化一个 kernel 时要问的问题。要比较不同 TensorCore、不同芯片上的事件，或者要一个以秒为单位的时间，用第 6 节的全局时钟 GTC；LCC 的频率也是在那里借助 GTC 和主机时钟标定的。
 
-[tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/README.md) 用同样的载体与读法测量了第二章引用的全部 DMA 代价。[研究报告 48](../../../pallas-tpu-readings-dev/research_reports/48_scalar_cycle_lowering.md) 则走了另一条路：为读 LCC 增加一个 Pallas primitive 和它的 lowering，由编译器生成读数指令。两条路得到的读法相同。
+[tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/README.md) 用同样的载体与读法测量了第二章引用的全部 DMA 开销。[研究报告 48](../../../pallas-tpu-readings-dev/research_reports/48_scalar_cycle_lowering.md) 则走了另一条路：为读 LCC 增加一个 Pallas primitive 和它的 lowering，由编译器生成读数指令。两条路得到的读法相同。

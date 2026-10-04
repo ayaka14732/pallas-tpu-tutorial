@@ -1,6 +1,6 @@
 # 前缀扫描
 
-前缀和把每个位置换成它和它之前所有元素之和：`y[i] = x[0] + … + x[i]`。归约只要最后一个数，前缀和要保留每一步的中间结果，所以不能直接套用上一节的 XLU 归约或二叉树。本节先看 Pallas 能否直接写 `jnp.cumsum`，再分别沿 lane 和沿 sublane 设计实现，并说明为什么同一个算法在两个方向上的代价不同。
+前缀和把每个位置换成它和它之前所有元素之和：`y[i] = x[0] + … + x[i]`。归约只要最后一个数，前缀和要保留每一步的中间结果，所以不能直接套用上一节的 XLU 归约或二叉树。本节先看 Pallas 能否直接写 `jnp.cumsum`，再分别沿 lane 和沿 sublane 设计实现，并说明为什么同一个算法在两个方向上的开销不同。
 
 ## jnp.cumsum 不能用
 
@@ -31,7 +31,7 @@ def hillis_steele_lanes(x):
 
 bf16 输入先 unpack 成 f32，其余相同。
 
-## 沿 sublane：方向决定代价
+## 沿 sublane：方向决定开销
 
 同样的算法改为沿 sublane，3 轮即可（8 = 2³）：
 
@@ -43,7 +43,7 @@ for d in range(3):
 
 结果正确，但用了 17 条 `vrot.slane.down`。上一节已经看到，`pltpu.roll(x, k, axis=0)` 降低成 `(8 - k) % 8` 条 `vrot.slane.down`：位移 1、2、4 分别要 7、6、4 条。
 
-`vrot.slane.down` 只朝一个方向移动，把它的方向用作前缀和要走的方向，代价最低。实际上，后缀和 `y[i] = x[i] + … + x[7]` 正好需要 roll 位移为 7、6、4，即每轮 1、2、4 条 `vrot.slane.down`：
+`vrot.slane.down` 只朝一个方向移动，把它的方向用作前缀和要走的方向，开销最低。实际上，后缀和 `y[i] = x[i] + … + x[7]` 正好需要 roll 位移为 7、6、4，即每轮 1、2、4 条 `vrot.slane.down`：
 
 ```python
 for d in range(3):
@@ -51,7 +51,7 @@ for d in range(3):
     x = x + jnp.where(sublane < 8 - shift, pltpu.roll(x, 8 - shift, axis=0), 0)
 ```
 
-结果正确，只用 7 条移位。前缀和与后缀和在数学上对称，在 TPU v4 上代价却差一倍多。需要沿 sublane 扫描时，可以先把数据的行序颠倒存放，再做后缀和。
+结果正确，只用 7 条移位。前缀和与后缀和在数学上对称，在 TPU v4 上开销却差一倍多。需要沿 sublane 扫描时，可以先把数据的行序颠倒存放，再做后缀和。
 
 ## 沿 sublane 的另一种做法：逐行广播
 

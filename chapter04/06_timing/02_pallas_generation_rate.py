@@ -32,7 +32,7 @@ def main() -> None:
             compiled = tpuasm_tools.compile(draw, mesh=mesh)
             compiled().block_until_ready()
             times[tiles] = kernel_cycles(clock, compiled)
-        # 与循环体只生成全零的 kernel 相比，多出的计算指令就是每次生成的代价。
+        # 与循环体只生成全零的 kernel 相比，多出的计算指令就是每次生成的开销。
         mesh, empty = build(rows, lambda rows, step: jnp.zeros((rows, 128), jnp.uint32), 1)
         ops = (compute_ops(compiled) - compute_ops(tpuasm_tools.compile(empty, mesh=mesh))) / (rows // 8)
         cycles = (times[TILES[1]] - times[TILES[0]]) / (TILES[1] - TILES[0])

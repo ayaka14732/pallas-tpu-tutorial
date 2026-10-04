@@ -6,7 +6,7 @@
 
 本小节实验[源码](01_pallas_scale_64x128.py)、[输出](01_pallas_scale_64x128.txt)。
 
-TPU v4 TensorCore 的一个向量寄存器（TC VREG）由 8 个 sublane、每个 sublane 128 个 lane 组成，每个位置 32 bit，共 4096 B：
+TPU v4 TensorCore 的一个向量寄存器（TC VREG）由 8 个 sublane（子通道）、每个 sublane 128 个 lane（通道）组成，每个位置 32 bit，共 4096 B：
 
 ![8 行 128 列的 b32 TC VREG](00_b32_tc_vreg_grid.svg)
 

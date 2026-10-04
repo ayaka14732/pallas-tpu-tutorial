@@ -1,6 +1,6 @@
 # 主机内存
 
-TensorCore 能直接搬运的内存不止芯片上的这几种。kernel 还可以读写主机（CPU 一侧）的 pinned host memory：把暂时不用的数据卸载到主机，腾出 HBM；或者在 kernel 运行期间与主机交换数据。本节看清这条通路在 TPU v4 上怎样工作、代价多大、公开接口有哪些限制，以及怎样用 tpuasm 绕过其中一个。
+TensorCore 能直接搬运的内存不止芯片上的这几种。kernel 还可以读写主机（CPU 一侧）的 pinned host memory：把暂时不用的数据卸载到主机，腾出 HBM；或者在 kernel 运行期间与主机交换数据。本节看清这条通路在 TPU v4 上怎样工作、开销多大、公开接口有哪些限制，以及怎样用 tpuasm 绕过其中一个。
 
 ## 写法：主机内存中的输入与输出
 
@@ -55,7 +55,7 @@ HBM 与 TC VMEM 之间仍是熟悉的 `dma.simple`，但主机与 HBM 之间的�
 
 TensorCore 没有自己发起这次 DMA。它把长度、主机地址和请求写进三个同步标志组成的邮箱，用 `vint 2` 中断主机，由主机上的 TPU runtime 完成搬运，再给 DMA 信号量加上 8。kernel 中的 `.wait()` 与其他 DMA 一样，只是等待的对象变成了主机。
 
-## 代价
+## 开销
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/README.md) 测得，TensorCore 发起 HBM → pinned host，从 `vint` 之前到完成：
 

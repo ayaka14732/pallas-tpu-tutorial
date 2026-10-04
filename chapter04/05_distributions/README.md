@@ -24,7 +24,7 @@ def per_tile(listing: str, baseline: str) -> str:
     total = sum(difference.values()) / TILES
 ```
 
-这样种子混合、`vrng`、DMA 与 `vst` 都被减掉，剩下的就是变换本身每个 TC VREG 的代价。`excerpt` 从清单中取出第一条 `vrng`（或 `vlog2`）开始的几个 bundle，作为变换的实际指令序列。
+这样种子混合、`vrng`、DMA 与 `vst` 都被减掉，剩下的就是变换本身每个 TC VREG 的开销。`excerpt` 从清单中取出第一条 `vrng`（或 `vlog2`）开始的几个 bundle，作为变换的实际指令序列。
 
 ## 均匀分布
 
@@ -181,13 +181,13 @@ def box_muller():
 
 每两个正态数只要一次 `vlog2` 和一次 `vrsqrt`，EUP 指令少一半；但每个正态数 TC VREG 需要约 121 条计算指令，比反误差函数还多。原因是 TPU v4 的 EUP 只有 `vpow2`、`vlog2`、`vrcp`、`vrsqrt`、`vtanh`（第一章第 6 节），没有正弦和余弦：`jnp.cos`、`jnp.sin` 要先做范围归约（清单中大量的 `vcvt`、`vand`、`vshrl`、`vshll`），再用多项式近似。两个输出的相关系数 0.0018，分布同样正确。
 
-在 TPU v4 上，正态分布的代价主要在变换，选择变换时要按“EUP 有哪些函数”来估算，而不是按教科书上的运算次数。
+在 TPU v4 上，正态分布的开销主要在变换，选择变换时要按“EUP 有哪些函数”来估算，而不是按教科书上的运算次数。
 
 ## 指数分布与 Gumbel 分布
 
 本小节实验[源码](04_pallas_exponential_gumbel.py)、[输出](04_pallas_exponential_gumbel.txt)。
 
-指数分布是 `−log u`，Gumbel 分布是 `−log(−log u)`。u 必须避开 0，这里用 `2 − [1, 2)` 直接得到 `(0, 1]`，与 `[0, 1)` 的代价相同：
+指数分布是 `−log u`，Gumbel 分布是 `−log(−log u)`。u 必须避开 0，这里用 `2 − [1, 2)` 直接得到 `(0, 1]`，与 `[0, 1)` 的开销相同：
 
 ```python
 def open_uniform():

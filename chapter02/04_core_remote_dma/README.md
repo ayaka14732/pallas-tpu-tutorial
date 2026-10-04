@@ -68,7 +68,7 @@ remote DMA 是一条 `dma.general`：
 
 > 暂且可以理解为：`ici_dest` 编码了目的 TensorCore 所在的芯片与编号，同一颗芯片内与跨芯片使用同样的格式。第 5、6 节会看到跨芯片的情况，并用 tpuasm 改写其中的字段。
 
-## 代价
+## 开销
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/results/04_remote.md) 测得，同一颗芯片内 TC VMEM → 另一 TensorCore 的 TC VMEM（K 为 KiB 数，周期数从发起到确认完成）：
 

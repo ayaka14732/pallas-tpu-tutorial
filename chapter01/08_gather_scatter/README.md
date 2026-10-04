@@ -61,7 +61,7 @@ def sublane_gather_by_rotation(x, indices):
 
 `jax.lax.broadcasted_iota(dtype, shape, axis)` 生成沿 axis 递增的序号，这里得到每个位置的行号。`pltpu.roll(x, shift, axis)` 是循环移位，语义与 `np.roll` 相同：`out[s] = x[(s - shift) % 8]`，`shift=7` 时 `out[s] = x[(s + 1) % 8]`，正是一条 `vrot.slane.down`。
 
-这个函数数值正确，共 40 条计算指令，其中 7 条 `vrot.slane.down`、8 条 `vsel`，其余是比较和行号计算。与 lane gather 的 3 条 XLU 指令相比，代价高出一个数量级。它说明了本教程反复出现的一种情况：编译器拒绝，不代表硬件做不到；但硬件没有直接支持的操作，合成出来通常很贵。设计数据布局时，应当让需要按索引重排的轴落在 lane 方向。
+这个函数数值正确，共 40 条计算指令，其中 7 条 `vrot.slane.down`、8 条 `vsel`，其余是比较和行号计算。与 lane gather 的 3 条 XLU 指令相比，开销高出一个数量级。它说明了本教程反复出现的一种情况：编译器拒绝，不代表硬件做不到；但硬件没有直接支持的操作，合成出来通常很贵。设计数据布局时，应当让需要按索引重排的轴落在 lane 方向。
 
 ## 固定位移的循环移位
 
@@ -98,7 +98,7 @@ for copy in copies:
 
 每次 DMA 只搬一个 granule，即一行 128 个 f32。表只有一列 tile，按第 3、7 节的结论，任意一行都是一个连续的 granule，起点不必与 tile 对齐。这是在 HBM 中按行查表的基本形式；表更宽时，一行在 HBM 中分散在各个列 tile 里，Mosaic 对这种窗口的对齐要求见第 3 节。
 
-> 暂且可以理解为：每次 DMA 都有数百个周期的固定开销，按行逐次发起的 DMA 越多，固定开销越大，但多次 DMA 可以同时进行。第二章第 2 节给出 DMA 代价模型。
+> 暂且可以理解为：每次 DMA 都有数百个周期的固定开销，按行逐次发起的 DMA 越多，固定开销越大，但多次 DMA 可以同时进行。第二章第 2 节给出 DMA 开销模型。
 
 ## scatter：写的位置由索引决定
 
@@ -188,4 +188,4 @@ def kernel(u_hbm: Ref, r_hbm: Ref, t_hbm: Ref, u_vmem: Ref, r_smem: Ref, sem: Re
 
 XLA 对 lane gather 没有使用一次 `vperm` 完成整个 TC VREG 的写法，而是更通用、更长的展开。对 scatter，即使通过 `unique_indices=True` 告诉它索引互不重复，XLA 也没有把它改写成逆排列的 gather，而是逐个位置比较、用带掩码的 store 写回，产生了 1939 个 bundle 的程序。
 
-这三个对照都说明同一件事：XLA 的通用实现必须对任意索引正确，代价可能比手写版本高出一到两个数量级。手写 kernel 的价值，就在于利用 XLA 不知道的结构，例如“索引在一个 tile 内”或“索引构成排列”。
+这三个对照都说明同一件事：XLA 的通用实现必须对任意索引正确，开销可能比手写版本高出一到两个数量级。手写 kernel 的价值，就在于利用 XLA 不知道的结构，例如“索引在一个 tile 内”或“索引构成排列”。

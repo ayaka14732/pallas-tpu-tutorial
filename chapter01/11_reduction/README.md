@@ -22,7 +22,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, o_vmem: Ref, sem: Ref) -> None:
 
 这里的 `out_type` 不是 `jax.ShapeDtypeStruct`，而是 `pltpu.HBM(shape, dtype)`：它明确要求输出放在 HBM。第 1 节说过，kernel 输入输出的默认内存空间是 `ANY`，由 XLA 决定放在哪里。对于 `f32[8,1]` 这样又窄又小的输出，XLA 会把它放进 Megacore Shared CMEM，kernel 中的 DMA 目的地随之变成 `[cmem:...]`（实验[源码](03_pallas_output_memory_space.py)、[输出](03_pallas_output_memory_space.txt)）。
 
-> 暂且可以理解为：Megacore Shared CMEM 是芯片上一块两个 TensorCore 共享的片上内存，容量比 TC VMEM 大，比 HBM 近。第二章第 3 节详细介绍它。
+> 暂且可以理解为：Megacore Shared CMEM 是芯片上一块两个 TensorCore 共享的片上内存，容量 128 MiB，比 TC VMEM 大，比 HBM 近。第二章第 3 节详细介绍它。
 
 本章只研究单个 TensorCore 与 HBM、TC VMEM 之间的操作，所以这里固定为 HBM。另外，`f32[8,1]` 在 HBM 中的 layout 与 kernel 写出的不同，XLA 会在 kernel 之后追加一段重排；本节的统计只看 kernel 本身（`kernel_listing(compiled, pallas_only=True)`）。
 
@@ -100,7 +100,7 @@ def f(x):
 
 ## 跨多个 tile：先逐元素，再 sublane
 
-`f32[64,128]` 沿 axis=0 求和：8 个 tile 先用 7 条 `vadd` 逐元素加成一个 TC VREG，再在这个 TC VREG 内做上面的 sublane 树（3 条 `vadd`、7 条移位），共 10 条 `vadd`。跨 tile 的归约就是普通的逐元素运算，代价随 tile 数线性增长；只有最后一个 TC VREG 内部的归约需要移位。
+`f32[64,128]` 沿 axis=0 求和：8 个 tile 先用 7 条 `vadd` 逐元素加成一个 TC VREG，再在这个 TC VREG 内做上面的 sublane 树（3 条 `vadd`、7 条移位），共 10 条 `vadd`。跨 tile 的归约就是普通的逐元素运算，开销随 tile 数线性增长；只有最后一个 TC VREG 内部的归约需要移位。
 
 ## 归约到标量：从向量单元到标量单元
 

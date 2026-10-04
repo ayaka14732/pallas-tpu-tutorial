@@ -13,7 +13,7 @@ TensorCore 的 bundle 按顺序经过两次发射：
 ```
 
 - 标量发射按顺序进行，没有阻塞时每周期一个 bundle。标量槽中的指令在标量发射时执行。
-- 含向量指令（包括 `misc` 槽的 `vwait`、`vsyncadd`）或 DMA 指令的 bundle，在标量发射之后进入一个先进先出的队列 VIF（Vector Instruction FIFO），再按顺序向量发射。向量发射由硬件的计分板（scoreboard）放行：它记录每个 TC VREG、每个结果队列何时就绪，每个单元何时空闲；向量指令要等源操作数就绪、等对应的单元空闲，`vwait` 要等信号量满足条件。这些等待都发生在向量一侧，不挡住标量发射。
+- 含向量指令（包括 `misc` 槽的 `vwait`、`vsyncadd`）或 DMA 指令的 bundle，在标量发射之后进入一个先进先出的队列 VIF（vector issue FIFO），再按顺序向量发射。向量发射由硬件的计分板（scoreboard）放行：它记录每个 TC VREG、每个结果队列何时就绪，每个单元何时空闲；向量指令要等源操作数就绪、等对应的单元空闲，`vwait` 要等信号量满足条件。这些等待都发生在向量一侧，不挡住标量发射。
 - VIF 的容量有限。积压到上限时，标量发射也停下来。
 
 所以 LCC 读数记录的是读数所在 bundle 的标量发射时刻。向量一侧落后多少，读数看不到，除非 VIF 已满、反过来挡住了标量一侧。
@@ -72,7 +72,7 @@ bundle(f's0: dma.simple [cmem:s23], [vmem:s23], length={granules}, dst_flag=[sfl
 | R1 − R0 | 4 | 4 | 4 |
 | R2 − R0 | 315 | 343 | 439 |
 
-不加 `sfence` 的 R1 只有 4，与 DMA 的大小无关：`vwait` 在向量一侧等待，标量一侧直接走了过去。加了 `sfence` 的 R2 才包含 DMA 的时间。第二章第 2 节的 TC VMEM → CMEM 代价 `309 + 1K` 正是按“发起 → 等待 → 读数”测得的，等待与 `sfence` 放在同一个 bundle，4、32、128 KiB 时为 313、341、437。这里的 R2 − R0 恰好都多 2：`vwait` 之后还有 `vsyncadd` 和单独的 `sfence` 两个 bundle 要在向量一侧依次发射。
+不加 `sfence` 的 R1 只有 4，与 DMA 的大小无关：`vwait` 在向量一侧等待，标量一侧直接走了过去。加了 `sfence` 的 R2 才包含 DMA 的时间。第二章第 2 节的 TC VMEM → CMEM 开销 `309 + 1K` 正是按“发起 → 等待 → 读数”测得的，等待与 `sfence` 放在同一个 bundle，4、32、128 KiB 时为 313、341、437。这里的 R2 − R0 恰好都多 2：`vwait` 之后还有 `vsyncadd` 和单独的 `sfence` 两个 bundle 要在向量一侧依次发射。
 
 计时的规则由此确定：**测异步工作的完成，必须是“等待 → `sfence` → 下一个 bundle 读数”。** 只读 R1 会把 DMA 测成 4 个周期。反过来，`sfence` 会排空 VIF，使它之前和之后的工作不再重叠，所以计时本身会改变被测程序的行为：只在需要的边界上放 `sfence`。
 

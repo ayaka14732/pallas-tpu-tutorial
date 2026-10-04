@@ -160,9 +160,9 @@ def insert_bundles(serialized: bytes, insertions: dict[int, str]) -> bytes:
     (record, index, _), = executable_programs(serialized)
     return insert_executable_bundles(serialized, {(record, index): [BundleInsertion(pc, f'.target {TARGET}\n{text}') for pc, text in sorted(insertions.items())]})
 
-def load(serialized: bytes, template: Compiled) -> Compiled:
-    """按 template 的调用约定装载改写后的 executable。"""
-    return load_executable(serialized, template)
+def load(serialized: bytes, template: Compiled, devices: list[jax.Device] | None = None) -> Compiled:
+    """按 template 的调用约定装载改写后的 executable。程序跨越多个 host 时，devices 给出全部 device（jax.devices()），每个进程都要装载。"""
+    return load_executable(serialized, template, devices=devices)
 
 def bundle(text: str = '') -> str:
     """一个 bundle 的清单文本；text 为空时是空 bundle。"""
@@ -329,11 +329,11 @@ def hlo_ops(compiled: Compiled) -> list[tuple[str, int, int]]:
 class KernelClock:
     """给任意已编译的程序计时：在指定的 bundle 之前插入 clock_read，读数留在每个 TensorCore 的 SMEM 中，程序运行之后再用一个读取程序取回。
 
-    SMEM 的内容在程序之间保留，所以被计时的程序不需要为读数增加任何输出。每个 TensorCore 各有自己的 SMEM 和 LCC，读数只能在同一个 TensorCore 内相减。插入点在循环中时，留下的是最后一次迭代的读数。
+    SMEM 的内容在程序之间保留，所以被计时的程序不需要为读数增加任何输出。每个 TensorCore 各有自己的 SMEM 和 LCC，读数只能在同一个 TensorCore 内相减。进程打开多颗芯片时，device 选择从第几颗芯片取回读数。插入点在循环中时，留下的是最后一次迭代的读数。
     """
 
-    def __init__(self, num_cores: int = 2) -> None:
-        self.probe = LccProbe(num_cores)
+    def __init__(self, num_cores: int = 2, device: int = 0) -> None:
+        self.probe = LccProbe(num_cores, device)
         self.readers: dict[tuple[int, int], Callable[[jax.Array], jax.Array]] = {}
 
     def instrument(self, compiled: Compiled, points: list[int], counter: str = 'lcc') -> Compiled:

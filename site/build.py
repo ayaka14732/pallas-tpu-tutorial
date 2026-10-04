@@ -39,7 +39,7 @@ ASSET_SUFFIXES = {
     ".txt",
     ".webp",
 }
-CHAPTER_PATTERN = re.compile(r"chapter\d{2}")
+CHAPTER_PATTERN = re.compile(r"chapter\d{2}|appendix_\w+")
 SECTION_PATTERN = re.compile(r"\d{2}_.+")
 
 @dataclass(frozen=True)
@@ -101,7 +101,8 @@ def discover_site() -> tuple[tuple[Page, ...], tuple[Chapter, ...], tuple[str, .
     pages = [root_page]
     chapters = []
     skipped = []
-    for chapter_directory in sorted(path for path in ROOT_DIR.iterdir() if path.is_dir() and CHAPTER_PATTERN.fullmatch(path.name)):
+    # 附录排在各章之后。
+    for chapter_directory in sorted((path for path in ROOT_DIR.iterdir() if path.is_dir() and CHAPTER_PATTERN.fullmatch(path.name)), key=lambda path: (path.name.startswith("appendix"), path.name)):
         chapter_readme = chapter_directory / "README.md"
         if not chapter_readme.is_file():
             skipped.append(chapter_directory.name)

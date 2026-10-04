@@ -44,7 +44,35 @@ DMA 的端点写成 `[cmem:...]` 即可，长度和信号量的用法与第一�
 
 两种改写的结果都是 `2y` 而不是 `2x`，说明数据确实来自 CMEM。`cld` 有自己的发射槽（第一章第 2 节的 `cld` 槽），它与 EUP、XLU、MXU 一样是“提交—取回”的形式：结果进入队列 `crf`，再由 `vpop` 取回。
 
-## 两条通路的代价
+## CMEM 有多大
+
+本小节实验[源码](04_tpuasm_cmem_capacity.py)、[输出](04_tpuasm_cmem_capacity.txt)。
+
+TC VMEM 的容量可以让编译器报出来（第一章第 3 节），CMEM 不能由 Pallas 分配，只能直接测。CMEM 的地址与 DMA 的长度一样以 512 B 的 granule 为单位。实验用第三章第 3 节的 `LccProbe` 执行手写片段：把一个 tile（记作 P）写到 CMEM 地址 0，把它的按位取反（记作 Q）写到地址 A，再把两处读回：
+
+```python
++ dma('[cmem:s20]', '[vmem:s22]')     # P → CMEM 地址 0
++ dma('[cmem:s21]', '[vmem:s23]')     # Q → CMEM 地址 A
++ dma('[vmem:s24]', '[cmem:s20]')     # 读回地址 0
++ dma('[vmem:s26]', '[cmem:s21]')     # 读回地址 A
+```
+
+如果 A 在容量之内，地址 0 读回的仍是 P；如果 A 超出了容量并绕回到地址 0，第二次写入就会把 P 覆盖成 Q。实验只改 A：
+
+```text
+A = 0x1000（2.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x20000（64.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x3fff8（127.996 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x40000（128.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P False，变成了 Q True
+A = 0x7fff8（255.996 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x80000（256.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P False，变成了 Q True
+```
+
+直到 `0x3fff8`（最后一个 tile）都互不干扰；`0x40000` 和 `0x80000` 写到了地址 0。所以 Megacore Shared CMEM 是 `0x40000` 个 granule，即 **128 MiB**，是一个 TensorCore 的 TC VMEM（16 MiB）的 8 倍，由两个 TensorCore 共用。超出容量的地址不会报错，也不会停机，而是按 `0x40000` 回绕：写错地址会悄悄覆盖别处的数据。`pltpu.get_tpu_info()` 报告的 `cmem_capacity_bytes=67000000` 是 JAX 中写死的估计值，与实测不符。
+
+本节的 kernel 把输入输出都固定在 HBM，所以可以从地址 0 起随意使用 CMEM。XLA 自己也会把数组放进 CMEM（见本节最后），与 XLA 的其他部分共存时，要避开它已经占用的区域。
+
+## 两条通路的开销
 
 [tpu-v4-latency-numbers](../../../tpu-v4-latency-numbers/README.md) 测得（周期数，N 为读取的 TC VREG 个数，K 为 KiB 数）：
 

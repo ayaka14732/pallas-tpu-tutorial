@@ -1,0 +1,6 @@
+A = 0x1000（2.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x20000（64.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x3fff8（127.996 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x40000（128.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P False，变成了 Q True
+A = 0x7fff8（255.996 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P True，变成了 Q False
+A = 0x80000（256.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P False，变成了 Q True
