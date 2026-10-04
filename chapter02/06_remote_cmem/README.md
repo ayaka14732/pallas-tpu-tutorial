@@ -70,18 +70,26 @@ patched = tpuasm_tools.edit_bundles(serialized, {
 patched = tpuasm_tools.insert_bundles(patched, {barrier_pc: STAGE, output_pc: UNSTAGE})
 ```
 
-`edit_bundles` 在逐字节精确的清单上工作：只有被修改的 bundle 重新编码，其余 bundle 与编译器生成的完全相同。这一点很重要。
+`edit_bundles` 在逐字节精确的清单上工作：只有被修改的 bundle 重新编码，其余 bundle 与编译器生成的完全相同。
 
 本小节实验[源码](02_tpuasm_canonical_reencode.py)、[输出](02_tpuasm_canonical_reencode.txt)。
 
-tpuasm 的另一种清单格式 `encoding='canonical'` 让汇编器为每个 bundle 重新选择编码。实验把载体的清单不做任何修改，分别以两种格式重新汇编后运行：
+为什么要强调“其余完全相同”？同一条指令往往有不止一种机器编码。例如一个常数可以放进 bundle 的几个立即数槽中的任意一个，`vwait.ge [sflag:52], 8` 的阈值可以直接写在指令里，也可以引用立即数槽。清单的文本只写出指令，写不出这些选择。tpuasm 的清单有两种格式：`encoding='exact'` 在需要时附上 `.encoding` 约束，记录编译器的选择，重新汇编后逐字节还原，例如
+
+```text
+{ misc: vwait.ge [sflag:52], 8 ; .encoding { misc.value = imm2 } }
+```
+
+`encoding='canonical'` 不带约束，由汇编器为每个 bundle 重新选择编码。实验把载体的清单不做任何修改，分别以两种格式重新汇编后运行：
 
 ```text
 encoding='exact'：结果正确：True
-encoding='canonical'：canonical 编码改变了 102 / 970 个 bundle 的机器字节；60 秒内没有返回，程序挂起
+encoding='canonical'：canonical 编码改变了 99 / 970 个 bundle 的机器字节；结果正确：True
 ```
 
-两份清单的文本完全相同，但 canonical 格式改变了 102 个 bundle 中不出现在文本里的位，程序因此挂起。改写已编译的程序时，应当只改动必须改动的 bundle，其余部分保持编译器生成的原样。
+canonical 格式改变了 99 个 bundle 的字节，结果仍然正确：改变的只是编码的选择，指令的含义不变。
+
+但这依赖汇编器对每一条指令的理解都正确。本教程写作期间，这个实验曾经挂起：tpuasm 当时把 mask 寄存器之间的移动（例如 `vm4 ← vm7`）反汇编成 `misc: vnop`，目的和源寄存器只留在 `.encoding` 约束里；canonical 格式丢掉约束，重新汇编出来的是一条真正的空操作，runtime 代码中的一个 mask 没有被复制，程序再也等不到它要的条件。把当时被改变的 bundle 对半排查，最后定位到 runtime 代码中的这一个 bundle；修正后的 tpuasm 把它写作 `misc: vmmov.8x128.u1 vm4, vm7`。逐字节精确的清单不受这类问题影响：没有被修改的 bundle 根本不经过“理解”这一步。所以改写已编译的程序时，应当只改动必须改动的 bundle，其余部分保持编译器生成的原样。
 
 ## 代价
 

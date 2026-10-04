@@ -2,26 +2,26 @@ XLA：数值检查通过；编译后的 HLO 中 cross_program_prefetch 无，S(3
 Pallas（out_type=pltpu.HBM）：数值检查通过；编译后的 HLO 中 cross_program_prefetch 无，S(3) 0 处，ROOT 是 copy
 Pallas（out_type=ShapeDtypeStruct）：数值检查通过；编译后的 HLO 中 cross_program_prefetch 无，S(3) 0 处，ROOT 是 custom-call
 ## 方法 1：每次调用并等到结果，固定同一个输入
-  XLA：198.3 µs
-  Pallas（out_type=pltpu.HBM）：236.1 µs
-  Pallas（out_type=ShapeDtypeStruct）：204.7 µs
+  XLA：199789 个周期（190.3 µs）
+  Pallas（out_type=pltpu.HBM）：246750 个周期（235.0 µs）
+  Pallas（out_type=ShapeDtypeStruct）：207564 个周期（197.7 µs）
 ## 方法 2：每次调用并等到结果，每次一个新的输入数组
-  XLA：201.3 µs
-  Pallas（out_type=pltpu.HBM）：242.2 µs
-  Pallas（out_type=ShapeDtypeStruct）：201.6 µs
+  XLA：197573 个周期（188.2 µs）
+  Pallas（out_type=pltpu.HBM）：245443 个周期（233.8 µs）
+  Pallas（out_type=ShapeDtypeStruct）：205843 个周期（196.0 µs）
 ## 方法 3：XProf，每次一个新的输入数组
-  XLA /device:TPU:0：module 66.5 µs；op：multiply_add_fusion 34.5 µs
-  XLA /device:TPU:1：module 34.6 µs；op：multiply_add_fusion 34.5 µs
-  Pallas（out_type=pltpu.HBM） /device:TPU:0：module 109.1 µs；op：transform.1 41.8 µs，copy 34.4 µs
-  Pallas（out_type=pltpu.HBM） /device:TPU:1：module 76.4 µs；op：transform.1 41.9 µs，copy 34.4 µs
-  Pallas（out_type=ShapeDtypeStruct） /device:TPU:0：module 74.2 µs；op：transform.1 41.9 µs
-  Pallas（out_type=ShapeDtypeStruct） /device:TPU:1：module 42.0 µs；op：transform.1 42.0 µs
+  XLA /device:TPU:0：module 55688 个周期；op：multiply_add_fusion 36246 个周期
+  XLA /device:TPU:1：module 36350 个周期；op：multiply_add_fusion 36226 个周期
+  Pallas（out_type=pltpu.HBM） /device:TPU:0：module 100534 个周期；op：transform.1 43852 个周期，copy 36285 个周期
+  Pallas（out_type=pltpu.HBM） /device:TPU:1：module 80311 个周期；op：transform.1 43876 个周期，copy 36225 个周期
+  Pallas（out_type=ShapeDtypeStruct） /device:TPU:0：module 63576 个周期；op：transform.1 43959 个周期
+  Pallas（out_type=ShapeDtypeStruct） /device:TPU:1：module 44062 个周期；op：transform.1 43979 个周期
 ## 方法 4：在一个 jit 中用 fori_loop 重复 N 次，(T(32) − T(16)) / 16
-  XLA：每次 9.0 µs；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 13 处，ROOT 是 copy-done
-  Pallas（out_type=pltpu.HBM）：每次 43.8 µs；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 1 处，ROOT 是 get-tuple-element
-  Pallas（out_type=ShapeDtypeStruct）：每次 30.7 µs；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 12 处，ROOT 是 copy-done
+  XLA：每次 9740 个周期（9.3 µs）；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 13 处，ROOT 是 copy-done
+  Pallas（out_type=pltpu.HBM）：每次 45845 个周期（43.7 µs）；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 1 处，ROOT 是 get-tuple-element
+  Pallas（out_type=ShapeDtypeStruct）：每次 32676 个周期（31.1 µs）；循环版本的 HLO 中 cross_program_prefetch 无，S(3) 12 处，ROOT 是 copy-done
 ## 方法 5：方法 2 按 AB/BA 交替做 4 轮
-  第 1 轮（XLA、Pallas（out_type=pltpu.HBM）、Pallas（out_type=ShapeDtypeStruct））：XLA 196.0 µs，Pallas（out_type=pltpu.HBM） 232.1 µs，Pallas（out_type=ShapeDtypeStruct） 198.5 µs
-  第 2 轮（Pallas（out_type=ShapeDtypeStruct）、Pallas（out_type=pltpu.HBM）、XLA）：XLA 188.0 µs，Pallas（out_type=pltpu.HBM） 234.1 µs，Pallas（out_type=ShapeDtypeStruct） 200.0 µs
-  第 3 轮（XLA、Pallas（out_type=pltpu.HBM）、Pallas（out_type=ShapeDtypeStruct））：XLA 190.5 µs，Pallas（out_type=pltpu.HBM） 236.1 µs，Pallas（out_type=ShapeDtypeStruct） 198.1 µs
-  第 4 轮（Pallas（out_type=ShapeDtypeStruct）、Pallas（out_type=pltpu.HBM）、XLA）：XLA 185.2 µs，Pallas（out_type=pltpu.HBM） 236.5 µs，Pallas（out_type=ShapeDtypeStruct） 202.3 µs
+  第 1 轮（XLA、Pallas（out_type=pltpu.HBM）、Pallas（out_type=ShapeDtypeStruct））：XLA 199341 个周期（189.8 µs），Pallas（out_type=pltpu.HBM） 242072 个周期（230.5 µs），Pallas（out_type=ShapeDtypeStruct） 205112 个周期（195.3 µs）
+  第 2 轮（Pallas（out_type=ShapeDtypeStruct）、Pallas（out_type=pltpu.HBM）、XLA）：XLA 204992 个周期（195.2 µs），Pallas（out_type=pltpu.HBM） 240954 个周期（229.5 µs），Pallas（out_type=ShapeDtypeStruct） 204214 个周期（194.5 µs）
+  第 3 轮（XLA、Pallas（out_type=pltpu.HBM）、Pallas（out_type=ShapeDtypeStruct））：XLA 204982 个周期（195.2 µs），Pallas（out_type=pltpu.HBM） 250189 个周期（238.3 µs），Pallas（out_type=ShapeDtypeStruct） 209359 个周期（199.4 µs）
+  第 4 轮（Pallas（out_type=ShapeDtypeStruct）、Pallas（out_type=pltpu.HBM）、XLA）：XLA 199348 个周期（189.9 µs），Pallas（out_type=pltpu.HBM） 246025 个周期（234.3 µs），Pallas（out_type=ShapeDtypeStruct） 211239 个周期（201.2 µs）

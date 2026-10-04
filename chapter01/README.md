@@ -21,7 +21,7 @@
 - [06 · 逐元素运算](06_elementwise/README.md)
 - [07 · 标量单元与控制流](07_scalar_control_flow/README.md)
 - [08 · gather 与 scatter](08_gather_scatter/README.md)
-- [09 · 矩阵转置与 XLU](09_transpose_xlu/README.md)
+- [09 · 矩阵转置](09_transpose_xlu/README.md)
 - [10 · 矩阵乘法与 MXU](10_matmul_mxu/README.md)
 - [11 · 归约](11_reduction/README.md)
 - [12 · 前缀扫描](12_prefix_scan/README.md)

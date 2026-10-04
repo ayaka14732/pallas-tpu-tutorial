@@ -78,6 +78,14 @@ TensorCore 没有自己发起这次 DMA。它把长度、主机地址和请求�
 INTERNAL: LLO_CHECK failure (.../llo_region_builder.cc:5132) multiplier_in_bytes % word_size == 0 (512 == 0) 512 4096
 ```
 
+用 `pl.multiple_of` 声明对齐也不能绕过。第一章第 7 节用它向编译器保证一个运行时的起点是 tile 的倍数；这里把输出写成 `f32[32,128]`，每页是 8 行的窗口，起始行声明为 8 的倍数：
+
+```python
+window = pages_host.at[pl.ds(pl.multiple_of(page_smem[0] * 8, 8), 8)]
+```
+
+编译仍然失败，报的是同一个检查。检查的对象是地址表达式中页号的乘数：编译器把窗口的起点写成“行号 × 512 B”，而主机地址以 4096 B 为单位，512 不能被 4096 整除；`pl.multiple_of` 提供的“行号是 8 的倍数”没有被这条路径用来把乘数合并成 4096。
+
 这是 [JAX issue #40200](https://github.com/jax-ml/jax/issues/40200) 记录的问题，在当前的 libtpu `0.0.49` 中仍然存在。它使得按运行时位置写主机内存的环形缓冲区无法直接写出。
 
 本小节实验[源码](03_tpuasm_host_dynamic_page.py)、[输出](03_tpuasm_host_dynamic_page.txt)。

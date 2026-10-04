@@ -18,7 +18,7 @@ def main() -> None:
     host = jax.NamedSharding(mesh, P(), memory_kind='pinned_host')
     x = jnp.arange(8 * 128, dtype=jnp.float32).reshape(8, 128)
     page = jnp.array([2, 0], jnp.int32)
-    carrier = tpuasm_tools.compile(pages.build(mesh, False), x, page, mesh=mesh, out_shardings=host)
+    carrier = tpuasm_tools.compile(pages.build(mesh, 'constant'), x, page, mesh=mesh, out_shardings=host)
     serialized = tpuasm_tools.serialize(carrier)
     listing = tpuasm_tools.kernel_listing(serialized, pallas_only=True)
     print('## 载体（页号为常数 2）中，主机地址的计算与发给主机的请求')

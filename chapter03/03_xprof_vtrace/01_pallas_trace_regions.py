@@ -81,7 +81,7 @@ def device_medians(compiled, x: jax.Array) -> dict[tuple[str, str, str], float]:
     durations = defaultdict(list)
     for event in events:
         name = 'module' if event['track'] == 'XLA Modules' else event['name']
-        durations[(event['device'], event['track'], name)].append(xprof_tools.duration_us(event))
+        durations[(event['device'], event['track'], name)].append(xprof_tools.duration_cycles(event))
     return {key: statistics.median(values) for key, values in durations.items()}
 
 def main() -> None:
@@ -119,7 +119,7 @@ def main() -> None:
             print(f'  XProf，16 次调用的中位数：')
             for (device, track, name), value in sorted(device_medians(compiled, x).items()):
                 if device == '/device:TPU:0' or track == 'XLA Modules':
-                    print(f'    {device} {track} {name}：{value * 1000:.0f} ns')
+                    print(f'    {device} {track} {name}：{value:.0f} 个周期')
 
 if __name__ == '__main__':
     main()

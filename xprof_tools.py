@@ -7,6 +7,8 @@ import shutil
 
 import jax
 
+CYCLES_PER_US = 1050  # TensorCore 的周期计数器 LCC 约 1.05 GHz（第三章第 7 节）
+
 def capture(function: Callable[[], object], directory: Path) -> list[dict]:
     """在 jax.profiler.trace 中执行 function，返回 trace 中的全部事件。"""
     shutil.rmtree(directory, ignore_errors=True)
@@ -30,3 +32,11 @@ def duration_us(event: dict) -> float:
     """事件在设备上的持续时间（µs），优先使用皮秒精度的 device_duration_ps。"""
     picoseconds = event.get('args', {}).get('device_duration_ps')
     return float(picoseconds) / 1e6 if picoseconds is not None else float(event['dur'])
+
+def duration_cycles(event: dict) -> float:
+    """事件在设备上的持续时间，按 1.05 GHz 换算成 TensorCore 的周期数。"""
+    return duration_us(event) * CYCLES_PER_US
+
+def host_cycles(seconds: float) -> str:
+    """主机时钟测得的一段时间，按 1.05 GHz 换算成周期数，并附上原始的微秒数。"""
+    return f'{seconds * 1e6 * CYCLES_PER_US:.0f} 个周期（{seconds * 1e6:.1f} µs）'

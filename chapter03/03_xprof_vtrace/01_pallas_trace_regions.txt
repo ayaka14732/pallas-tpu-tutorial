@@ -1,9 +1,9 @@
 ## xla_enable_custom_call_region_trace=false：数值检查通过；kernel 段 159 个 bundle，其中含 vtrace 的 2 个
   misc: vtrace 0x80000000；misc: vtrace 0x90000000
   XProf，16 次调用的中位数：
-    /device:TPU:0 XLA Modules module：19585 ns
-    /device:TPU:0 XLA Ops affine.1：2012 ns
-    /device:TPU:1 XLA Modules module：2112 ns
+    /device:TPU:0 XLA Modules module：33477 个周期
+    /device:TPU:0 XLA Ops affine.1：2122 个周期
+    /device:TPU:1 XLA Modules module：2226 个周期
 ## xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 168 个 bundle，其中含 vtrace 的 10 个
   清单（[编号] bundle）：
     [0] { misc: vtrace 0x80000000 }
@@ -37,21 +37,21 @@
     [166] { misc: cfence }
     [167] { misc: vtrace 0x90000000 }
   XProf，16 次调用的中位数：
-    /device:TPU:0 XLA Modules module：18892 ns
-    /device:TPU:0 XLA Ops affine.1：2039 ns
-    /device:TPU:0 XLA TraceMe compute：127 ns
-    /device:TPU:0 XLA TraceMe load_start：1 ns
-    /device:TPU:0 XLA TraceMe load_wait：985 ns
-    /device:TPU:0 XLA TraceMe store：903 ns
-    /device:TPU:1 XLA Modules module：2138 ns
+    /device:TPU:0 XLA Modules module：33405 个周期
+    /device:TPU:0 XLA Ops affine.1：2141 个周期
+    /device:TPU:0 XLA TraceMe compute：134 个周期
+    /device:TPU:0 XLA TraceMe load_start：2 个周期
+    /device:TPU:0 XLA TraceMe load_wait：1041 个周期
+    /device:TPU:0 XLA TraceMe store：946 个周期
+    /device:TPU:1 XLA Modules module：2246 个周期
 ## 嵌套区域，xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 170 个 bundle，其中含 vtrace 的 12 个
   misc: vtrace 0x80000000；misc: vtrace 0xb8000000；misc: vtrace 0xc8000000；misc: vtrace 0xb8000001；misc: vtrace 0xc8000001；misc: vtrace 0xb8000002；misc: vtrace 0xb8000003；misc: vtrace 0xc8000003；misc: vtrace 0xb8000004；misc: vtrace 0xc8000004；misc: vtrace 0xc8000002；misc: vtrace 0x90000000
   XProf，16 次调用的中位数：
-    /device:TPU:0 XLA Modules module：19746 ns
-    /device:TPU:0 XLA Ops affine.1：2140 ns
-    /device:TPU:0 XLA TraceMe compute：127 ns
-    /device:TPU:0 XLA TraceMe compute_and_store：1034 ns
-    /device:TPU:0 XLA TraceMe load_start：1 ns
-    /device:TPU:0 XLA TraceMe load_wait：1090 ns
-    /device:TPU:0 XLA TraceMe store：903 ns
-    /device:TPU:1 XLA Modules module：2241 ns
+    /device:TPU:0 XLA Modules module：33193 个周期
+    /device:TPU:0 XLA Ops affine.1：2129 个周期
+    /device:TPU:0 XLA TraceMe compute：134 个周期
+    /device:TPU:0 XLA TraceMe compute_and_store：1083 个周期
+    /device:TPU:0 XLA TraceMe load_start：2 个周期
+    /device:TPU:0 XLA TraceMe load_wait：1030 个周期
+    /device:TPU:0 XLA TraceMe store：945 个周期
+    /device:TPU:1 XLA Modules module：2233 个周期

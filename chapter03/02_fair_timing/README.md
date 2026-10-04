@@ -32,23 +32,25 @@ Pallas（out_type=pltpu.HBM）：cross_program_prefetch 无，S(3) 0 处，ROOT 
 Pallas（out_type=ShapeDtypeStruct）：cross_program_prefetch 无，S(3) 0 处，ROOT 是 custom-call
 ```
 
-`out_type=pltpu.HBM` 的版本在 kernel 之后多了一次 copy：kernel 写出的数组被要求留在 HBM 内存空间，而程序的结果使用默认内存空间，XLA 只好再复制一遍。这次 16 MiB 的复制在 XProf 中占 34.4 µs，与 kernel 本身相当。第二章第 2 节用 `pltpu.HBM` 是为了在 kernel 内部重复计时时固定数据通路，那里测的是 kernel 的每遍时间，不受这次复制影响；但作为一个完整的程序与 XLA 比较时，应当用 `ShapeDtypeStruct`，让 kernel 直接写程序的结果。
+`out_type=pltpu.HBM` 的版本在 kernel 之后多了一次 copy：kernel 写出的数组被要求留在 HBM 内存空间，而程序的结果使用默认内存空间，XLA 只好再复制一遍。这次 16 MiB 的复制在 XProf 中占 36285 个周期，与 kernel 本身相当。第二章第 2 节用 `pltpu.HBM` 是为了在 kernel 内部重复计时时固定数据通路，那里测的是 kernel 的每遍时间，不受这次复制影响；但作为一个完整的程序与 XLA 比较时，应当用 `ShapeDtypeStruct`，让 kernel 直接写程序的结果。
 
 ## 五种方法
 
 | 方法 | XLA | Pallas，`pltpu.HBM` | Pallas，`ShapeDtypeStruct` |
 | --- | ---: | ---: | ---: |
-| 1. 调用并等到结果，固定同一个输入 | 198.3 µs | 236.1 µs | 204.7 µs |
-| 2. 调用并等到结果，每次一个新输入 | 201.3 µs | 242.2 µs | 201.6 µs |
-| 3. XProf，kernel（op） | 34.5 µs | 41.8 + 34.4 µs | 41.9 µs |
-| 3. XProf，TensorCore 1 的 module | 34.6 µs | 76.4 µs | 42.0 µs |
-| 4. `fori_loop` 重复 16 与 32 次之差 | 9.0 µs | 43.8 µs | 30.7 µs |
+| 1. 调用并等到结果，固定同一个输入 | 199789 | 246750 | 207564 |
+| 2. 调用并等到结果，每次一个新输入 | 197573 | 245443 | 205843 |
+| 3. XProf，kernel（op） | 36246 | 43852 + 36285 | 43959 |
+| 3. XProf，TensorCore 1 的 module | 36350 | 80311 | 44062 |
+| 4. `fori_loop` 重复 16 与 32 次之差 | 9740 | 45845 | 32676 |
 
-**方法 1、2：主机计时。** 第 1 节说过，等到结果的时间包含 100 多微秒的固定开销（这里约 160 µs）。XLA 与 `ShapeDtypeStruct` 版本在设备上差 7 µs，主机计时却分不出谁快（201.3 与 201.6 µs）。主机计时只适合差别远大于开销波动的比较。
+单位都是周期；方法 1、2、4 由主机时钟换算（1 µs = 1050 个周期）。
+
+**方法 1、2：主机计时。** 第 1 节说过，等到结果的时间包含十几万个周期的固定开销（这里约 16 万个周期）。XLA 与 `ShapeDtypeStruct` 版本在设备上差 7713 个周期，主机计时的差是 8270 个周期，但各轮之间的波动也有五千个周期以上（方法 5），其中一轮的结论甚至相反。主机计时只适合差别远大于开销波动的比较。
 
 方法 1 与方法 2 的区别是输入是否每次都是新数组。这里两者相同，因为 XLA 没有做跨程序预取；在第二章第 9 节的矩阵乘法中，XLA 会把输入预取进 CMEM，固定输入时下一次调用可能直接用上片上的副本。正式比较应当每次用一个新的输入数组（[研究报告 28](../../../pallas-tpu-readings-dev/research_reports/28_xla_pallas_kernel_fair_timing.md) 称为 fresh-HBM），并且在预热之后计时。
 
-**方法 3：XProf。** XProf 直接给出设备上的时间，差别清楚：XLA 的 fusion 34.5 µs，Pallas kernel 41.9 µs。比较完整程序时应看 module：它包含 kernel 之外的 copy 等其他指令。TensorCore 0 的 module 还包含一段 kernel 之外的 runtime 代码，这里约 32 µs，第 1 节的采集中是 19–22 µs，波动很大；两个候选都有这一段，用 TensorCore 1 的 module 比较更稳定。
+**方法 3：XProf。** XProf 直接给出设备上的时间，差别清楚：XLA 的 fusion 36246 个周期，Pallas kernel 43959 个周期。比较完整程序时应看 module：它包含 kernel 之外的 copy 等其他指令。TensorCore 0 的 module 还包含一段 kernel 之外的 runtime 代码，这里约 1.9 万个周期，第 3 节的采集中约 3.1 万个周期，随程序而变；两个候选都有这一段，用 TensorCore 1 的 module 比较更稳定。
 
 **方法 4：在 jit 中循环。** 把调用放进 `jax.lax.fori_loop`，用循环 32 次与 16 次之差消去固定开销：
 
@@ -56,25 +58,25 @@ Pallas（out_type=ShapeDtypeStruct）：cross_program_prefetch 无，S(3) 0 处�
 looped = tpuasm_tools.compile(lambda x: jax.lax.fori_loop(0, count, lambda i, y: function(y), x), x, mesh=meshes[name])
 ```
 
-这看起来与第二章第 2 节“在 kernel 内部重复”的思路相同，结果却完全不同：XLA 每次只要 9.0 µs，比 XProf 中的 34.5 µs 快了近 4 倍。原因在编译结果中：
+这看起来与第二章第 2 节“在 kernel 内部重复”的思路相同，结果却完全不同：XLA 每次只要 9740 个周期，比 XProf 中的 36246 个周期快了近 4 倍。原因在编译结果中：
 
 ```text
 XLA：循环版本的 HLO 中 cross_program_prefetch 无，S(3) 13 处，ROOT 是 copy-done
 Pallas（out_type=ShapeDtypeStruct）：循环版本的 HLO 中 cross_program_prefetch 无，S(3) 12 处，ROOT 是 copy-done
 ```
 
-循环中传递的数组被 XLA 放进了 Megacore Shared CMEM，每次迭代读写的都是片上内存，不再经过 HBM。测到的是另一个程序。`pltpu.HBM` 版本的输出被固定在 HBM，所以循环中的时间（43.8 µs）仍接近 kernel 本身。改变程序结构的计时方法，都要重新检查编译结果。
+循环中传递的数组被 XLA 放进了 Megacore Shared CMEM，每次迭代读写的都是片上内存，不再经过 HBM。测到的是另一个程序。`pltpu.HBM` 版本的输出被固定在 HBM，所以循环中的时间（45845 个周期）仍接近 kernel 本身。改变程序结构的计时方法，都要重新检查编译结果。
 
 **方法 5：轮次与顺序。** 方法 2 按正序、倒序交替做 4 轮：
 
 ```text
-第 1 轮：XLA 196.0 µs，Pallas（pltpu.HBM）232.1 µs，Pallas（ShapeDtypeStruct）198.5 µs
-第 2 轮：XLA 188.0 µs，Pallas（pltpu.HBM）234.1 µs，Pallas（ShapeDtypeStruct）200.0 µs
-第 3 轮：XLA 190.5 µs，Pallas（pltpu.HBM）236.1 µs，Pallas（ShapeDtypeStruct）198.1 µs
-第 4 轮：XLA 185.2 µs，Pallas（pltpu.HBM）236.5 µs，Pallas（ShapeDtypeStruct）202.3 µs
+第 1 轮：XLA 199341，Pallas（pltpu.HBM）242072，Pallas（ShapeDtypeStruct）205112
+第 2 轮：XLA 204992，Pallas（pltpu.HBM）240954，Pallas（ShapeDtypeStruct）204214
+第 3 轮：XLA 204982，Pallas（pltpu.HBM）250189，Pallas（ShapeDtypeStruct）209359
+第 4 轮：XLA 199348，Pallas（pltpu.HBM）246025，Pallas（ShapeDtypeStruct）211239
 ```
 
-同一个候选在不同轮次之间相差可达 10 µs，比 XLA 与 Pallas 的设备时间之差还大；只跑一轮，结论可能取决于运气。交替顺序可以抵消“先跑的吃亏”或“后跑的吃亏”这类与顺序有关的漂移。研究报告 28 的做法是：每个候选在自己的连续块中运行，块内取中位数，多轮之间正反交替，最后取各轮中位数的中位数；需要彻底清除片上状态时，每轮用一个新进程。
+同一个候选在不同轮次之间相差可达 9 千个周期，比 XLA 与 Pallas 的设备时间之差还大；第 2 轮中 `ShapeDtypeStruct` 版本甚至比 XLA 少 778 个周期。只跑一轮，结论可能取决于运气。交替顺序可以抵消“先跑的吃亏”或“后跑的吃亏”这类与顺序有关的漂移。研究报告 28 的做法是：每个候选在自己的连续块中运行，块内取中位数，多轮之间正反交替，最后取各轮中位数的中位数；需要彻底清除片上状态时，每轮用一个新进程。
 
 ## 公平比较的清单
 
@@ -83,4 +85,4 @@ Pallas（out_type=ShapeDtypeStruct）：循环版本的 HLO 中 cross_program_pr
 3. 设备时间用 XProf 或 kernel 内部的计数器；主机时间只用于差别远大于开销波动的场合。
 4. 多轮、交替顺序，报告中位数，并保留每轮的结果。
 
-按这张清单，本例的结论是：在同样从 HBM 读、写回 HBM 的边界下，XLA 的 fusion 34.5 µs，单个 TensorCore 的 Pallas kernel 41.9 µs。XLA 用了两个 TensorCore（第二章第 2 节），这是两个实现之间真实的差别，而不是计时的问题；第二章第 1 节的方法可以让 Pallas kernel 也用上两个 TensorCore。
+按这张清单，本例的结论是：在同样从 HBM 读、写回 HBM 的边界下，XLA 的 fusion 36246 个周期，单个 TensorCore 的 Pallas kernel 43959 个周期。XLA 用了两个 TensorCore（第二章第 2 节），这是两个实现之间真实的差别，而不是计时的问题；第二章第 1 节的方法可以让 Pallas kernel 也用上两个 TensorCore。
