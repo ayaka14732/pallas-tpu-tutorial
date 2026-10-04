@@ -26,7 +26,16 @@ setrngseed 之前的指令：vadd.8x128.s32 36，vxor.8x128.u32 21，vshll.8x128
 { va0: setrngseed v21 }；{ va0: vrng.8x128.u32 v22 }
 ```
 
-`prng_seed` 不是把整数直接装进状态。编译器用 `vlaneseq` 得到每个元素的编号，与种子一起经过约 120 条向量运算的混合，算出 64 个生成器各不相同的状态，再 `setrngseed`。混合运算的组成很规整：20 组 `vshll`、`vshrl`、`vor`，即 20 次 32 位循环移位（第 4 节），加上约 20 条 `vxor` 和 36 条 `vadd`。这正是“加法—循环移位—异或”交替 20 轮的结构，与 threefry2x32 的一次 hash 相同；本节没有逐条核对它与 threefry2x32 的常数是否一致。之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
+`prng_seed` 不是把整数直接装进状态。编译器用 `vlaneseq` 得到每个元素的编号，与种子一起经过约 120 条向量运算的混合，算出 64 个生成器各不相同的状态，再 `setrngseed`。混合运算的组成很规整：20 组 `vshll`、`vshrl`、`vor`，即 20 次 32 位循环移位（第 4 节），加上约 20 条 `vxor` 和 36 条 `vadd`。这正是“加法—循环移位—异或”交替 20 轮的结构，与 threefry2x32 的一次 hash 相同。清单中的循环移位量依次是 13、15、26、6 和 17、29、16、24，每 4 轮之后加上的常数中有 `466688986`（`0x1BD11BDA`），都是 threefry2x32 的参数。实验在主机上按同样的算法算了一遍，与设备上读回的状态比较：
+
+```text
+prng_seed(7,)：状态与主机上的 threefry2x32(key=(7, 7), 计数器=(i, i)) 两个输出字的异或一致：True
+prng_seed(7, 1)：状态与主机上的 threefry2x32(key=(1, 7), 计数器=(i, i)) 两个输出字的异或一致：True
+```
+
+所以 `prng_seed` 的展开可以完整写出：第 i 个元素（`vlaneseq` 给出的序号，i = sublane × 128 + lane）以 `(i, i)` 为计数器做一次 threefry2x32，key 是倒序的两个种子，只有一个种子时两个字相同；两个输出字异或，得到的 TC VREG 交给 `setrngseed`。`setrngseed` 只取前两个 sublane（第 1 节），所以真正用到的是 i = 0–255 这 256 个值，正好是 64 个生成器各 128 位的状态。
+
+之后每 8 行一条 `vrng`：`rows = 64` 时有 8 条 `vrng`、1 条 `setrngseed`。
 
 种子的个数几乎不影响代价，但最多只能有两个：
 

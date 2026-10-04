@@ -25,6 +25,26 @@
   { s0: dma.simple [vmem:s10], [hbm:s0], length=9, dst_flag=[sflag:52] ;
   { s0: dma.simple [vmem:s13], [hbm:s1], length=9, dst_flag=[sflag:52] ;
   { s0: dma.simple [hbm:s2], [vmem:s0], length=18, dst_flag=[sflag:52] ;
+  计算部分的清单：
+    { s0: simm.s32 s0, 32 ; va0: vlaneseq.8x128.u32 v8 ; vld: vld.8x128 v0, [vmem:0x0] ; misc: vsyncadd.s32 [sflag:52], -9 }
+    { va1: vshrl.8x128.s32 v13, v8, 0x7 ; vst: vst.8x128 [vmem:0x20], v0 ; vld: vld.8x128 v1, [vmem:0x10] }
+    { va0: vrot.slane.down.8x128.u32 v2, v1 ; va1: veq.8x128.s32 vm0, v13, 0 ; vld: vld.8x128 v3, [vmem:0x18, sm=1] }
+    { va0: vrot.slane.down.8x128.u32 v4, v3 ; vld: vld.8x128 v16, [vmem:0x8, sm=1] }
+    { va0: vrot.slane.down.8x128.u32 v5, v2 }
+    { va0: vrot.slane.down.8x128.u32 v6, v4 }
+    { va0: vrot.slane.down.8x128.u32 v7, v5 }
+    { va0: vrot.slane.down.8x128.u32 v9, v6 }
+    { va0: vrot.slane.down.8x128.u32 v10, v7 }
+    { va0: vrot.slane.down.8x128.u32 v11, v9 }
+    { va0: vrot.slane.down.8x128.u32 v12, v10 }
+    { va0: vrot.slane.down.8x128.u32 v14, v11 }
+    { va0: vrot.slane.down.8x128.u32 v15, v12 }
+    { va0: vrot.slane.down.8x128.u32 v17, v14 }
+    { va0: vrot.slane.down.8x128.u32 v18, v15 }
+    { va0: vrot.slane.down.8x128.u32 v19, v17 }
+    { va0: vsel.8x128 v20, vm0, v16, v18 }
+    { va0: vsel.8x128 v21, vm0, v18, v19 ; vst: vst.8x128 [vmem:0x28], v20 }
+    { vst: vst.8x128 [vmem:0x30, sm=3], v21 }
 
 ## f32[9, 128] × 2，axis=0，DMA 写入输出窗口：数值检查通过
   向量指令：无
@@ -36,6 +56,19 @@
   { s0: dma.simple [vmem:s10], [hbm:s0], length=16, dst_flag=[sflag:52] }
   { s0: dma.simple [vmem:s13], [hbm:s1], length=16, dst_flag=[sflag:52] }
   { s0: dma.simple [hbm:s2], [vmem:s0], length=24, dst_flag=[sflag:52] }
+  计算部分的清单：
+    { s0: simm.s32 s16, 1 ; s1: simm.s32 s0, 32 ; va0: vlaneseq.8x128.u32 v2 ; vld: vld.8x128 v0, [vmem:0x10] ; misc: vsyncadd.s32 [sflag:52], -16 }
+    { va0: vand.8x128.u32 v3, 0x7f, v2 ; vld: vld.8x128 v1, [vmem:0x18] ; vx0: vrot.2.8x128 trf0, v0, s16 }
+    { va0: veq.8x128.s32 vm0, v3, 0 ; va1: vlt.8x128.s32 vm1, v3, 2 ; vld: vld.8x128 v4, [vmem:0x8] }
+    { vld: vld.8x128 v7, [vmem:0x0] }
+    { vst: vst.8x128 [vmem:0x20], v7 }
+    { vx0: vrot.0.8x128 trf0, v1, s16 }
+    { vr0: vpop.8x128 v5, trf0 }
+    { va0: vsel.8x128 v6, vm0, v4, v5 }
+    { vst: vst.8x128 [vmem:0x28], v6 }
+    { vr0: vpop.8x128 v8, trf0 }
+    { va0: vsel.8x128 v9, vm0, v5, v8 }
+    { vst: vst.msk.8x128 [vmem:0x30], vm1, v9 }
 
 ## f32[8, 129] × 2，axis=1，DMA 写入输出窗口：编译失败：INTERNAL: Mosaic failed to compile TPU kernel with MLIR module name `concatenate` HLO name `concatenate.1`: Slice sizes along tiled dimensions must be aligned to tiles. Failed to verify that the size at dimension 1 is divisible by the tile dimension 
 

@@ -2,6 +2,8 @@
 import tpu_init
 tpu_init.initialise_one_chip()
 
+import re
+
 import jax
 from jax import Ref
 from jax.experimental import pallas as pl
@@ -95,6 +97,11 @@ def main() -> None:
             print(f'## {name}：数值检查通过')
             print(f'  向量指令：{vector or "无"}')
             print('\n'.join('  ' + line.split('#')[0].strip() for line in listing.splitlines() if 'dma.' in line))
+            if shape != (8, 128) and style.startswith('TC VMEM'):
+                # 不对齐时，列出含向量运算、读写 TC VMEM 的 bundle。
+                text = re.sub(r'\s*;\s*\.encoding \{[^}]*\}', '', ' '.join(line.split('#')[0].strip() for line in listing.splitlines() if not line.startswith('#')))
+                print('  计算部分的清单：')
+                print('\n'.join('    { ' + body.strip() + ' }' for body in re.findall(r'\{(.*?)\}', text) if re.search(r'\b(va0|va1|vld|vst|vx0|vx1|vr0|vr1):', body)))
             print()
 
 if __name__ == '__main__':

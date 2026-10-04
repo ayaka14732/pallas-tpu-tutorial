@@ -4,7 +4,9 @@
   读回的状态经 xorshift128+ 模型得到的 tile 与 kernel 的输出一致：True
 ## 只改种子的个数：setrngseed 之前的向量运算
   prng_seed(7,)：118 条，其中 vshll 20
+    状态与主机上的 threefry2x32(key=(7, 7), 计数器=(i, i)) 两个输出字的异或一致：True
   prng_seed(7, 1)：119 条，其中 vshll 20
+    状态与主机上的 threefry2x32(key=(1, 7), 计数器=(i, i)) 两个输出字的异或一致：True
   prng_seed(7, 1, 2)：编译失败：Setting seed with more than 2 values is not supported.
 ## prng_seed(0)：输出中 0 的个数 0 / 1024
 ## prng_seed(1)：输出中 0 的个数 0 / 1024
