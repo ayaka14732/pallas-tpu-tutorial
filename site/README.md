@@ -14,6 +14,8 @@
 
 构建结果位于 `site/build/`。构建过程会检查生成页面引用的本地文件与页内锚点，发现无效链接时直接失败。
 
+构建器还会生成 `site/build/sitemap.xml`，其中的网址以 GitHub Pages 项目子目录 `https://ayaka14732.github.io/pallas-tpu-tutorial/` 为基址。Google Search Console 中可提交 `https://ayaka14732.github.io/pallas-tpu-tutorial/sitemap.xml`。
+
 本地预览：
 
 ```sh

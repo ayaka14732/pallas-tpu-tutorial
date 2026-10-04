@@ -18,6 +18,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 SITE_DIR = ROOT_DIR / "site"
 OUTPUT_DIR = SITE_DIR / "build"
 SITE_TITLE = "Pallas TPU Kernel 开发教程"
+SITE_URL = "https://ayaka14732.github.io/pallas-tpu-tutorial/"
 GITHUB_URL = "https://github.com/ayaka14732/pallas-tpu-tutorial"
 EXTERNAL_REPOSITORIES = {
     "pallas-tpu-readings-dev": "https://github.com/ayaka14732/pallas-tpu-readings-dev",
@@ -143,6 +144,11 @@ def relative_page_href(page: Page, target: Page) -> str:
     relative = os.path.relpath(route_directory(target.route), route_directory(page.route))
     href = Path(relative).as_posix()
     return "./" if href == "." else quote(href, safe="/.") + "/"
+
+def public_page_url(page: Page) -> str:
+    if not page.route:
+        return SITE_URL
+    return f"{SITE_URL}{quote(page.route, safe='/')}/"
 
 def append_url_parts(path: str, query: str, fragment: str) -> str:
     return urlunsplit(("", "", path, query, fragment))
@@ -325,6 +331,7 @@ def html_document(page: Page, content: str, headings: tuple[Heading, ...], pages
     stylesheet = relative_output_href(page, Path("style.css"))
     script = relative_output_href(page, Path("site.js"))
     home_href = relative_page_href(page, root_page)
+    canonical_url = public_page_url(page)
     title = SITE_TITLE if page.kind == "root" else f"{page.title} · {SITE_TITLE}"
     return f'''<!doctype html>
 <html lang="zh-CN">
@@ -334,6 +341,7 @@ def html_document(page: Page, content: str, headings: tuple[Heading, ...], pages
 <meta name="theme-color" content="#aa2e45">
 <meta name="description" content="系统学习 Pallas TPU kernel 与 TPU v4 用户可编程硬件能力。">
 <title>{escape(title)}</title>
+<link rel="canonical" href="{escape(canonical_url, quote=True)}">
 <script>try{{const theme=localStorage.getItem("pallas-tpu-theme");if(theme==="light"||theme==="dark")document.documentElement.dataset.theme=theme}}catch(error){{}}</script>
 <link rel="stylesheet" href="{stylesheet}">
 <script defer src="{script}"></script>
@@ -403,6 +411,18 @@ def copy_assets(output: Path, assets: set[Path]) -> None:
             preview = output / Path(str(relative) + ".html")
             preview.write_bytes(render_source_preview(source))
 
+def write_sitemap(output: Path, pages: tuple[Page, ...]) -> None:
+    entries = "\n".join(
+        f"  <url><loc>{escape(public_page_url(page))}</loc></url>"
+        for page in pages
+    )
+    sitemap = f'''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{entries}
+</urlset>
+'''
+    (output / "sitemap.xml").write_text(sitemap, encoding="utf-8")
+
 def parse_html(path: Path) -> SiteReferenceParser:
     parser = SiteReferenceParser()
     parser.feed(path.read_text(encoding="utf-8"))
@@ -446,6 +466,7 @@ def build_site() -> tuple[int, tuple[str, ...]]:
         shutil.copy2(SITE_DIR / "site.js", temporary_output / "site.js")
         (temporary_output / ".nojekyll").touch()
         copy_assets(temporary_output, assets)
+        write_sitemap(temporary_output, pages)
         for page in pages:
             content, headings = render_markdown(page, pages_by_source, assets)
             destination = temporary_output / route_directory(page.route) / "index.html"
