@@ -1,15 +1,15 @@
 ## LHS 一次读入：数值检查通过；kernel 段 4080 个 bundle；dma.simple 1，dma.strided 5，vdwg.128x128.f16 8，vmatmul.packed.8x128.f16 968，vmatmul.packed.dwg.8x128.f16 56，vmatpush.packed.8x128.f16 512
-  LCC，module：TensorCore 0 111738 个周期，TensorCore 1 85126 个周期
-  LCC，matmul.1：TensorCore 0 85007 个周期，TensorCore 1 84974 个周期
+  LCC，module：TensorCore 0 112138 个周期，TensorCore 1 85038 个周期
+  LCC，matmul.1：TensorCore 0 84919 个周期，TensorCore 1 84896 个周期
 ## LHS 分 4 段，同时发出：数值检查通过；kernel 段 9845 个 bundle；dma.simple 4，dma.strided 5，vdwg.128x128.f16 8，vmatmul.packed.8x128.f16 2408，vmatmul.packed.dwg.8x128.f16 152，vmatpush.packed.8x128.f16 1280
-  LCC，module：TensorCore 0 109953 个周期，TensorCore 1 85269 个周期
-  LCC，matmul.1：TensorCore 0 85150 个周期，TensorCore 1 85113 个周期
+  LCC，module：TensorCore 0 114817 个周期，TensorCore 1 85131 个周期
+  LCC，matmul.1：TensorCore 0 85012 个周期，TensorCore 1 85013 个周期
 ## LHS 分 4 段，逐段发出：数值检查通过；kernel 段 9835 个 bundle；dma.simple 4，dma.strided 5，vdwg.128x128.f16 8，vmatmul.packed.8x128.f16 2408，vmatmul.packed.dwg.8x128.f16 152，vmatpush.packed.8x128.f16 1280
-  LCC，module：TensorCore 0 111281 个周期，TensorCore 1 82737 个周期
-  LCC，matmul.1：TensorCore 0 82618 个周期，TensorCore 1 82599 个周期
+  LCC，module：TensorCore 0 114113 个周期，TensorCore 1 82732 个周期
+  LCC，matmul.1：TensorCore 0 82613 个周期，TensorCore 1 82621 个周期
 ## LHS 逐段发出，最后一块分段写回：数值检查通过；kernel 段 17764 个 bundle；dma.simple 4，dma.strided 9，vdwg.128x128.f16 12，vmatmul.packed.8x128.f16 4332，vmatmul.packed.dwg.8x128.f16 276，vmatpush.packed.8x128.f16 2304
-  LCC，module：TensorCore 0 105090 个周期，TensorCore 1 80642 个周期
-  LCC，matmul.1：TensorCore 0 80523 个周期，TensorCore 1 80514 个周期
-## LHS 逐段发出，最后一块分段写回，每次 jnp.dot 512 行：数值检查通过；无法序列化 executable：INTERNAL: Failed to serialize TpuExecutableProto, is it too large? Compiler Metadata byte size is: 2253749668
-  XProf，module：TensorCore 0 107888 个周期，TensorCore 1 78478 个周期
-  XProf，matmul.1：TensorCore 0 78372 个周期，TensorCore 1 78367 个周期
+  LCC，module：TensorCore 0 103961 个周期，TensorCore 1 80745 个周期
+  LCC，matmul.1：TensorCore 0 80626 个周期，TensorCore 1 80595 个周期
+## LHS 逐段发出，最后一块分段写回，每次 jnp.dot 512 行：数值检查通过；kernel 段 19238 个 bundle；dma.simple 4，dma.strided 9，vdwg.128x128.f16 12，vmatmul.packed.8x128.f16 4844，vmatmul.packed.dwg.8x128.f16 276，vmatpush.packed.8x128.f16 2304
+  LCC，module：TensorCore 0 107336 个周期，TensorCore 1 78305 个周期
+  LCC，matmul.1：TensorCore 0 78186 个周期，TensorCore 1 78168 个周期

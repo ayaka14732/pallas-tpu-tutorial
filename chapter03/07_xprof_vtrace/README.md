@@ -307,5 +307,4 @@ with jax.profiler.TraceAnnotation('call'):
 | 不同 TensorCore、不同芯片上的事件谁先谁后、相隔多久 | GTC（第 6 节）；不想改程序时用 XProf，它的时间线就是 GTC |
 | 一段时间是多少秒 | GTC，区间要足够长；单芯片会话中也可以用 LCC 的周期数除以 1.05 GHz |
 | 程序中有哪些 HLO 指令、各自大致多久，不想改程序 | XProf 的 `XLA Ops` |
-| 程序太大无法序列化、不能用 tpuasm 插入读数 | XProf，时间按一格 1.43 ns 解读 |
 | 主机在一次调用中做了什么 | XProf 的主机事件 |

@@ -147,19 +147,12 @@ def main() -> None:
         mesh, matmul = build(panels, staged, split_last, chunk)
         compiled = tpuasm_tools.compile(matmul, lhs, rhs, mesh=mesh)
         np.testing.assert_array_equal(np.asarray(compiled(lhs, rhs)), reference)
-        try:
-            listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
-        except jax.errors.JaxRuntimeError as error:
-            # 程序太大时，executable 连同编译器元数据无法序列化：读不到清单，也无法插入 LCC 读数，只能用 XProf。
-            print(f'## {name}：数值检查通过；无法序列化 executable：{str(error).splitlines()[0]}')
-            times, method = baseline.xprof_times(compiled, pairs), 'XProf'
-        else:
-            counts = tpuasm_tools.count_mnemonics(listing)
-            bundles = sum(line.startswith('{') for line in listing.splitlines())
-            print(f'## {name}：数值检查通过；kernel 段 {bundles} 个 bundle；' + '，'.join(f'{mnemonic} {counts[mnemonic]}' for mnemonic in sorted(counts) if mnemonic.split('.')[0] in ('vmatmul', 'vmatpush', 'vdwg', 'dma')))
-            times, method = baseline.clock_times(clock, compiled, pairs), 'LCC'
-        for op, cycles in times:
-            print(f'  {method}，{op}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
+        listing = tpuasm_tools.kernel_listing(compiled, pallas_only=True)
+        counts = tpuasm_tools.count_mnemonics(listing)
+        bundles = sum(line.startswith('{') for line in listing.splitlines())
+        print(f'## {name}：数值检查通过；kernel 段 {bundles} 个 bundle；' + '，'.join(f'{mnemonic} {counts[mnemonic]}' for mnemonic in sorted(counts) if mnemonic.split('.')[0] in ('vmatmul', 'vmatpush', 'vdwg', 'dma')))
+        for op, cycles in baseline.clock_times(clock, compiled, pairs):
+            print(f'  LCC，{op}：TensorCore 0 {cycles[0]} 个周期，TensorCore 1 {cycles[1]} 个周期')
 
 if __name__ == '__main__':
     main()

@@ -1,17 +1,12 @@
-"""原生 XLA 的 bf16[2048,2048] @ bf16[2048,2048] → f32[2048,2048]：编译后的 HLO 把输入放在哪里，清单中两个 TensorCore 各用了哪些指令，XProf 中设备上的时间。"""
+"""原生 XLA 的 bf16[2048,2048] @ bf16[2048,2048] → f32[2048,2048]：编译后的 HLO 把输入放在哪里，清单中两个 TensorCore 各用了哪些指令，LCC 测得的设备上的周期数。"""
 import tpu_init
 tpu_init.initialize_one_chip()
-
-from collections import defaultdict
-from pathlib import Path
-import statistics
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 import tpuasm_tools
-import xprof_tools
 
 SIZE = 2048
 
@@ -26,15 +21,6 @@ def clock_times(clock: tpuasm_tools.KernelClock, compiled, pairs: list[tuple[jax
     """整个程序与每条 HLO 指令在两个 TensorCore 上的周期数：设备上的 LCC 读数，每对输入运行一次，取中位数。"""
     inputs = iter(pairs)
     return clock.time_ops(compiled, lambda timed: timed(*next(inputs)).block_until_ready(), samples=len(pairs))
-
-def xprof_times(compiled, pairs: list[tuple[jax.Array, jax.Array]]) -> list[tuple[str, list[int]]]:
-    """同样的量改由 XProf 的设备事件给出（按 1.05 GHz 换算成周期），用于无法改写的程序。"""
-    events = xprof_tools.device_events(xprof_tools.capture(lambda: [compiled(lhs, rhs).block_until_ready() for lhs, rhs in pairs], Path('/tmp/pallas_tpu_tutorial/xprof')))
-    durations = defaultdict(lambda: defaultdict(list))
-    for event in events:
-        name = 'module' if event['track'] == 'XLA Modules' else event['name']
-        durations[name][event['device']].append(xprof_tools.device_cycles(event))
-    return [(name, [round(statistics.median(cores[device])) for device in sorted(cores)]) for name, cores in durations.items()]
 
 def main() -> None:
     lhs, rhs = inputs(0)
