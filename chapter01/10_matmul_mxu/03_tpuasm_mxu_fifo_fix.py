@@ -1,6 +1,6 @@
 """用 tpuasm 查明并修正上一个实验的错误：先运行一个装入另一份 RHS 的矩阵乘法，再运行被测 kernel，判断每块结果用的是哪份 RHS。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib
 

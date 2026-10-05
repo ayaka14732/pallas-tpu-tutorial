@@ -4,7 +4,7 @@ TensorCore 内部有一个随机数生成器，用三条向量指令操作。本
 
 ## 三条指令
 
-```text
+```tpuasm
 setrngseed vN          # 用 TC VREG vN 中的值设定生成器的状态
 getrngseed vN          # 把生成器的状态读进 vN，不改变状态
 vrng.8x128.u32 vN      # 生成一个 u32[8,128] 写进 vN，并推进状态

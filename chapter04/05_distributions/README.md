@@ -42,7 +42,7 @@ def mantissa():
 
 `bitcast_convert_type` 只重新解释位型，不产生指令。清单中每个 TC VREG 三条：
 
-```text
+```tpuasm
 { va0: vrng.8x128.u32 v22 }
 { va1: vshrl.8x128.s32 v23, v22, 0x9 }
 { va0: vor.8x128.u32 v24, 0x3f800000, v23 }
@@ -69,7 +69,7 @@ def convert():
     return ((bits() >> 8).astype(jnp.int32).astype(jnp.float32) * 2.0**-24,)
 ```
 
-```text
+```tpuasm
 { va1: vshrl.8x128.s32 v23, v22, 0x8 }
 { va0: vcvt.8x128.s32.f32 v24, v23 }
 { va0: vmul.8x128.f32 v25, 5.960464477539063e-08, v24 }
@@ -100,7 +100,7 @@ def by_integer(p: float):
     return lambda: (((bits() >> 8).astype(jnp.int32) < threshold(p)).astype(jnp.int32),)
 ```
 
-```text
+```tpuasm
 { va1: vshrl.8x128.s32 v23, v22, 0x8 }
 { va0: vlt.8x128.s32 vm0, v23, 4194304 }
 { va0: vsel.8x128 v25, vm0, 0x1, v24 }
@@ -129,7 +129,7 @@ def dropout(x):
     return (jnp.where(keep, x * (4.0 / 3.0), 0.0),)
 ```
 
-```text
+```tpuasm
 { va1: vshrl.8x128.s32 v25, v24, 0x8 }
 { va0: vlt.8x128.s32 vm0, v25, 4194304 ; ... }
 { va0: vsel.8x128 v26, vm0, 0x0, v23 }
@@ -229,7 +229,7 @@ def by_hand(x):
     return (jax.lax.bitcast_convert_type(rounded, jnp.float32),)
 ```
 
-```text
+```tpuasm
 { va0: vand.8x128.u32 v24, 0xffff, v23 }
 { va0: vadd.8x128.s32 v25, v24, v22 }
 { va0: vand.8x128.u32 v26, 0xffff0000, v25 ; ... }

@@ -1,6 +1,6 @@
 """随机比特 → [0, 1) 的均匀分布：stateful_uniform、两种手写方法，以及 minval/maxval。比较每个 TC VREG 的指令、取值的间隔和能取到的最小、最大值。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax.experimental.pallas import tpu as pltpu

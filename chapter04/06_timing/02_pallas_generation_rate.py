@@ -1,6 +1,6 @@
 """在 kernel 中连续生成随机数，比较硬件 vrng、各种分布、threefry2x32 与 Philox 的生成速度：同一方法编译生成 64 个与 576 个 TC VREG 的两个 kernel，取 kernel 周期数之差除以 512；再与清单中每个 TC VREG 的计算指令数比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import Counter
 import re

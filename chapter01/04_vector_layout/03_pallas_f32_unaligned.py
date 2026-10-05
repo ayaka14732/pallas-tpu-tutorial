@@ -1,6 +1,6 @@
 """只改对齐：f32[9,130] 整块乘以 2，观察不整除 8×128 的 shape 怎样占用 TC VREG 与写回。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

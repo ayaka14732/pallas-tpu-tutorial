@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
+import tpuasm_highlight
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SITE_DIR = ROOT_DIR / "site"
 OUTPUT_DIR = SITE_DIR / "build"
@@ -222,6 +224,12 @@ def transform_references(value: object, page: Page, pages_by_source: dict[Path, 
     if isinstance(value, dict):
         for child in value.values():
             transform_references(child, page, pages_by_source, assets)
+        if value.get("t") == "CodeBlock" and "tpuasm" in value["c"][0][1]:
+            # Pandoc 没有 tpuasm 的语法定义，由 tpuasm_highlight 生成同样结构的 HTML。
+            code = value["c"][1]
+            value.clear()
+            value.update({"t": "RawBlock", "c": ["html", tpuasm_highlight.highlight(code)]})
+            return
         if value.get("t") in {"Image", "Link"}:
             rewrite_reference(value, page, pages_by_source, assets)
         if value.get("t") == "Link":

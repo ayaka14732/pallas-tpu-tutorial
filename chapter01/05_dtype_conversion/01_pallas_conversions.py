@@ -1,6 +1,6 @@
 """单 TC 的类型转换：bf16↔f32、f32↔int32、int8↔int32，各打印清单中的转换指令。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import jax.numpy as jnp

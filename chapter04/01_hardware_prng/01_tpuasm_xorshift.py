@@ -1,6 +1,6 @@
 """TensorCore 的三条随机数指令：setrngseed 装入状态，getrngseed 读出状态，vrng.8x128.u32 产生一个 u32[8,128] 并推进状态。用 tpuasm 直接执行它们，与主机端 xorshift128+ 模型逐位比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import numpy as np

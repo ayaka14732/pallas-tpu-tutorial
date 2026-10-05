@@ -1,6 +1,6 @@
 """两个 TensorCore 的 bf16[2048,2048] @ bf16[2048,2048] → f32[2048,2048]：每个 TensorCore 算 1024 行，LHS 的一半常驻 TC VMEM，RHS 按 256 列的块双缓冲流过，输出块双缓冲写回。各版本只改流水线的头和尾，以及每次 jnp.dot 的行数。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib
 

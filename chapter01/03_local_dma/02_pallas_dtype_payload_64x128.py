@@ -1,6 +1,6 @@
 """只改 dtype：f32、bf16、int8 的 [64,128] 经 TC VMEM 复制，比较 DMA 的 length。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

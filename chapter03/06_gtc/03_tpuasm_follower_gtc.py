@@ -26,6 +26,8 @@ def main() -> None:
         regular = sum(count for pattern, count in patterns.items() if pattern in REGULAR)
         others = sorted(((pattern, count) for pattern, count in patterns.items() if pattern not in REGULAR), key=lambda item: -item[1])
         low = Counter((dense & 15).ravel().tolist())
+        # 相邻两次读数完全相同的运行：低 4 位饱和在 15、高位又没有推进。
+        repeated = int(np.sum(np.any(np.diff(dense, axis=1) == 0, axis=1)))
         # L0、G0、vdelay、sfence、G1、L1：GTC 两个读数之间的本地周期数是 ΔL − 2。
         setup = bundle(f's0: simm.s32 s24, {DELAY}')
         body = read_lcc(20) + read_gtc(21) + bundle('misc: vdelay s24') + bundle('s0: sfence') + read_gtc(22) + read_lcc(23)
@@ -35,7 +37,7 @@ def main() -> None:
         lines.append(
             f'device {device.id}，坐标 {tuple(device.coords)}，进程 {device.process_index}\n'
             f'  连续 4 次读 GTC，{REPEATS} 次运行：1、15、16 的三种轮换 {regular} 次，其他 {REPEATS - regular} 次 {others[:6]}\n'
-            f'  低 4 位的取值与次数：{sorted(low.items())}\n'
+            f'  低 4 位的取值与次数：{sorted(low.items())}；有相邻两次读数完全相同的运行 {repeated} 次\n'
             f'  停 {DELAY} 个周期，4 次运行：本地周期数 {sorted(set(cycles.tolist()))}，3ΔG − 32ΔL = {excess.tolist()}，ΔG 相对 32/3 × ΔL 偏离 {np.median(excess / (32 * cycles)) * 1e6:+.3f} ppm'
         )
     print('\n'.join(lines), flush=True)

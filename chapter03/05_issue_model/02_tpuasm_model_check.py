@@ -1,6 +1,6 @@
 """用发射模型预测第 3、4 节和本节各段手写清单的 LCC 读数，再在真机上运行同样的清单，逐一比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

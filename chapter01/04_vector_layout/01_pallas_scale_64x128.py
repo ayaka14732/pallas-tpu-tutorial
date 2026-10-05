@@ -1,6 +1,6 @@
 """只改 dtype：f32、bf16、int8 的 [64,128] 在 TC VMEM 中乘以 2（int8 为加 1），比较 load/store 条数与 TC VREG 内的 pack/unpack。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

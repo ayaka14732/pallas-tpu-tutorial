@@ -1,6 +1,6 @@
 """vadd.xlane 与 vmax.xlane 的结果放在哪里：用 tpuasm 直接执行一条跨 lane 归约，把取回的整个 TC VREG 写回主机检查。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import numpy as np

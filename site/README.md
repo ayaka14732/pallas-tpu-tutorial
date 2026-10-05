@@ -4,6 +4,8 @@
 
 构建器通过 Pandoc AST 转换链接，不直接用正则表达式修改 Markdown。教程内的 README 链接变为目录式网页地址，实验附件保持原路径，跨仓库资料则指向对应 GitHub 仓库。`.py`、`.txt` 和根目录的 `LICENSE` 文件同时生成带行号的预览，普通点击会在当前页面打开文件窗口，修饰键点击或禁用 JavaScript 时仍可直接访问原文件。
 
+机器清单的代码块写成 ```` ```tpuasm ````。Pandoc 没有这种语言的语法定义，[`tpuasm_highlight.py`](tpuasm_highlight.py) 按 [vscode-tpuasm](https://github.com/ayaka14732/vscode-tpuasm) 的 TextMate 语法划分词法单元（槽名、谓词、助记符、寄存器、内存空间、具名操作数、数值、标号、指示、注释），输出与 Pandoc 高亮相同结构和 class 的 HTML，沿用网站已有的配色。它也接受正文中常见的简写：行首的 `[编号]`、`编号:`、`N ×`，以及不带花括号和槽名的指令。
+
 ## 本地构建
 
 系统需要提供 Python 3 和 Pandoc 3.12，然后从仓库根目录运行：

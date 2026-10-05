@@ -14,7 +14,7 @@ bundle 455：va0: setrngseed v13；bundle 456：va0: vrng.8x128.u32 v17
 
 它们之前约 300 个 bundle 在计算装入的状态 `v13`。实验打印了这段计算的开头：
 
-```text
+```tpuasm
 160: { s1: sld s6, [smem:0x3ffe0] }
 161: { s0: seq.s32 p0, s6, 0 }
 162: { s0: @p0 sbr.rel L_01c9 ; s1: @!p0 sld s7, [smem:0x0] ; va0: @!p0 vand.8x128.u32 v8, 0x7f, v0 ; ... }
@@ -41,7 +41,7 @@ bundle 455：va0: setrngseed v13；bundle 456：va0: vrng.8x128.u32 v17
 所以程序每次启动时，前导用 runtime 写入的值、芯片、TensorCore 和生成器的编号算出 64 个各不相同的状态，`setrngseed` 装入，再空转一次 `vrng`。实验读出连续 4 次调用中 runtime 写入的值：
 
 ```text
-连续 4 次调用中 [smem:0x3ffe0] 的值：0x208e3da4、0xa93e8cd2、0x135d7960、0x0bf19785
+连续 4 次调用中 [smem:0x3ffe0] 的值：0x0f4defd2、0x18ec9681、0x98c500df、0xdbacfa47
 连续两次调用读出的状态相同：False
 同一次调用中两个 TensorCore 读出的状态相同：False
 ```

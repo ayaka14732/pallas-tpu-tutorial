@@ -36,7 +36,7 @@ pltpu.async_copy(recv_vmem, o_hbm.at[core], sems.at[3]).wait()
 
 汇合在清单中是：
 
-```text
+```tpuasm
 { s0: ssub.s32 s23, 1, s6 }                       # 对方编号 1 − core
 { s0: sand.u32 s24, 0x3, s23 }
 { s0: sshll.u32 s25, s24, 0x10 }
@@ -52,7 +52,7 @@ barrier 信号量就是 `sflag:8`。地址的拼法与第 1 节编译器插入�
 
 remote DMA 是一条 `dma.general`：
 
-```text
+```tpuasm
 { s0: sshll.u32 s29, s23, 0x1a ; s1: sshll.u32 s30, s23, 0xd }     # 对方编号 << 26；对方编号 << 13
 { s0: sadd.s32 s2, 134217728, s29 ; s1: sadd.s32 s3, 16384, s30 }  # (2 + 对方编号) << 26；(2 + 对方编号) << 13
 { s0: sor.u32 s4, 0x80008000, s2 ; s1: sor.u32 s0, 0x36, s3 }      # ici_dest；dst_flag = … | 54

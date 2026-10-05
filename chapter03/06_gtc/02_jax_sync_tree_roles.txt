@@ -1,32 +1,32 @@
 device 4，坐标 (0, 0, 1)，进程 1，/dev/accel0
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 local leader、端口 1 follower、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117012896
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117239984
 device 5，坐标 (1, 0, 1)，进程 1，/dev/accel3
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 follower、端口 1 local leader、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 117092480
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 117007472
 device 6，坐标 (0, 1, 1)，进程 1，/dev/accel1
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 local leader、端口 1 follower、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117080608
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117283136
 device 7，坐标 (1, 1, 1)，进程 1，/dev/accel2
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 local leader、端口 1 follower、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117196512
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117561312
 device 0，坐标 (0, 0, 0)，进程 0，/dev/accel0
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 follower、端口 1 global leader、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 116993360
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 116889552
 device 1，坐标 (1, 0, 0)，进程 0，/dev/accel3
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 follower、端口 1 local leader、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 116943472
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 1 增加 116902384
 device 2，坐标 (0, 1, 0)，进程 0，/dev/accel1
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 local leader、端口 1 follower、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117335152
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117199136
 device 3，坐标 (1, 1, 0)，进程 0，/dev/accel2
   会话之前：6 个端口的角色 ['follower']，计数 [15]
   会话之中：端口 0 local leader、端口 1 follower、端口 2 follower、端口 3 follower、端口 4 follower、端口 5 follower
-  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117303600
+  6 个端口的计数相隔 10 ms 两次读数都在增加：True；端口 0 增加 117177344

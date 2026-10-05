@@ -1,6 +1,6 @@
 """运行时的标量决定 DMA 窗口和是否计算：从 f32[64,128] 中取第 p[0] 个行 tile，p[1] > 0 时才乘以 2。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

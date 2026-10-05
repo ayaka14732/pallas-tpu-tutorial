@@ -1,6 +1,6 @@
 """两个 TensorCore 共享 Megacore Shared CMEM：TensorCore 0 把整个 y 从 HBM 搬进 CMEM，两个 TensorCore 再各从 CMEM 读自己的一半。比较把这次搬运放在入口汇合之前与之后。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

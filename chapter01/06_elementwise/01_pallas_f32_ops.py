@@ -1,6 +1,6 @@
 """f32[8,128] 的逐元素运算：每种运算单独编译一个 kernel，列出它用到的计算指令，并用 ULP 衡量与 float64 参考的误差。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import jax.numpy as jnp

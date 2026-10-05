@@ -1,6 +1,6 @@
 """主机内存中的输出按页组织（每页 f32[8,128]，4 KiB，共 4 页），kernel 把结果写到第 p 页：比较页号为常数、页号来自运行时标量，以及把输出写成 f32[32,128]、用 pl.multiple_of 声明起始行对齐三种写法。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

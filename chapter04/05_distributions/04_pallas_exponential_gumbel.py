@@ -1,6 +1,6 @@
 """随机比特 → 指数分布 −log u 与 Gumbel 分布 −log(−log u)：指令、与主机 float64 的误差，以及均匀数的分辨率给分布尾部设的上限。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import math
 

@@ -1,6 +1,6 @@
 """只改 DMA 窗口：从 HBM 中的 f32[64,256] 与 f32[64,128] 取各种行窗口和列窗口，经 TC VMEM 写回输出的同一位置。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

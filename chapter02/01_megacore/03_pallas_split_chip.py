@@ -2,7 +2,7 @@
 import os
 
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 # 这是 libtpu 的启动参数，必须在 TPU 初始化之前设置；它改变 runtime 的 device 划分，不是某次编译的选项。
 os.environ['LIBTPU_INIT_ARGS'] = f"{os.environ.get('LIBTPU_INIT_ARGS', '')} --deepsea_chip_config_name=legacy".strip()
 

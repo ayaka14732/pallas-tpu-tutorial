@@ -1,6 +1,6 @@
 """LCC 与 GTC 的计数速率：用 vdelay 让向量一侧停住 H 个周期，在其两侧用 LCC 包住 GTC 读数；再与主机计时比较，得出两者的频率。最后连续读 4 次 GTC，看它每个周期加多少，并把读数拆成高 60 位与低 4 位；再读出单芯片会话中这颗芯片的同步角色。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import Counter
 import time

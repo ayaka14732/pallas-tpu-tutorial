@@ -1,6 +1,6 @@
 """用 tpuasm 实现 Mosaic 拒绝的运行时页号：以页号为常数 2 的版本为载体，把主机地址计算中的常数 2 换成从 SMEM 读出的 page[0]。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib
 

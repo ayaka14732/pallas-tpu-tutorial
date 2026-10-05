@@ -1,6 +1,6 @@
 """找出一次交换中“发起顺序”起作用的原因：只让指定的几颗芯片发出指定的几条 remote DMA（流），比较不同的流组合与发起顺序下每次的时间。每条流写成 (源, 目的)，都是物理环 mesh 中的位置；位置 0、1、2、3 依次是 device 0、1、3、2，相差 2 的两个位置在对角线上。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 import jax
 from jax import Ref

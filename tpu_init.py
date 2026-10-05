@@ -4,7 +4,7 @@
 """
 import os
 
-def initialise_one_chip(chip: int | None = None) -> None:
+def initialize_one_chip(chip: int | None = None) -> None:
     """只打开本 host 的第 chip 颗芯片（0–3）；不同 chip 的进程可以同时运行。省略 chip 时读环境变量 TPU_TUTORIAL_CHIP，默认 0。"""
     if chip is None:
         chip = int(os.environ.get('TPU_TUTORIAL_CHIP', '0'))
@@ -12,12 +12,12 @@ def initialise_one_chip(chip: int | None = None) -> None:
     os.environ['TPU_PROCESS_BOUNDS'] = '1,1,1'
     os.environ['TPU_VISIBLE_CHIPS'] = str(chip)
 
-def initialise_one_core(chip: int | None = None) -> None:
+def initialize_one_core(chip: int | None = None) -> None:
     """只打开一颗芯片，并让它的两个 TensorCore 各作为一个 device 出现（split-chip）。原生 XLA 的程序默认在第 0 个 device 上运行，只用一个 TensorCore。"""
-    initialise_one_chip(chip)
+    initialize_one_chip(chip)
     os.environ['LIBTPU_INIT_ARGS'] = f"{os.environ.get('LIBTPU_INIT_ARGS', '')} --deepsea_chip_config_name=legacy".strip()
 
-def initialise_local_chips() -> None:
+def initialize_local_chips() -> None:
     """打开本 host 的全部四颗芯片（2x2x1）；在多 host 切片上也只用本 host，不调用 `jax.distributed.initialize()`。"""
     os.environ['TPU_CHIPS_PER_PROCESS_BOUNDS'] = '2,2,1'
     os.environ['TPU_PROCESS_BOUNDS'] = '1,1,1'

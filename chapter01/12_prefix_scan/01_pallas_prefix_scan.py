@@ -1,6 +1,6 @@
 """前缀和：jnp.cumsum 沿 lane 与沿 sublane，以及用循环移位和掩码手写的 Hillis–Steele 扫描。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax.numpy as jnp
 import ml_dtypes

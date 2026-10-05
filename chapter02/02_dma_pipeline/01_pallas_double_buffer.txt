@@ -1,4 +1,4 @@
-## 串行：数值检查通过；每遍 102958 个周期
+## 串行：数值检查通过；每遍 103202 个周期
   DMA 指令 2 条，vwait.ge 3 条，vld 64、vst 64
 # function jit(transform)/transform/mpmd_map [symbol 4, transform.1]; image bundles [504, 509)
 { misc: vtrace 0x80000000 }
@@ -372,7 +372,7 @@ L_01ff:
 { misc: vtrace 0x90000000 }
 # end function jit(transform)/transform/mpmd_map [symbol 4, transform.1]
 
-## 输入双缓冲：数值检查通过；每遍 67660 个周期
+## 输入双缓冲：数值检查通过；每遍 67974 个周期
   DMA 指令 3 条，vwait.ge 3 条，vld 64、vst 64
 # function jit(transform)/transform/mpmd_map [symbol 4, transform.1]; image bundles [504, 509)
 { misc: vtrace 0x80000000 }
@@ -767,7 +767,7 @@ L_0200:
 { misc: vtrace 0x90000000 }
 # end function jit(transform)/transform/mpmd_map [symbol 4, transform.1]
 
-## 输入输出双缓冲：数值检查通过；每遍 67425 个周期
+## 输入输出双缓冲：数值检查通过；每遍 67555 个周期
   DMA 指令 3 条，vwait.ge 5 条，vld 64、vst 64
 # function jit(transform)/transform/mpmd_map [symbol 4, transform.1]; image bundles [504, 509)
 { misc: vtrace 0x80000000 }
@@ -1169,6 +1169,6 @@ L_0200:
 { misc: vtrace 0x90000000 }
 # end function jit(transform)/transform/mpmd_map [symbol 4, transform.1]
 
-## 输入输出双缓冲，tile 为 f32[512,128]（256 KiB）：每遍 67929 个周期
-## 输入输出双缓冲，tile 为 f32[1024,128]（512 KiB）：每遍 53147 个周期
-## 输入输出双缓冲，tile 为 f32[2048,128]（1024 KiB）：每遍 43872 个周期
+## 输入输出双缓冲，tile 为 f32[512,128]（256 KiB）：每遍 67290 个周期
+## 输入输出双缓冲，tile 为 f32[1024,128]（512 KiB）：每遍 52910 个周期
+## 输入输出双缓冲，tile 为 f32[2048,128]（1024 KiB）：每遍 43795 个周期

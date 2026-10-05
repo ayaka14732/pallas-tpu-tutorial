@@ -1,6 +1,6 @@
 """TC VMEM 有多大：只改 scratch buffer 的行数，看多大的 pltpu.VMEM 还能编译并正确运行。kernel 只用 buffer 的最后 8 行。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

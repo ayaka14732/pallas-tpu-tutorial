@@ -1,6 +1,6 @@
 """同一个比较用不同的计时方法：f32[32768,128] 的 y = 2x + 1，原生 XLA 对照第二章第 2 节的 Pallas 双缓冲 kernel。分别用固定输入、每次新输入、设备上的 LCC、fori_loop 循环和 AB/BA 轮次计时，并检查编译后的 HLO 中输入放在哪一层内存。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib.util
 from pathlib import Path

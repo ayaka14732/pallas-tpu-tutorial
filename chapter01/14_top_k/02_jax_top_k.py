@@ -1,6 +1,6 @@
 """原生 XLA 的 top-k 对照：f32[8,128] 的 top-1、top-8，以及每行只有 3 个有限值时的 top-8。"""
 import tpu_init
-tpu_init.initialise_one_core()
+tpu_init.initialize_one_core()
 
 import jax
 import numpy as np

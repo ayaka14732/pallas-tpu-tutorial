@@ -1,6 +1,6 @@
 """同一颗芯片两个 TensorCore 的 GTC 偏移，精确到一个计数：两个 TensorCore 共用一个时钟，互发信号时用 LCC 记下发出与收到的时刻，由两个方向的最小时延求出两个 LCC 的固定差 D，再把两边的 GTC 读数换到同一时刻比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import Counter
 import importlib.util

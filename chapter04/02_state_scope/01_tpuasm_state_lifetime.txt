@@ -23,7 +23,7 @@
   第 6 次：读状态，与模型一致 True
   第 7 次：装入第 4 次读出的状态并生成，与第 5 次的结果相同 True
 ## 保留编译器前导：前导用 runtime 写在 [smem:0x3ffe0] 的值计算状态
-  连续 4 次调用中 [smem:0x3ffe0] 的值：0x208e3da4、0xa93e8cd2、0x135d7960、0x0bf19785
+  连续 4 次调用中 [smem:0x3ffe0] 的值：0x0f4defd2、0x18ec9681、0x98c500df、0xdbacfa47
   连续两次调用读出的状态相同：False
   同一次调用中两个 TensorCore 读出的状态相同：False
 ## 一颗芯片的两个 TensorCore

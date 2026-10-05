@@ -1,6 +1,6 @@
 """逐 tile 计算 y = 2x + 1：f32[32768,128] 切成 f32[512,128] 的 tile。比较串行、输入双缓冲、输入输出都双缓冲三种调度的数值、清单与每遍的周期数；再只改 tile 大小。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

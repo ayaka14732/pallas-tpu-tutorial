@@ -18,7 +18,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
 
 输入方向在清单中是：
 
-```text
+```tpuasm
 { s0: @p0 dma.simple [vmem:s7], [hbm:s0], length=64, dst_flag=[sflag:52] }
 { misc: @p0 vwait.ge [sflag:52], 64 }
 { misc: @p0 vsyncadd.s32 [sflag:52], -64 }
@@ -66,7 +66,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, sem: Ref) -> None:
 
 清单中只有一条 DMA：
 
-```text
+```tpuasm
 { s0: @p0 dma.general [hbm:s1], [hbm:s0], length=64, stride_descriptor=[smem:0x0], stride_count=0,
       src_flag=[sflag:s8], dst_flag=[sflag:s7], ici_dest=s9 }
 ```
@@ -128,7 +128,7 @@ pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 
 它的输入 DMA 是 `sadd.s32 s9, 16, s0` 加一条 `dma.simple [vmem:s10], [hbm:s9], length=16`。改写把这一条 DMA 换成两条 `dma.strided`：
 
-```text
+```tpuasm
 # 新插入的 4 个 bundle：准备地址与段长，发出第一段
 { s0: sadd.s32 s11, -13, s9 ; s1: simm.s32 s12, 5 }      # 源 = 第 3 行（16 − 13）；每段 5 个 granule
 { s0: simm.s32 s13, 8 ; s1: sadd.s32 s14, 5, s10 }       # 两段之间相隔 8 个 granule；第二段的目的
@@ -198,7 +198,7 @@ def kernel(x_hbm: Ref, y_hbm: Ref, o_hbm: Ref, x_vmem: Ref, y_vmem: Ref, sems: R
 
 两个输入各用一个信号量时，两次等待分别是 `vwait.ge [sflag:52], 64` 和 `vwait.ge [sflag:53], 64`。共用一个信号量时，两条 `dma.simple` 都写 `sflag:52`，编译器把两次等待合并成一条：
 
-```text
+```tpuasm
 { s0: dma.simple [vmem:s10], [hbm:s0], length=64, dst_flag=[sflag:52] }
 { s0: dma.simple [vmem:s13], [hbm:s1], length=64, dst_flag=[sflag:52] }
 { misc: vwait.ge [sflag:52], 128 }

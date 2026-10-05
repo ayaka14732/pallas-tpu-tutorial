@@ -1,6 +1,6 @@
 """默认的 Megacore 模式下，原生 XLA 把 f32[64,128] 乘以 2：观察 XLA 怎样把工作分给两个 TensorCore。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import jax.numpy as jnp

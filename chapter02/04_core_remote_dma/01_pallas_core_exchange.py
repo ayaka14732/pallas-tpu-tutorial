@@ -1,6 +1,6 @@
 """一颗芯片的两个 TensorCore 交换数据：每个 TensorCore 把自己 TC VMEM 中的 f32[8,128] 用 remote DMA 直接写进对方的 TC VMEM。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

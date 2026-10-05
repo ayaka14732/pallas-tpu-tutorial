@@ -1,8 +1,8 @@
 32 次运行
-  每次的 G1 − G0（TensorCore 0）：192–1679 个 GTC 计数
-  每次的 G1 − G0（TensorCore 1）：161–785 个 GTC 计数
-  两个 TensorCore 的 G0 之差：-304–1184 个 GTC 计数
-  单次运行给出的偏移区间宽度：962–1854 个 GTC 计数
+  每次的 G1 − G0（TensorCore 0）：271–3280 个 GTC 计数
+  每次的 G1 − G0（TensorCore 1）：161–719 个 GTC 计数
+  两个 TensorCore 的 G0 之差：-224–2784 个 GTC 计数
+  单次运行给出的偏移区间宽度：962–3456 个 GTC 计数
   32 个区间的交集：[-481, 481] 个 GTC 计数，即 [-42.9, 42.9] ns
-  紧随 G1 的 LCC 读数之差（TensorCore 1 − TensorCore 0）：-51329–-51271
-  TensorCore 0 的 LCC 读数：7780389098，TensorCore 1：7780337769
+  紧随 G1 的 LCC 读数之差（TensorCore 1 − TensorCore 0）：-51329–-51278
+  TensorCore 0 的 LCC 读数：7793766104，TensorCore 1：7793714775

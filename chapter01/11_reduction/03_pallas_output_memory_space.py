@@ -1,6 +1,6 @@
 """同一个沿 lane 求和的 kernel，输出类型分别写成 jax.ShapeDtypeStruct 与 pltpu.HBM，比较 kernel 写回输出的 DMA 目的地。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

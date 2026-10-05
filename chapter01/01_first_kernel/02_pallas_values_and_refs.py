@@ -1,6 +1,6 @@
 """值与 Ref：读一次 Ref 得到的值可以多次使用、连续运算而不写回；每次读写 Ref 才对应一次 load/store。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

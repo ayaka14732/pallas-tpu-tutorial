@@ -1,6 +1,6 @@
 """原生 XLA 的 all-reduce：shard_map 中的 jax.lax.psum，与 Pallas 版本相同的三种大小；统计 XLA 生成的 remote DMA，并用 XProf 给 psum 计时。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 from pathlib import Path
 import statistics

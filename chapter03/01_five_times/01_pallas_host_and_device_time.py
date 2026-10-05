@@ -1,6 +1,6 @@
 """同一个 kernel 的五种“时间”：Python 调用返回的时间、调用并等到结果的时间、连续调用时每次调用的时间、设备上用 LCC 读出的周期数，以及从清单读出的设备工作量。kernel 用 pl.delay 让 TensorCore 停住已知的时间。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import statistics
 import time

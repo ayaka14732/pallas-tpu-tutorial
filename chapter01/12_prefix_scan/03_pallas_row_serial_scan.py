@@ -1,6 +1,6 @@
 """沿 sublane 的前缀和逐行串行计算：每次把一行广播到 8 个 sublane 再累加。比较 jnp.broadcast_to 与 stride=0 的 Ref 读取。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import numpy as np
 

@@ -1,6 +1,6 @@
 """拼接两个数组：在 TC VMEM 中用 jnp.concatenate，或不经 TC VMEM、让两次 DMA 直接写进输出的两个窗口；对齐与不对齐的 shape 各一组。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import re
 

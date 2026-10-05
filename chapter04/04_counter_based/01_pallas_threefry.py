@@ -1,6 +1,6 @@
 """计数器式生成器在 TensorCore 上的写法与开销：kernel 中调用 jax.random（threefry2x32），结果与 kernel 外逐位相同；统计每个 u32[8,128] 需要多少条向量指令，并与 Philox 4x32（需要 32 位乘法）和硬件 vrng 对照。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

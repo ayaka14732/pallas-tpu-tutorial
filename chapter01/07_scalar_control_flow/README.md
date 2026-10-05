@@ -24,7 +24,7 @@ def kernel(x_hbm: Ref, s_hbm: Ref, o_hbm: Ref, x_vmem: Ref, s_smem: Ref, sem: Re
 
 清单中的对应部分：
 
-```text
+```tpuasm
 { s0: dma.simple [smem:s13], [hbm:s1], length=1, dst_flag=[sflag:52] }
 { misc: vwait.ge [sflag:52], 1 }
 { misc: vsyncadd.s32 [sflag:52], -1 }
@@ -92,7 +92,7 @@ def _(i: jax.Array) -> None:
 
 静态边界的 `pl.loop` 在清单中是一个真正的循环：
 
-```text
+```tpuasm
 L_0200:
 { s0: sshll.u32 s11, s10, 0x3 ;  s1: sadd.s32 s10, 1, s10 }   # start = i * 8；i += 1
 { s0: sadd.s32 s12, 0, s11 ;     s1: sge.s32 p1, s10, 8 }     # 地址；p1 = (i >= 8)
@@ -117,7 +117,7 @@ Python `for` 与 `pl.loop` 的差别不只在代码长度。展开后的 8 个 t
 
 运行时边界的 `pl.loop` 多了一段循环前的检查：
 
-```text
+```tpuasm
 { s1: sld s17, [smem:0x3f] }
 { s0: sle.s32 p1, s17, 0 }
 { s0: @p1 sbr.rel L_023a }      # n <= 0 时跳过整个循环
@@ -147,7 +147,7 @@ pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 
 清单中，运行时的窗口起点就是一次标量乘法和一次加法：
 
-```text
+```tpuasm
 { s1: sld s13, [smem:0x3e] }
 { s0: sshll.u32 s14, s13, 0x3 }           # p[0] * 8
 { s0: sadd.s32 s17, s14, s0 }             # HBM 基址 + 偏移
@@ -156,7 +156,7 @@ pltpu.async_copy(x_vmem, o_hbm, sem).wait()
 
 这与第 3 节的常数窗口相同，只是偏移从立即数变成了寄存器。`pl.when` 是一次条件跳转：
 
-```text
+```tpuasm
 { s0: sle.s32 p1, s19, 0 }
 { s0: @p1 sbr.rel L_020e ;  vld: @!p1 vld.8x128 v0, [vmem:0x0] }
 { va0: @!p1 vmul.8x128.f32 v1, 2.0, v0 }     # 延迟槽
@@ -182,7 +182,7 @@ o_vmem[...] = x_vmem[pl.ds(p_smem[0], 8)]
 
 同一份编译结果分别用起点 8、3、13、56 调用，结果都等于 `x[start:start+8]`。清单中两者各只有一条指令：
 
-```text
+```tpuasm
 { s0: dma.simple [vmem:s17], [hbm:s16], length=8, dst_flag=[sflag:52] }   # 一
 { vld: vld.8x128 v0, [vmem:s17] }                                         # 二
 ```

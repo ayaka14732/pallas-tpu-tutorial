@@ -20,7 +20,7 @@ o_vmem[...] = jnp.dot(lhs_vmem[...], rhs_vmem[...], preferred_element_type=jnp.f
 
 `bf16[16,128] @ bf16[128,128]` 的结果与精确值逐元素一致，清单中的矩阵指令是：
 
-```text
+```tpuasm
 8 × vmatpush.packed.8x128.f16 gsfn0, v      # RHS 的 8 个打包 TC VREG 送入暂存区 gsfn0
 1 × vdwg.128x128.f16 gmr0, gsfn0            # 暂存区整块装入 MXU0 的 gains 寄存器 gmr0
 1 × vmatmul.packed.8x128.f16 mrf0, v        # 一个打包 LHS TC VREG（16 行）送入 MXU0
@@ -53,7 +53,7 @@ o_vmem[...] = jnp.dot(lhs_vmem[...], rhs_vmem[...].T, preferred_element_type=jnp
 
 清单中没有出现第 9 节的 `vxpose`，而是 push 换成了 `vmatpush.packed.xpose`，目的地换成另一个暂存区 `gsft0`，`vdwg` 也从 `gsft0` 装入：
 
-```text
+```tpuasm
 8 × vmatpush.packed.xpose.8x128.f16 gsft0, v
 1 × vdwg.128x128.f16 gmr0, gsft0
 ```
@@ -119,7 +119,7 @@ for block in range(2):
 
 清单直接说明了原因：
 
-```text
+```tpuasm
 8 × vmatpush.packed.8x128.f16 gsfn0, ...            # 转置时为 vmatpush.packed.xpose ... gsft0
 vmatmul.packed.dwg.8x128.f16 (gmr0, gsfn0, mrf0), v8
 vmatmul.packed.8x128.f16 mrf0, v9

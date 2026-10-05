@@ -23,7 +23,7 @@ return kernel(pltpu.with_memory_space_constraint(x, pltpu.HBM), pltpu.with_memor
 
 两种改写都先在输入 DMA 之前插入 4 个 bundle，把 y（地址在 `s1`）从 HBM 搬进 CMEM 地址 0：
 
-```text
+```tpuasm
 { s0: simm.s32 s20, 0 }
 { s0: dma.simple [cmem:s20], [hbm:s1], length=8, dst_flag=[sflag:52] }
 { misc: vwait.ge [sflag:52], 8 }
@@ -36,7 +36,7 @@ DMA 的端点写成 `[cmem:...]` 即可，长度和信号量的用法与第一�
 
 第二种是直接读：保留 x 的输入 DMA，把读 TC VMEM 的 `vld` 换成读 CMEM 的 `cld`，并在乘法之前插入一条 `vpop`：
 
-```text
+```tpuasm
 { cld: cld.8x128 crf, [cmem:0x0] }      # 原来的 vld：从 CMEM 地址 0 读一个 TC VREG 的数据，送入队列 crf
 { vr0: vpop.8x128 v0, crf }             # 新插入：从 crf 取回到 v0
 { va0: vmul.8x128.f32 v1, 2.0, v0 }     # 原来的乘法
@@ -99,7 +99,7 @@ A = 0x80000（256.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P Fa
 
 CMEM 的另一个价值在于它是两个 TensorCore 共享的：一份数据只需从 HBM 读一次，两个 TensorCore 都能用。实验以第 1 节的两 TensorCore kernel 为载体（各读 x 的一半、乘以 2），改写为：TensorCore 0 把整个 y 搬进 CMEM，两个 TensorCore 再各从 CMEM 读自己的一半。
 
-```text
+```tpuasm
 { s0: smov s22, s1 }                                         # 保存 y 的地址（编译器随后会把 s1 另作他用）
 { s0: seq.s32 p10, s9, 0 ; s1: simm.s32 s21, 0 }             # p10 = (TensorCore 编号 == 0)
 { s0: @p10 dma.simple [cmem:s21], [hbm:s22], length=64, dst_flag=[sflag:52] }

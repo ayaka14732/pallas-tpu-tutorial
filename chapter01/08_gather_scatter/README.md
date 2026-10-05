@@ -20,7 +20,7 @@ f = lambda x, i: jnp.take_along_axis(x, i, axis=1)   # y[s,l] = x[s, i[s,l]]
 
 清单中的计算指令：
 
-```text
+```tpuasm
 { va0: vlt.8x128.s32 vm0, v0, 0 ;  va1: vadd.8x128.s32 v1, 128, v0 }
 { va0: vsel.8x128 v2, vm0, v1, v0 }          # 负索引加 128
 { vx0: vsetperm.2.all.u8 pcr0, v2 }          # 用索引设置重排模式
@@ -74,7 +74,7 @@ f = lambda x, i: pltpu.roll(x, 3, axis=0)   # sublane 方向移动 3 位
 
 通道方向的移位是一次 XLU 操作，位移量放在标量寄存器中：
 
-```text
+```tpuasm
 { vx0: vrot.0.8x128 trf0, v0, s16 }
 { vr0: vpop.8x128 v1, trf0 }
 ```
@@ -159,7 +159,7 @@ def kernel(u_hbm: Ref, r_hbm: Ref, t_hbm: Ref, u_vmem: Ref, r_smem: Ref, sem: Re
 
 与按行 gather 相比只交换了 DMA 的源和目的。行号互不相同时结果正确。清单中，每个目的地址由 `sadd` 把行号（已换算成 granule 的偏移）加到表的起点上算出，随后是一条 `length=1` 的 `dma.simple`，8 条 DMA 之后只有一次 `vwait.ge [sflag:52], 8`：
 
-```text
+```tpuasm
 { s0: sadd.s32 s24, s19, s2 ; ... }
 { s0: dma.simple [hbm:s24], [vmem:s13], length=1, dst_flag=[sflag:52] }
 ...

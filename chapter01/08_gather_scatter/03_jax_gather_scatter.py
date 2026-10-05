@@ -1,6 +1,6 @@
 """原生 XLA 的三个对照：按行 take、lane gather（take_along_axis）、lane scatter（每行索引互不相同的置换）。"""
 import tpu_init
-tpu_init.initialise_one_core()
+tpu_init.initialize_one_core()
 
 import jax
 import jax.numpy as jnp

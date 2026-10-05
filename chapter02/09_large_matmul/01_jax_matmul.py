@@ -1,6 +1,6 @@
 """原生 XLA 的 bf16[2048,2048] @ bf16[2048,2048] → f32[2048,2048]：编译后的 HLO 把输入放在哪里，清单中两个 TensorCore 各用了哪些指令，XProf 中设备上的时间。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import defaultdict
 from pathlib import Path

@@ -23,7 +23,7 @@ pltpu.async_copy(recv_vmem, o_hbm.at[0], sems.at[0]).wait()
 
 清单中与 remote DMA 有关的两条指令：
 
-```text
+```tpuasm
 { s0: sor.u32 s21, 0x88008000, s17 }
 { s0: dma.general [vmem:s23], [vmem:s9], length=8, ..., src_flag=[sflag:s24], dst_flag=[sflag:s0], ici_dest=s21 }
 ```
@@ -36,14 +36,14 @@ pltpu.async_copy(recv_vmem, o_hbm.at[0], sems.at[0]).wait()
 
 `0x88008000` 中的 `0x08000000` 正是 bits 28:26 = 2，即 TensorCore 0。所以改写有两处：
 
-```text
+```tpuasm
 { s0: sor.u32 s21, 0x80008000, s17 }                                           # 清除 TensorCore 字段
 { s0: dma.general [cmem:s26], [cmem:s25], length=8, ..., ici_dest=s21 }       # 两端改为 CMEM
 ```
 
 此外，发送前要把数据从 TC VMEM 搬进本芯片的 CMEM，收到后再从 CMEM 搬回 TC VMEM，以便沿原来的路径写回 HBM。这两段插在汇合之前和输出 DMA 之前：
 
-```text
+```tpuasm
 # 汇合之前：本芯片 CMEM 地址 0 放要发送的数据，地址 64 作为接收区
 { s0: simm.s32 s25, 0 ; s1: simm.s32 s26, 64 }
 { s0: dma.simple [cmem:s25], [vmem:s9], length=8, dst_flag=[sflag:52] }
@@ -76,7 +76,7 @@ patched = tpuasm_tools.insert_bundles(patched, {barrier_pc: STAGE, output_pc: UN
 
 为什么要强调“其余完全相同”？同一条指令往往有不止一种机器编码。例如一个常数可以放进 bundle 的几个立即数槽中的任意一个，`vwait.ge [sflag:52], 8` 的阈值可以直接写在指令里，也可以引用立即数槽。清单的文本只写出指令，写不出这些选择。tpuasm 的清单有两种格式：`encoding='exact'` 在需要时附上 `.encoding` 约束，记录编译器的选择，重新汇编后逐字节还原，例如
 
-```text
+```tpuasm
 { misc: vwait.ge [sflag:52], 8 ; .encoding { misc.value = imm2 } }
 ```
 

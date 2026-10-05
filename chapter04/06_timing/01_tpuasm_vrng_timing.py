@@ -1,6 +1,6 @@
 """用 LCC 测 vrng 的时序：结果何时可用、连续发射的间隔、va0 与 va1 是否各有一个生成器，以及它与 setrngseed、getrngseed、普通向量运算的关系。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

@@ -1,6 +1,6 @@
 """四颗芯片的 all-reduce（求和），每颗芯片一个 f32[R,128]：一次交换（每颗芯片把整份数据直接发给其余三颗）、环形（reduce-scatter 加 all-gather，只和物理相邻的芯片通信）与双向环形。比较不同 R 下每次 all-reduce 的时间；再单独测汇合，并把一次交换拆成只发给相邻芯片、只发给对角线芯片等几种，看它的时间花在哪里。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 
 import jax

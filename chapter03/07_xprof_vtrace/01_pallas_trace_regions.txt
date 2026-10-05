@@ -1,9 +1,9 @@
 ## xla_enable_custom_call_region_trace=false：数值检查通过；kernel 段 159 个 bundle，其中含 vtrace 的 2 个
   misc: vtrace 0x80000000；misc: vtrace 0x90000000
   XProf，16 次调用的中位数（GTC 高 60 位之差 ΔT，每个计数 1/0.7 ns）：
-    /device:TPU:0 XLA Modules module：ΔT = 14718，即 21025.7 ns
-    /device:TPU:0 XLA Ops affine.1：ΔT = 1407，即 2010.0 ns
-    /device:TPU:1 XLA Modules module：ΔT = 1476，即 2108.6 ns
+    /device:TPU:0 XLA Modules module：ΔT = 14054，即 20077.1 ns
+    /device:TPU:0 XLA Ops affine.1：ΔT = 1409，即 2012.9 ns
+    /device:TPU:1 XLA Modules module：ΔT = 1478，即 2111.4 ns
 ## xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 168 个 bundle，其中含 vtrace 的 10 个
   清单（[编号] bundle）：
     [0] { misc: vtrace 0x80000000 }
@@ -37,21 +37,21 @@
     [166] { misc: cfence }
     [167] { misc: vtrace 0x90000000 }
   XProf，16 次调用的中位数（GTC 高 60 位之差 ΔT，每个计数 1/0.7 ns）：
-    /device:TPU:0 XLA Modules module：ΔT = 14242，即 20345.7 ns
-    /device:TPU:0 XLA Ops affine.1：ΔT = 1426，即 2037.1 ns
+    /device:TPU:0 XLA Modules module：ΔT = 14016，即 20022.9 ns
+    /device:TPU:0 XLA Ops affine.1：ΔT = 1423，即 2032.9 ns
     /device:TPU:0 XLA TraceMe compute：ΔT = 89，即 127.1 ns
     /device:TPU:0 XLA TraceMe load_start：ΔT = 1，即 1.4 ns
-    /device:TPU:0 XLA TraceMe load_wait：ΔT = 696，即 994.3 ns
-    /device:TPU:0 XLA TraceMe store：ΔT = 632，即 902.9 ns
-    /device:TPU:1 XLA Modules module：ΔT = 1497，即 2138.6 ns
+    /device:TPU:0 XLA TraceMe load_wait：ΔT = 689，即 984.3 ns
+    /device:TPU:0 XLA TraceMe store：ΔT = 633，即 904.3 ns
+    /device:TPU:1 XLA Modules module：ΔT = 1494，即 2134.3 ns
 ## 嵌套区域，xla_enable_custom_call_region_trace=true：数值检查通过；kernel 段 170 个 bundle，其中含 vtrace 的 12 个
   misc: vtrace 0x80000000；misc: vtrace 0xb8000000；misc: vtrace 0xc8000000；misc: vtrace 0xb8000001；misc: vtrace 0xc8000001；misc: vtrace 0xb8000002；misc: vtrace 0xb8000003；misc: vtrace 0xc8000003；misc: vtrace 0xb8000004；misc: vtrace 0xc8000004；misc: vtrace 0xc8000002；misc: vtrace 0x90000000
   XProf，16 次调用的中位数（GTC 高 60 位之差 ΔT，每个计数 1/0.7 ns）：
-    /device:TPU:0 XLA Modules module：ΔT = 15014，即 21448.6 ns
-    /device:TPU:0 XLA Ops affine.1：ΔT = 1424，即 2034.3 ns
+    /device:TPU:0 XLA Modules module：ΔT = 17134，即 24477.1 ns
+    /device:TPU:0 XLA Ops affine.1：ΔT = 1524，即 2177.1 ns
     /device:TPU:0 XLA TraceMe compute：ΔT = 89，即 127.1 ns
-    /device:TPU:0 XLA TraceMe compute_and_store：ΔT = 722，即 1031.4 ns
+    /device:TPU:0 XLA TraceMe compute_and_store：ΔT = 724，即 1034.3 ns
     /device:TPU:0 XLA TraceMe load_start：ΔT = 1，即 1.4 ns
-    /device:TPU:0 XLA TraceMe load_wait：ΔT = 688，即 982.9 ns
+    /device:TPU:0 XLA TraceMe load_wait：ΔT = 793，即 1132.9 ns
     /device:TPU:0 XLA TraceMe store：ΔT = 632，即 902.9 ns
-    /device:TPU:1 XLA Modules module：ΔT = 1494，即 2134.3 ns
+    /device:TPU:1 XLA Modules module：ΔT = 1594，即 2277.1 ns

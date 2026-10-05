@@ -505,6 +505,10 @@ code span.vs {
     color: var(--syntax-string);
 }
 
+code span.va {
+    color: var(--syntax-function);
+}
+
 code span.fu {
     color: var(--syntax-function);
     font-weight: 650;

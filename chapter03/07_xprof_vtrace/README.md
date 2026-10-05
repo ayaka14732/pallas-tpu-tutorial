@@ -41,7 +41,7 @@ XSpace
 
 设备上的每个事件都由程序中的一对 `vtrace` 指令产生。第一章第 2 节的清单中，kernel 段的第一条和最后一条指令是：
 
-```text
+```tpuasm
 { misc: vtrace 0x80000000 }
 ...
 { misc: vtrace 0x90000000 }
@@ -84,7 +84,7 @@ with jax.named_scope('store'):
 
 实验只改编译选项。关闭时 kernel 段 159 个 bundle，只有开头和结尾两条 `vtrace`；打开时 168 个 bundle，10 条 `vtrace`（连续 6 个以上不含 `vtrace` 的 bundle 折叠成一行）：
 
-```text
+```tpuasm
 [0] { misc: vtrace 0x80000000 }
 [1] { s1: sld s6, [smem:0x1] }
 [2] { s0: sne.s32 p0, s6, 0 }
@@ -120,9 +120,9 @@ with jax.named_scope('store'):
 | 区域 | ΔT | 时间 | 对照（第二章第 2 节的时延公式，按 1.05 GHz 换成时间） |
 | --- | ---: | ---: | --- |
 | `load_start` | 1 | 1.4 ns | — |
-| `load_wait` | 696 | 994.3 ns | HBM → TC VMEM 512 KiB：`483.6 + 1.105 × 512` ≈ 1049 个周期，999 ns |
+| `load_wait` | 689 | 984.3 ns | HBM → TC VMEM 512 KiB：`483.6 + 1.105 × 512` ≈ 1049 个周期，999 ns |
 | `compute` | 89 | 127.1 ns | 区域内 133 个 bundle |
-| `store` | 632 | 902.9 ns | TC VMEM → HBM 512 KiB：`417.5 + 1.051 × 512` ≈ 956 个周期，910 ns |
+| `store` | 633 | 904.3 ns | TC VMEM → HBM 512 KiB：`417.5 + 1.051 × 512` ≈ 956 个周期，910 ns |
 
 这种做法有代价：每条 `vtrace` 独占一个 bundle，区域的边界还限制了编译器跨边界重排指令（[研究报告 34](../../../pallas-tpu-readings-dev/research_reports/34_named_scope_changes_tpu_scheduling.md)）。带 region trace 测到的，是一个与正式运行不同的程序。
 
@@ -143,10 +143,10 @@ patched = tpuasm_tools.insert_bundles(serialized, {first: bundle(f'misc: vtrace 
 | 插入的一对 `vtrace` | 多出的事件 |
 | --- | --- |
 | `0xb8000000`、`0xc8000000` | `XLA TraceMe` 轨道，名字 `$$unknown$$`，ΔT = 89（127.1 ns） |
-| `0xb0000005`、`0xc0000005` | `XLA TraceMe` 轨道，名字 `overlayer-overhead`，ΔT = 89（127.1 ns） |
-| `0x80000007`、`0x90000007` | `XLA Ops` 轨道，名字 `region.7`，ΔT = 90（127.9 ns，16 次的中位数落在 89 与 90 之间） |
+| `0xb0000005`、`0xc0000005` | `XLA TraceMe` 轨道，名字 `overlayer-overhead`，ΔT = 90（127.9 ns） |
+| `0x80000007`、`0x90000007` | `XLA Ops` 轨道，名字 `region.7`，ΔT = 90（127.9 ns） |
 
-三种都得到了与 `named_scope` 的 `compute` 相同的事件。区别只在名字：主机用编号到程序的 metadata 中查名字，手写的编号查不到时显示 `$$unknown$$`，碰巧与 runtime 自己的编号相同时显示那个编号的名字；写成 `0x8`、`0x9` 类型时，它被当作一条 HLO 指令，名字是 `region.` 加编号。需要多个区域时，用不同的编号区分。
+三种都得到了与 `named_scope` 的 `compute` 相同的事件：每次调用的 ΔT 是 89 或 90（下一小节解释为什么有两个值），表中是 16 次的中位数。区别只在名字：主机用编号到程序的 metadata 中查名字，手写的编号查不到时显示 `$$unknown$$`，碰巧与 runtime 自己的编号相同时显示那个编号的名字；写成 `0x8`、`0x9` 类型时，它被当作一条 HLO 指令，名字是 `region.` 加编号。需要多个区域时，用不同的编号区分。
 
 ## 事件的时间就是 GTC
 
@@ -176,10 +176,10 @@ def gtc_ticks(event: dict) -> int:
 实验在计算部分的前后各插入一条 `vtrace`（上一个实验的第二种操作数），调用 48 次，列出每个字段出现过的值：
 
 ```text
-duration_ps：127142（2 次）、127143（17 次）、127232（11 次）、127233（2 次）、128482（15 次）、128483（1 次）
-duration_ps × 11.2 / 1000，即 GTC 之差 ΔG：1424（19 次）、1425（13 次）、1439（16 次）
-device_duration_ps：127143（32 次）、128571（16 次）
-device_duration_ps × 0.7 / 1000，即 GTC 高 60 位之差 ΔT：89（32 次）、90（16 次）
+duration_ps：127142（3 次）、127143（15 次）、127232（17 次）、127233（3 次）、128482（9 次）、128483（1 次）
+duration_ps × 11.2 / 1000，即 GTC 之差 ΔG：1424（18 次）、1425（20 次）、1439（10 次）
+device_duration_ps：127143（38 次）、128571（10 次）
+device_duration_ps × 0.7 / 1000，即 GTC 高 60 位之差 ΔT：89（38 次）、90（10 次）
 ```
 
 换回去之后都是整数，而且只有三个 ΔG：1424、1425、1439。这正是 134 个周期在时间源上应有的结果：134 = 3 × 44 + 2，44 组完整的循环贡献 44 × 32 = 1408，剩下的 2 个周期按起点的相位贡献 1 + 15、15 + 16 或 16 + 1，即 16、31、17，合计 1424、1439、1425。高 60 位之差相应地是 89 或 90。
@@ -195,7 +195,7 @@ timed = clock.instrument(compiled, [first, last + 1], counter)
 ```
 
 ```text
-同样的两个位置改为读 GTC：两次读数之差 1601（23 次）、1615（14 次）、1616（11 次）；高 60 位之差 100（23 次）、101（25 次）
+同样的两个位置改为读 GTC：两次读数之差 1601（15 次）、1615（16 次）、1616（17 次）；高 60 位之差 100（15 次）、101（33 次）
 同样的两个位置改为读 LCC：两次读数之差 151（48 次）
 ```
 
@@ -238,18 +238,18 @@ XProf 还能显示每条指令的事件。打开编译选项 `xla_xprof_enable_c
 ```text
 bundle 编号  指令            与上一个 bundle 相差（ns）
  10         vtrace          2.86
- 11         vtrace          122.14
- 12         dma.done.wait   122.14
- 13         vsyncadd        122.14
+ 11         vtrace          126.25
+ 12         dma.done.wait   126.25
+ 13         vsyncadd        126.34
  ...
- 19         vadd.f32        122.14
- 20         vadd.f32        122.14
- 21         vadd.f32        0.98
- 22         vadd.f32        0.98
+ 19         vadd.f32        126.25
+ 20         vadd.f32        126.34
+ 21         vadd.f32        1.07
+ 22         vadd.f32        1.16
  ...
 ```
 
-编号 11 到 20 的 bundle 每个相隔恰好 122.14 ns。这一段真实的情况是：等待输入 DMA 的 `dma.done.wait` 一条指令占了约 1220 ns，其余指令各占约 1 ns（一个周期）。主机只知道这 10 个 bundle 一共用了 1221 ns，就给每个 bundle 分了十分之一。从编号 21 起，相邻的标记之间只有计算，每个 bundle 相隔约 1 ns，插值与实际一致。
+编号 11 到 20 的 bundle 每个相隔约 126.3 ns。这一段真实的情况是：等待输入 DMA 的 `dma.done.wait` 一条指令占了约 1260 ns，其余指令各占约 1 ns（一个周期）。主机只知道这 10 个 bundle 一共用了 1263 ns，就给每个 bundle 分了十分之一。从编号 21 起，相邻的标记之间只有计算，每个 bundle 相隔约 1 ns，插值与实际一致。
 
 所以逐指令的事件只能用来看“执行到了哪一段”，不能当作每条指令的耗时：等待集中在哪一条指令上，从这些事件中看不出来。两个标记的时间差太小时，主机还会跳过它们之间的全部指令事件（研究报告 38）。要知道一条指令或一小段指令的周期数，用第 3 节的 LCC。
 
@@ -280,23 +280,23 @@ with jax.profiler.TraceAnnotation('call'):
 
 | 事件 | 开始 | 持续 | 含义 |
 | --- | ---: | ---: | --- |
-| `PjitFunction(jit(wait))` | 2.3 | 82.5 | Python 一侧的 `jit` 调用（嵌套出现两次） |
-| `PjRtCApiLoadedExecutable::Execute` | 12.2 | 67.7 | 交给 runtime 执行 |
-| `CommonPjRtLoadedExecutable::ExecutePrepare` | 18.3 | 11.1 | 准备参数，分配输出 buffer |
-| `TpuLoadedExecutable::ExecuteLaunch` | 29.6 | 45.6 | 把程序放进设备的执行队列 |
-| `tpu::System::Execute`（`core_id` 0、1） | 30.9、58.0 | 25.9、15.1 | 其中每个 TensorCore 一次入队 |
-| `ReadSyncFlag`（两次） | 213.1、216.8 | 26.4、28.8 | 读取设备的完成标志 |
-| `CompleteCallbacks`（两次） | 239.6、246.1 | 16.3、34.0 | 完成后的回调 |
-| `tpu::System::Execute=>Done`（`core_id` 1、0） | 251.7、259.5 | 2.7、16.5 | 标记每个 TensorCore 执行结束 |
-| 整个调用 | 0 | 284.9 | |
+| `PjitFunction(jit(wait))` | 2.3 | 82.8 | Python 一侧的 `jit` 调用（嵌套出现两次） |
+| `PjRtCApiLoadedExecutable::Execute` | 11.5 | 68.4 | 交给 runtime 执行 |
+| `CommonPjRtLoadedExecutable::ExecutePrepare` | 17.2 | 11.2 | 准备参数，分配输出 buffer |
+| `TpuLoadedExecutable::ExecuteLaunch` | 28.8 | 46.0 | 把程序放进设备的执行队列 |
+| `tpu::System::Execute`（`core_id` 0、1） | 30.2、57.0 | 25.8、15.5 | 其中每个 TensorCore 一次入队 |
+| `ReadSyncFlag`（两次） | 208.3、210.4 | 26.4、27.3 | 读取设备的完成标志 |
+| `CompleteCallbacks`（两次） | 235.3、237.9 | 15.5、25.7 | 完成后的回调 |
+| `tpu::System::Execute=>Done`（`core_id` 1、0） | 246.2、251.0 | 2.7、19.7 | 标记每个 TensorCore 执行结束 |
+| 整个调用 | 0 | 272.7 | |
 
 按时间顺序，一次调用分成三段：
 
-- **提交，约 75 µs。** 从调用开始到 `ExecuteLaunch` 结束（29.6 + 45.6），主机在 Python、参数处理、输出分配和入队上花掉的时间。两个 TensorCore 各入队一次。
-- **等待设备，约 138 µs。** 从入队结束到主机开始读完成标志（213.1）。设备上的 module 118.7 µs、kernel 100.8 µs 都在这一段之内，其余是程序启动与结束、完成标志传回主机的时间。
-- **完成处理，约 72 µs。** 读完成标志、执行回调、标记结束，直到 `block_until_ready()` 返回（284.9）。
+- **提交，约 75 µs。** 从调用开始到 `ExecuteLaunch` 结束（28.8 + 46.0），主机在 Python、参数处理、输出分配和入队上花掉的时间。两个 TensorCore 各入队一次。
+- **等待设备，约 134 µs。** 从入队结束到主机开始读完成标志（208.3）。设备上的 module 119.0 µs、kernel 100.8 µs 都在这一段之内，其余是程序启动与结束、完成标志传回主机的时间。
+- **完成处理，约 64 µs。** 读完成标志、执行回调、标记结束，直到 `block_until_ready()` 返回（272.7）。
 
-所以 1 万个周期（约 10 µs）的 kernel 调用并等到结果要 160 µs 左右，不是因为 kernel 慢：提交与完成处理这两段在主机上就占了约 147 µs，与 kernel 的长短无关。要缩短调用方的等待，只能减少调用次数，例如把多步工作合进一个程序、在 kernel 内部循环，或者让多个调用在途重叠。
+所以 1 万个周期（约 10 µs）的 kernel 调用并等到结果要 160 µs 左右，不是因为 kernel 慢：提交与完成处理这两段在主机上就占了约 139 µs，与 kernel 的长短无关。要缩短调用方的等待，只能减少调用次数，例如把多步工作合进一个程序、在 kernel 内部循环，或者让多个调用在途重叠。
 
 ## 什么时候用哪一种
 

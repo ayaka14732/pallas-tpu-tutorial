@@ -1,6 +1,6 @@
 """矩阵转置：只改并发个数、dtype、大小和对齐，统计清单中 XLU 的提交与取回指令及其所在的槽。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

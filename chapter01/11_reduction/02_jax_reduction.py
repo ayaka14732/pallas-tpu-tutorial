@@ -1,6 +1,6 @@
 """原生 XLA 的归约对照：f32[8,128] 沿 lane、沿 sublane、全部求和，以及 f32[64,128] 沿 sublane 求和。"""
 import tpu_init
-tpu_init.initialise_one_core()
+tpu_init.initialize_one_core()
 
 import jax
 import jax.numpy as jnp

@@ -1,6 +1,6 @@
 """Megacore Shared CMEM 的两条读取通路：用 tpuasm 改写一个只读 x 的载体 kernel，先把 y 从 HBM 搬进 CMEM，再分别经 DMA 搬进 TC VMEM（staging），或用 cld 直接读进 TC VREG。结果应为 2y 而非 2x。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

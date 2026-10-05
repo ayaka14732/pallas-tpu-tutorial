@@ -1,6 +1,6 @@
 """随机比特 → 标准正态分布：stateful_normal（反误差函数）与手写的 Box–Muller。比较每个随机数的指令、用到的 EUP 指令，以及落在 ±1σ、±2σ、±3σ 内的比例。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import math
 

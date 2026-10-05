@@ -1,6 +1,6 @@
 """int8 → int32 的三条指令逐条验证：先用 pltpu.bitcast 读出 int8 的打包格式，再用 tpuasm 单独执行 vld.sshfl 与编译器算移位量的几条指令，看它们各自做了什么。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

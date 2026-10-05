@@ -1,6 +1,6 @@
 """向量侧比标量侧慢的指令序列：N 条相互依赖的向量乘法、N 组从 CMEM 读入（cld 加 vpop）、一次 DMA 加等待。比较不加 sfence 的读数 R1 与加 sfence 之后的读数 R2。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

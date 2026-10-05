@@ -1,6 +1,6 @@
 """kernel 直接读写主机内存：输入与输出都在 pinned host memory，数据经 HOST → HBM → TC VMEM 计算 2x + 1，再经 HBM → HOST 写回；另试 HOST 与 TC VMEM 之间直接 DMA。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

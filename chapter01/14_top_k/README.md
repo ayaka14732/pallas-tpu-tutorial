@@ -24,7 +24,7 @@ def kernel(x_hbm: Ref, v_hbm: Ref, i_hbm: Ref, x_vmem: Ref, v_vmem: Ref, i_vmem:
 
 `jnp.max(x, axis=1, keepdims=True)` 与 `jnp.argmax(x, axis=1, keepdims=True)` 一起，输入 DMA 之后的清单是：
 
-```text
+```tpuasm
 { va0: vlaneseq.8x128.u32 v1 ; vld: vld.8x128 v0, [vmem:0x0] }
 { va0: vand.8x128.u32 v2, 0x7f, v1 ; vx0: vmax.xlane.2.8x128.f32 trf0, v0 }   # v2 = lane 号；提交求最大值
 { va0: veq.8x128.s32 vm0, v2, 0 }                                            # vm0 = 第 0 个 lane
@@ -94,7 +94,7 @@ bf16 输入无法编译：`bfloat16 top_k is not supported on TPUv5 or older`。
 
 清单的前两轮（只保留计算指令）：
 
-```text
+```tpuasm
 { va0: vand.8x128.u32 v2, 0x7f, v1 ; vx0: vmax.index.xlane.2.8x128.f32 trf0, v0 }   # 第 1 轮：原始输入的下标
 { va0: veq.8x128.s32 vm6, v2, 0 ; va1: vlt.8x128.s32 vm7, v2, 2 }                    # 拼结果用的掩码
 { vr0: vpop.8x128 v3, trf0 }                                                         # 第 1 个下标

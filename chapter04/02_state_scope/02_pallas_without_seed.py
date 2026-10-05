@@ -1,6 +1,6 @@
 """不调用 prng_seed 就使用 prng_random_bits：kernel 拿到的是 runtime 前导装入的状态。比较连续两次调用、两个 TensorCore 的输出，以及设定种子之后的情况。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

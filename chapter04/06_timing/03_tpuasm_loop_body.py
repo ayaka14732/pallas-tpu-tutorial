@@ -1,6 +1,6 @@
 """解释第 2 个实验中均匀分布、指数分布与 Gumbel 分布每个 TC VREG 的周期数：取出编译器生成的循环体，用 LCC 实测它本身的周期数，再用第三章第 5 节的发射模型分别在不考虑与考虑 vrng 发射间隔时预测。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from pathlib import Path
 import re

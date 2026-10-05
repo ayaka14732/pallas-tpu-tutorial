@@ -1,6 +1,6 @@
 """bf16 的两种打包格式：f32[16,128] 转为 bf16 后按位读出每个 32 bit 位置装的是哪两行；再用 tpuasm 把 vpackc 换成 vpack，比较两种格式。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

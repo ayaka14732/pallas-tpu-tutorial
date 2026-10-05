@@ -1,6 +1,6 @@
 """第一章第 7 节的 o = x * s[0] + s[1]：用 tpuasm 去掉 SMEM 的 DMA 等待之后的 sfence，看 sld 读到的是哪一次运行的标量。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

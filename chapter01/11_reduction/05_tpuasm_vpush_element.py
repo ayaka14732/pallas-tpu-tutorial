@@ -1,6 +1,6 @@
 """vpush 把 TC VREG 的哪个元素交给标量单元：用 tpuasm 对一个随机的 TC VREG 执行 vpush、spop，再把取出的标量广播写回，与输入逐元素比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import numpy as np
 

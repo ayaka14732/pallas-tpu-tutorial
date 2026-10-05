@@ -1,6 +1,6 @@
 """按行 scatter：把 8 行更新写进 HBM 中 f32[64,128] 的指定行，行号在 SMEM 中，每行一次 DMA；数组作为 jax Ref 原地修改。检查行号重复时谁的写入留下，以及在 TC VREG 内按 lane 做 scatter 能否编译。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

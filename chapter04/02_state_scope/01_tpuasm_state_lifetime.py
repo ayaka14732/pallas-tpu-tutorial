@@ -1,6 +1,6 @@
 """硬件随机数状态的作用域：它是否跨 kernel 调用保留、getrngseed 是否推进状态、能否保存后恢复，以及一颗芯片的两个 TensorCore 是否共享状态。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import numpy as np

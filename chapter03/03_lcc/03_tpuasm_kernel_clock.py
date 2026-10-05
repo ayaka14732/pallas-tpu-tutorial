@@ -1,6 +1,6 @@
 """给整个 kernel 计时：SMEM 的内容在程序之间保留，所以可以在任意程序的指定位置插入 LCC 读数、存进 SMEM，程序运行之后再由另一个程序取回。用第 1 节那个设备时间已知的 kernel 验证。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib.util
 from pathlib import Path

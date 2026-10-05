@@ -1,6 +1,6 @@
 """类型转换的边界情况：f32 → int32 的越界与 NaN，f32 → bf16 的舍入、NaN、非规格化数与溢出，int32 → f32 的舍入，bf16 → f32 的非规格化数。每组与 XLA 的 astype 比较，并列出按位的结果。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import jax.numpy as jnp

@@ -1,6 +1,6 @@
 """每行取最大的 k 个值及其下标：argmax、top-1、top-8，跨两个 lane tile 的 top-8，bf16 输入，以及有效值少于 k 个的边界情况。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import ml_dtypes

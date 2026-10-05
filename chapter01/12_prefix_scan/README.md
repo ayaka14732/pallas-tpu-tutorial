@@ -69,7 +69,7 @@ for k in range(8):
 
 `pl.ds(start, size, stride)` 的第三个参数是行距：从第 k 行开始读 8 行，每读一行前进 `stride` 行。`stride=0` 时 8 行都是第 k 行，即把一行广播到整个 TC VREG。清单中它是一条带 `ss=0` 的 load：
 
-```text
+```tpuasm
 vld: vld.8x128 v0, [vmem:0x0, ss=0]       # 第 0 行广播到 8 个 sublane
 vld: vld.8x128 v1, [vmem:0x1, ss=0]       # 第 1 行
 vst: vst.8x128 [vmem:0x8, sm=1], v0       # 输出第 0 行

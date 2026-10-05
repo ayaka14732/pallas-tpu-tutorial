@@ -4,27 +4,27 @@ TensorCore 0 的轨道：['Pallas Primitives', 'SALU Instructions', 'VALU Instru
 bundle 编号、其中一条指令、与上一个 bundle 的起始时刻之差（ns）：
     0  inlined_call_operand 
    10  vtrace         2.86
-   11  vtrace         122.14
-   12  dma.done.wait  122.14
-   13  vsyncadd       122.14
-   14  vtrace         122.14
-   15  vtrace         122.14
-   16  vld            122.14
-   17  vmul.f32       122.14
-   18  vmul.f32       122.14
-   19  vadd.f32       122.14
-   20  vadd.f32       122.14
-   21  vadd.f32       0.98
-   22  vadd.f32       0.98
-   23  vadd.f32       0.98
-   24  vadd.f32       0.98
-   25  vadd.f32       1.07
-   26  vadd.f32       0.98
-   27  vadd.f32       0.98
-   28  vadd.f32       0.98
-   29  vadd.f32       0.98
-   30  vadd.f32       1.07
+   11  vtrace         126.25
+   12  dma.done.wait  126.25
+   13  vsyncadd       126.34
+   14  vtrace         126.25
+   15  vtrace         126.34
+   16  vld            126.25
+   17  vmul.f32       126.25
+   18  vmul.f32       126.34
+   19  vadd.f32       126.25
+   20  vadd.f32       126.34
+   21  vadd.f32       1.07
+   22  vadd.f32       1.16
+   23  vadd.f32       1.16
+   24  vadd.f32       1.07
+   25  vadd.f32       1.16
+   26  vadd.f32       1.16
+   27  vadd.f32       1.07
+   28  vadd.f32       1.16
+   29  vadd.f32       1.16
+   30  vadd.f32       1.16
    31  vadd.f32       0.98
    32  vadd.f32       0.98
    33  vadd.f32       0.98
-   34  vadd.f32       1.07
+   34  vadd.f32       0.98

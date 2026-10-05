@@ -1,6 +1,6 @@
 """一个 f32[8,128] tile 内的数据重排：按索引的 lane gather、按索引的 sublane gather、固定位移的 lane/sublane 循环移位。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections.abc import Callable
 

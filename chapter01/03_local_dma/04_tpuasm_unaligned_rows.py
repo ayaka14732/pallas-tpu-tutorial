@@ -1,6 +1,6 @@
 """Mosaic 拒绝的窗口 f32[64,256] 的 [3:11, :]：编译对齐的 [8:16, :] 作为载体，用 tpuasm 把一次连续 DMA 改成两次 strided DMA，在真机上运行。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

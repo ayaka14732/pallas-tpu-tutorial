@@ -6,7 +6,7 @@
 
 本小节实验[源码](01_devices_and_mesh.py)、[输出](01_devices_and_mesh.txt)。
 
-实验在 `import jax` 之前调用 `tpu_init.initialise_local_chips()`，它与 `initialise_one_chip()` 的区别只在环境变量：
+实验在 `import jax` 之前调用 `tpu_init.initialize_local_chips()`，它与 `initialize_one_chip()` 的区别只在环境变量：
 
 ```python
 os.environ['TPU_CHIPS_PER_PROCESS_BOUNDS'] = '2,2,1'
@@ -63,7 +63,7 @@ mesh = jax.sharding.Mesh(np.array([devices[i] for i in [0, 1, 3, 2]]), ('device'
 
 kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标量计算。以物理环、1 轮为例（完整清单见输出的最后一段，这里省略输入输出 DMA）：
 
-```text
+```tpuasm
 { s0: simm.s32 s7, 0 ; s1: simm.s32 s8, 1 }
 { s0: simm.s32 s9, 3 ; s1: sst [smem:0x3f], s7 }
 { s0: simm.s32 s10, 2 ; s1: sst [smem:0x40], s8 }
@@ -73,7 +73,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 
 **mesh 位置到芯片编号的表。** kernel 一开始把 `[0, 1, 3, 2]` 写进 SMEM 的 `0x3f`–`0x42`。这正是构造 mesh 时给出的 device 顺序：mesh 中第 i 个位置是哪颗芯片。`device_id` 里写的是 mesh 位置，硬件需要的是芯片编号，这张表负责换算。
 
-```text
+```tpuasm
 { s1: sld s11, [smem:0x3ffe2] }
 { s1: sld s12, [smem:0x3ffe3] }
 { s0: sshll.u32 s16, s12, 0x2 }
@@ -83,7 +83,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 
 **本芯片在 mesh 中的位置。** `jax.lax.axis_index('device')` 由 runtime 写在 SMEM 高地址处的两个值算出（`s12 × 4 + s11`，再对 4 取模），结果 `me` 在 `s20` 中。
 
-```text
+```tpuasm
 { s0: simm.s32 s21, 294920 ; misc: vsyncadd.remote.s32 [sflag:32776], 1 }
 { s0: simm.s32 s22, 819208 ; misc: vsyncadd.remote.s32 [sflag:s21], 1 }
 { s0: simm.s32 s23, 557064 ; misc: vsyncadd.remote.s32 [sflag:s22], 1 }
@@ -94,7 +94,7 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 
 **四方汇合。** 循环中的四次 `pl.semaphore_signal(ready, 1, device_id={'device': rank, 'tc': 0})` 变成四条 `vsyncadd.remote`，目标的编号是常数：32776、294920、819208、557064，即十六进制的 `0x08008`、`0x48008`、`0xC8008`、`0x88008`。按第 1 节的格式拆开：低位的 `8` 是汇合用的信号量 `sflag 8`（`get_barrier_semaphore`，第 4 节），`0x8000` 是 `(2 + TensorCore 编号) << 14`，即目标芯片的 TensorCore 0，第 18 位起是芯片编号：0、1、3、2，正是 mesh 位置 0–3 对应的芯片。rank 是常数，编译器在编译时就查好了表。`pl.semaphore_wait(ready, 4)` 变成两条指令：先把本地的 `sflag 8` 减 4，再等它不小于 0，即四个信号都已到达。
 
-```text
+```tpuasm
 { s0: sadd.s32 s0, 1, s20 ; ... }       # me + 1
 ...（对 4 取模，结果在 s27）
 { s1: sld s28, [smem:s27 + 0x3f] }      # 查表：mesh 位置 → 芯片编号
@@ -131,10 +131,10 @@ kernel 中的几行 Python 在清单中变成了一段可以逐条读懂的标�
 
 | mesh 顺序 | 环上每一步的跳数 | 每轮 |
 | --- | --- | ---: |
-| `jax.make_mesh`：0, 2, 1, 3 | 1, 2, 1, 2 | 2920 个周期 |
-| 物理环：0, 1, 3, 2 | 1, 1, 1, 1 | 2372 个周期 |
+| `jax.make_mesh`：0, 2, 1, 3 | 1, 2, 1, 2 | 3055 个周期 |
+| 物理环：0, 1, 3, 2 | 1, 1, 1, 1 | 2905 个周期 |
 
-两种顺序的数值都正确，但按 `jax.make_mesh` 的顺序成环时，有两步要走对角线，每轮多 548 个周期。这比单条 DMA 两跳与一跳的固定开销之差（约 970 个周期）小：一轮的时间还包括汇合等两种顺序共有的部分，本实验没有把一轮再拆开。每一轮中的汇合是四颗芯片两两互发信号，两种顺序都相同；差别全部来自发送那一步的跳数。
+两种顺序的数值都正确，但按 `jax.make_mesh` 的顺序成环时，有两步要走对角线，每轮更慢。这个测量的波动不小：一轮的时间包括四方汇合，汇合的时间取决于四颗芯片各自何时到达。同一个脚本另外重复三次（没有留档），`jax.make_mesh` 的顺序在 3032–3431 个周期之间，物理环在 2325–2552 个周期之间；物理环每次都更快，差距从上表的 150 个周期到约 1100 个周期不等，平均在单条 DMA 两跳与一跳的固定开销之差（约 970 个周期）以内。每一轮中的汇合是四颗芯片两两互发信号，两种顺序都相同；差别来自发送那一步的跳数。
 
 设计跨芯片的通信时，应当按 `device.coords` 安排谁和谁通信，而不是按 mesh 中的序号。
 

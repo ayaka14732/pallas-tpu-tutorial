@@ -1,6 +1,6 @@
 """四颗芯片组成环，每颗芯片的 TensorCore 0 把 f32[8,128] 用 remote DMA 发给环上的下一颗。比较按 jax.make_mesh 顺序成环与按物理相邻顺序成环。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 import re
 

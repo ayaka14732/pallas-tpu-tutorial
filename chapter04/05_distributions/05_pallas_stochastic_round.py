@@ -1,6 +1,6 @@
 """f32 → bf16 的随机舍入：pltpu.stochastic_round 在 TPU v4 上能否编译；用整数加法手写，检查向上舍入的概率、对各种数值是否无偏，以及无穷大、NaN、最大有限值等特殊输入。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax.experimental.pallas import tpu as pltpu

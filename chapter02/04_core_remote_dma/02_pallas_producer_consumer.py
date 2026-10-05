@@ -1,6 +1,6 @@
 """TensorCore 0 计算 2x 写进 HBM，TensorCore 1 读它再加 1。比较 TensorCore 1 等待 TensorCore 0 的信号与不等待两种写法。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

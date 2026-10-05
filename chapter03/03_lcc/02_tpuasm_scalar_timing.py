@@ -1,6 +1,6 @@
 """标量单元的时序：相互依赖的 smul、连续的 sld、sld 的结果多久后可用、sst，以及 sst 之后读同一地址。每种序列给出 R1 − R0 与 R2 − R0。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

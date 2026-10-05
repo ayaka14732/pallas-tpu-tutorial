@@ -34,7 +34,7 @@ def apply_round(v, rot):
 
 TensorCore 没有循环移位指令，`rotate_left(v, r)` 要拆成三条：`vshll` 左移 r 位、`vshrl` 右移 32 − r 位、`vor` 合并。于是每一轮 5 条向量指令。清单中 hash 的一段：
 
-```text
+```tpuasm
 { va0: vor.8x128.u32 v11, v10, v8 }
 { va0: vxor.8x128.u32 v12, v11, v7 }
 { va0: vadd.8x128.s32 v13, v12, v7 ; va1: vshll.8x128.s32 v15, v12, 0x6 }

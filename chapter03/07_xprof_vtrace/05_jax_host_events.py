@@ -1,6 +1,6 @@
 """只有 XProf 能给出的信息：一次“调用并等到结果”在主机上花在哪里。采集主机一侧的事件，按事件名统计每次调用中的时间，并与设备上的 module、kernel 事件对照。kernel 是第 1 节的 pl.delay(100000)。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import defaultdict
 import importlib.util

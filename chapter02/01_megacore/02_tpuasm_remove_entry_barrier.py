@@ -1,6 +1,6 @@
 """两个 TensorCore 各算一半、互不读取对方数据时，kernel 入口的跨核汇合是多余的：用 tpuasm 把这三条同步指令换成 vnop，检查数值仍然正确。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib
 

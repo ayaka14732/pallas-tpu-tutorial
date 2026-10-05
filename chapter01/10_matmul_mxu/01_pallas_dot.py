@@ -1,6 +1,6 @@
 """MXU 上的矩阵乘法：从 bf16[16,128] @ bf16[128,128] 出发，只改 RHS 的存放方向、dtype、M、K，统计矩阵指令并检查数值。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax.experimental.pallas import tpu as pltpu

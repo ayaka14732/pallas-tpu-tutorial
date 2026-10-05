@@ -1,6 +1,6 @@
 """SMEM 有多大：只改 SMEM scratch buffer 的字数，看多大的 pltpu.SMEM 还能编译并正确运行。kernel 把一个标量存进 buffer 的最后一个字，再读出来参与计算。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

@@ -1,6 +1,6 @@
 """单 TC 把一个 f32[8,128] 从 HBM 搬到 TC VMEM、乘以 2、再搬回 HBM；打印完整清单的结构概览和 kernel 段。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

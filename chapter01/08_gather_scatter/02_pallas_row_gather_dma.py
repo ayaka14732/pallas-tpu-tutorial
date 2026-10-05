@@ -1,6 +1,6 @@
 """按行 gather：用 SMEM 中的 8 个行号，从 HBM 中的 f32[64,128] 各取一行，拼成 f32[8,128]；每行一次 DMA。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

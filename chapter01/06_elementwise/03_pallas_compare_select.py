@@ -1,6 +1,6 @@
 """比较、选择与向量掩码：where、掩码的与或非，以及同时活跃的掩码超过 8 个时编译器怎样处理。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import functools
 

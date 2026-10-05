@@ -1,6 +1,6 @@
 """两个 f32[64,128] 输入先后发起 DMA，再分别等待，然后相加；比较两个输入共用一个 DMA semaphore 与各用一个的写法。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

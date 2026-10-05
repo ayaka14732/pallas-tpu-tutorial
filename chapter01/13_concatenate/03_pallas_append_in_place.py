@@ -1,6 +1,6 @@
 """在已有数组的运行时位置追加若干行：数组作为 jax Ref 传入 kernel，DMA 直接写进它的窗口，不生成新数组。连续追加三次检查结果，并检查编译后的 HLO 与清单。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

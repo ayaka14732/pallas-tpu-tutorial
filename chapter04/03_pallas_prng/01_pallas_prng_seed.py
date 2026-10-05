@@ -1,6 +1,6 @@
 """Pallas 的硬件随机数接口：pltpu.prng_seed 与 pltpu.prng_random_bits 在清单中变成什么；输出是否就是第 1 节的 xorshift128+；两个 TensorCore 用同一个种子时的结果。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

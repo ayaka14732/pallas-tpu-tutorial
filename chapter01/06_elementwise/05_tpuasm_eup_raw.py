@@ -1,6 +1,6 @@
 """EUP 五条指令本身的精度：用 tpuasm 直接执行 vrcp、vrsqrt、vlog2、vpow2、vtanh，不加编译器的任何修正，与 float64 参考比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import numpy as np
 

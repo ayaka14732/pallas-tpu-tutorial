@@ -1,6 +1,6 @@
 """运行时的起点：从 f32[64,128] 的第 p[0] 行起取 8 行，分别用 DMA 和 vld 实现；再换成 f32[64,256]，比较有无 pl.multiple_of 时能否编译。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

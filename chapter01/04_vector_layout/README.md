@@ -101,7 +101,7 @@ ceil(9 / 8) × ceil(130 / 128) = 2 × 2 = 4 个 tile
 
 清单中有 4 条 `vld` 和 4 条 `vmul`，与 tile 数一致。不同的是边界：
 
-```text
+```tpuasm
 vld v3, [vmem:0x0]           # 第 0–7 行，第 0–127 列
 vld v5, [vmem:0x8]           # 第 0–7 行，第 128–129 列所在的 tile
 vld v7, [vmem:0x10, sm=1]    # 第 8 行，第 0–127 列
@@ -120,7 +120,7 @@ vst.msk [vmem:0x18, sm=1], vm2, v10
 
 掩码由前面几条向量指令现场生成：
 
-```text
+```tpuasm
 vlaneseq.8x128.u32 v0         # 每个位置的序号 sublane × 128 + lane
 vand.8x128.u32  v1, 0x7f, v0  # lane = 序号 & 127
 vshrl.8x128.s32 v2, v0, 0x7   # sublane = 序号 >> 7

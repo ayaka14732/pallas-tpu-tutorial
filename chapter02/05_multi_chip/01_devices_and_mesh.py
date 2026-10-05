@@ -1,6 +1,6 @@
 """本 host 的四颗芯片：device 的编号、芯片坐标与 jax.make_mesh 给出的顺序。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 import jax
 import numpy as np

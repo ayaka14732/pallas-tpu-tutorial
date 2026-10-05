@@ -1,6 +1,6 @@
 """原生 XLA 的拼接对照：与 Pallas 版本相同的四组 shape 与轴。"""
 import tpu_init
-tpu_init.initialise_one_core()
+tpu_init.initialize_one_core()
 
 import jax.numpy as jnp
 import numpy as np

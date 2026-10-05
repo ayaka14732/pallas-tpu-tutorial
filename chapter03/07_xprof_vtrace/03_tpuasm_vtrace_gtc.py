@@ -1,6 +1,6 @@
 """vtrace 记录的时间就是 GTC：在计算部分的前后各插入一条 vtrace，从 XPlane 的两个时间字段换回 GTC 的差值；再在同样的两个位置改为读 GTC、读 LCC，比较三者。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import Counter
 import importlib.util

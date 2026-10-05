@@ -1,6 +1,6 @@
 """f32 → int32 的 vcvt 有第三个操作数，Mosaic 总是写 0xffffffff。用 tpuasm 改变这个操作数，确定它的含义：小数部分大于它时向远离零的方向进 1。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import numpy as np
 

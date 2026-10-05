@@ -1,6 +1,6 @@
 """逐 tile 处理 f32[64,128]：Python for 循环、静态边界的 pl.loop、展开 4 次的 pl.loop、运行时边界的 pl.loop，比较清单中的循环形式。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

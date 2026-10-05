@@ -1,6 +1,6 @@
 """CompilerParams 的两个检查开关：同一 kernel 在默认参数下与关闭检查时，清单多出哪些指令。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

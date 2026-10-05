@@ -1,6 +1,6 @@
 """一颗芯片的两个 TensorCore 各算一半：f32[64,128] 乘以 2，TensorCore c 处理第 32c 到 32c+31 行；与只用一个 TensorCore 的版本对照。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

@@ -1,6 +1,6 @@
 """在 kernel 中用 jax.named_scope 标出四个区域：发起输入 DMA、等待输入 DMA、计算、输出 DMA（发起并等待）。比较打开与关闭 region trace 时的清单，再从 XProf 读出各区域的时间。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import defaultdict
 from pathlib import Path

@@ -43,7 +43,7 @@ for copy in copies:
 
 - TC VMEM 中拼接：b 的第 0 行要写到输出的第 9 行，即第二个 tile 的第 1 个子通道，所以 b 的每个 tile 都要移动一个子通道。清单中有 14 条 `vrot.slane.down` 和 2 条 `vsel`：
 
-  ```text
+  ```tpuasm
   { va0: vlaneseq.8x128.u32 v8 ; vld: vld.8x128 v0, [vmem:0x0] }                  # a 的第 0–7 行
   { va1: vshrl.8x128.s32 v13, v8, 0x7 ; vst: vst.8x128 [vmem:0x20], v0 ; vld: vld.8x128 v1, [vmem:0x10] }   # 原样写出；读 b 的第 0–7 行
   { va0: vrot.slane.down.8x128.u32 v2, v1 ; va1: veq.8x128.s32 vm0, v13, 0 ; vld: vld.8x128 v3, [vmem:0x18, sm=1] }   # vm0 = 第 0 个 sublane；读 b 的第 8 行
@@ -63,7 +63,7 @@ for copy in copies:
 
 - TC VMEM 中拼接：b 的第 0 列要放到输出的第 129 列，跨越 lane 边界，需要 XLU 的循环移位（`vrot` 加 `vpop`，第 8 节）加掩码选择和带掩码的 store：
 
-  ```text
+  ```tpuasm
   { s0: simm.s32 s16, 1 ; va0: vlaneseq.8x128.u32 v2 ; vld: vld.8x128 v0, [vmem:0x10] }   # b 的第 0–127 列
   { va0: vand.8x128.u32 v3, 0x7f, v2 ; vld: vld.8x128 v1, [vmem:0x18] ; vx0: vrot.2.8x128 trf0, v0, s16 }   # 沿 lane 循环右移 1
   { va0: veq.8x128.s32 vm0, v3, 0 ; va1: vlt.8x128.s32 vm1, v3, 2 ; vld: vld.8x128 v4, [vmem:0x8] }         # vm0 = 第 0 个 lane，vm1 = 前 2 个 lane
@@ -124,7 +124,7 @@ ROOT %append.1 = f32[64,128]{1,0:T(8,128)} custom-call(%args_0_.1, %copy.4.args_
 
 程序的结果与第 0 个参数（`buffer`）共用同一块内存（`input_output_alias`），kernel 的结果就是写回后的 `buffer`，没有任何 copy。清单中写入的只有一条 HBM → HBM 的 `dma.general`，长度 3 个 granule，目标地址在寄存器中：
 
-```text
+```tpuasm
 { s0: dma.general [hbm:s20], [hbm:s0], length=3, ... }
 ```
 

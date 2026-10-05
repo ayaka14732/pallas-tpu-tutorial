@@ -1,6 +1,6 @@
 """归约：沿 lane、沿 sublane、跨多个 tile、bf16 输入，各单独编译一个 kernel，列出计算指令并检查数值。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax.experimental.pallas import tpu as pltpu

@@ -1,6 +1,6 @@
 """用 LCC 读数测量几种指令序列：N 个空 bundle、N 条相互依赖的标量加法、N 条独立的向量加法、N 条 vld。每种都给出 R1 − R0（紧接其后的读数）与 R2 − R0（中间隔一条 sfence）。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

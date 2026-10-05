@@ -1,6 +1,6 @@
 """标量从 HBM 经 DMA 进入 SMEM，由标量单元读出，再作为向量乘法的一个操作数：o = x * s[0] + s[1]。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

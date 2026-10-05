@@ -1,6 +1,6 @@
 """单 TC 只做 DMA：f32[64,128] 经 TC VMEM 原样搬回 HBM，以及不经 TC VMEM 的 HBM→HBM 直接复制。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

@@ -1,6 +1,6 @@
 """沿 lane 的前缀和写成矩阵乘法：y = x @ U，U[k, l] = 1（k ≤ l）。比较默认精度与 HIGHEST 精度在整数输入和随机浮点输入上的误差，以及清单中的指令。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 import jax.numpy as jnp

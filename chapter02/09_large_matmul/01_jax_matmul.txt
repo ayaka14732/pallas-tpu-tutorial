@@ -20,7 +20,7 @@ bundle  549: entry bundle: %fusion = fusion(%copy-done, %rhs.1)
 bundle 8863: exit bundle: %fusion = fusion(%copy-done, %rhs.1)
 bundle 9000: 清单结束（共 9000 个 bundle）
 ## 设备上的周期数（LCC），16 对新输入的中位数
-  module：TensorCore 0 107317 个周期，TensorCore 1 84317 个周期
+  module：TensorCore 0 105024 个周期，TensorCore 1 84122 个周期
   copy-start：TensorCore 0 17 个周期，TensorCore 1 8 个周期
-  copy-done：TensorCore 0 9415 个周期，TensorCore 1 9445 个周期
-  fusion：TensorCore 0 74750 个周期，TensorCore 1 74711 个周期
+  copy-done：TensorCore 0 9138 个周期，TensorCore 1 9168 个周期
+  fusion：TensorCore 0 74832 个周期，TensorCore 1 74775 个周期

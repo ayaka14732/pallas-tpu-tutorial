@@ -8,7 +8,7 @@ TPU v4 的一颗芯片有两个 TensorCore。默认情况下，runtime 把一颗
 
 原生 XLA 会自动利用这一点。第一章的 XLA baseline 为了只用一个 TensorCore，特意换了一种 runtime 模式（第一章第 1 节）；回到默认模式，同样的 `f32[64,128] × 2`（[源码](04_jax_f32_64x128.py)、[输出](04_jax_f32_64x128.txt)）编译出的 fusion 中，DMA 的长度从 64 变成 32，`vld`、`vmul`、`vst` 从各 8 条变成各 4 条，开头多了两条指令：
 
-```text
+```tpuasm
 { s1: sld s6, [smem:0x1] }
 { s0: sshll.u32 s7, s6, 0x5 }
 ```
@@ -46,7 +46,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
 
 每个 TensorCore 的向量指令减半，与 XLA 的分工相同。窗口起点就是 `axis_index` 乘以 32：
 
-```text
+```tpuasm
 { s1: sld s6, [smem:0x1] }                  # TensorCore 编号
 { s0: sshll.u32 s18, s6, 0x5 }              # 编号 × 32
 { s0: sadd.s32 s21, s18, s0 }               # HBM 基址 + 偏移
@@ -57,7 +57,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
 
 两个 TensorCore 时，kernel 主体前后各有一段同样的同步：
 
-```text
+```tpuasm
 { s1: sld s6, [smem:0x1] }                       # 自己的编号
 { s1: sld s7, [smem:0x0] }                       # 芯片的编号
 { s0: sadd.s32 s8, 1, s6 }
@@ -109,7 +109,7 @@ patched = tpuasm_tools.edit_bundles(serialized, edits)
 第一章的 XLA baseline 已经用过 runtime 的另一种模式：在 TPU 初始化之前，给 libtpu 传入参数 `--deepsea_chip_config_name=legacy`，一颗芯片就作为两个 device 出现，每个 device 只有一个 TensorCore。那里只用了第 0 个 device；这里把两个都用上：
 
 ```python
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 os.environ['LIBTPU_INIT_ARGS'] = f"{os.environ.get('LIBTPU_INIT_ARGS', '')} --deepsea_chip_config_name=legacy".strip()
 ```
 

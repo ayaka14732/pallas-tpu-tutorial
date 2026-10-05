@@ -82,7 +82,7 @@ bundle(f's0: dma.simple [cmem:s23], [vmem:s23], length={granules}, dst_flag=[sfl
 
 两级发射不只影响计时，也影响正确性。第一章第 7 节的 kernel 把两个标量 DMA 进 SMEM，再用 `sld` 读出：
 
-```text
+```tpuasm
 514: { s0: dma.simple [smem:s13], [hbm:s1], length=1, dst_flag=[sflag:52] }
 515: { misc: vwait.ge [sflag:52], 1 }
 516: { misc: vsyncadd.s32 [sflag:52], -1 }

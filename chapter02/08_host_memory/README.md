@@ -43,7 +43,7 @@ return pltpu.with_memory_space_constraint(result, pl.HOST)
 
 HBM 与 TC VMEM 之间仍是熟悉的 `dma.simple`，但主机与 HBM 之间的搬运完全不同：
 
-```text
+```tpuasm
 { misc: vwait.eq [sflag:485], 0 }            # 等邮箱空闲
 ...                                          # 拼出主机地址 s16 与请求字 s25
 { misc: vsyncset.s32 [sflag:487], 8 }        # 长度：8 个 granule
@@ -92,7 +92,7 @@ window = pages_host.at[pl.ds(pl.multiple_of(page_smem[0] * 8, 8), 8)]
 
 但上一小节的清单说明，主机地址只是写进邮箱的一个数。页号为常数 2 的载体中，主机地址这样计算：
 
-```text
+```tpuasm
 { s0: sadd.s32 s25, 2, s2 }          # 主机输出的起点 + 2 页
 ```
 

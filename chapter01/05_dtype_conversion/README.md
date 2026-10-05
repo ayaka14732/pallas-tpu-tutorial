@@ -27,7 +27,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, o_vmem: Ref, sem: Ref) -> None:
 
 `bf16[16,128]` 正好是一个打包的 TC VREG：
 
-```text
+```tpuasm
 vld     v0, [vmem:0x0]
 vunpackl.8x128.f16.f32 v1, v0     # 第 0–7 行
 vunpacku.8x128.f16.f32 v2, v0     # 第 8–15 行
@@ -43,7 +43,7 @@ bf16 就是 f32 的高 16 bit，所以这个方向不需要舍入：unpack 把 1
 
 反向转换把两个 f32 TC VREG 合成一个：
 
-```text
+```tpuasm
 vld     v0, [vmem:0x0]
 vld     v1, [vmem:0x8]
 vpackc.8x128.f32.f16 v2, v1, v0
@@ -54,7 +54,7 @@ vst     [vmem:0x10], v2
 
 ## f32 ↔ int32：一条 vcvt
 
-```text
+```tpuasm
 vcvt.8x128.f32.s32 v1, v0, 0xffffffff   # f32 → int32
 vcvt.8x128.s32.f32 v1, v0               # int32 → f32
 ```
@@ -159,7 +159,7 @@ sublane 7：字节 0–3 = 第 [28, 29, 30, 31] 行
 
 **int8 → int32 的清单。** `int8[32,128]` 是一个打包的 TC VREG，转换成 4 个 int32 TC VREG：
 
-```text
+```tpuasm
 vld     v0, [vmem:0x0]                         # 读入打包的 int8
 vlaneseq.8x128.u32 v1                          # 计算移位量，只做一次
 vshrl.8x128.s32 v2, v1, 0x4
@@ -192,7 +192,7 @@ vld.sshfl.8x128 v8, [vmem:0x2a], 0x11110000    # 第 1 个输出 tile：读第 2
 
 **int32 → int8。** 反方向同样没有专用指令。`int32[32,128]` 转 int8 共用了 8 条 `vpackc`、8 条 `vand`、4 条 `vor`、8 条 `vshll`，每个输入 TC VREG 一组：
 
-```text
+```tpuasm
 vshll.8x128.s32 v4, v0, 0x18                 # 每个元素的低 8 位移到最高 8 位，低 24 位为 0
 vpackc.8x128.f32.f16 v5, 0.0, v4             # 第一次打包
 vand.8x128.u32 v9, 0xff00, v5
@@ -226,7 +226,7 @@ vst     [vmem:0x28, sm=3], v15               # 只写第 0、1 个 sublane
 
 XLA 的写法是：
 
-```text
+```tpuasm
 vpackc.8x128.f32.f16 v11, 0.0, v7
 vst [vmem:0x20, sm=15], v11
 ```

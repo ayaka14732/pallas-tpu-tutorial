@@ -6,7 +6,7 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else None
 
 def child(mode: str) -> None:
     import tpu_init
-    tpu_init.initialise_local_chips()
+    tpu_init.initialize_local_chips()
     import importlib
 
     import jax

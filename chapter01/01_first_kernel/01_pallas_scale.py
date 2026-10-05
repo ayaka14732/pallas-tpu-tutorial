@@ -1,7 +1,7 @@
 """第一个 Pallas TPU kernel：单 TC 把 f32[8,128] 从 HBM 搬到 TC VMEM、乘以 2、再搬回 HBM。"""
 # 第一步：在 import jax 之前决定 runtime 打开哪颗芯片。
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

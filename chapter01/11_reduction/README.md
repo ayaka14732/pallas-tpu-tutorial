@@ -30,7 +30,7 @@ def kernel(x_hbm: Ref, o_hbm: Ref, x_vmem: Ref, o_vmem: Ref, sem: Ref) -> None:
 
 `jnp.sum(x, axis=1, keepdims=True)` 把 `f32[8,128]` 的每一行加成一个数：
 
-```text
+```tpuasm
 { vx0: vadd.xlane.0.8x128.f32 trf0, v0 }
 { vr0: vpop.8x128 v3, trf0 }
 { vst: vst.msk.8x128 [vmem:0x8], vm0, v3 }
@@ -69,7 +69,7 @@ body = bundle('vx0: vadd.xlane.0.8x128.f32 trf0, v10') + GAP + bundle('vr0: vpop
 
 `jnp.sum(x, axis=0, keepdims=True)` 把 8 行加成一行。XLU 没有跨 sublane 的归约，编译器用第 8 节介绍的 `vrot.slane.down` 拼出一棵二叉树：
 
-```text
+```tpuasm
 4 × vrot.slane.down，vadd     # 与循环移动 4 行的自己相加
 2 × vrot.slane.down，vadd     # 再与移动 2 行的相加
 1 × vrot.slane.down，vadd     # 再与移动 1 行的相加
@@ -106,7 +106,7 @@ def f(x):
 
 `jnp.sum(x, keepdims=True)` 把 `f32[8,128]` 加成一个数。先 `vadd.xlane` 沿通道求和，再用 sublane 树合并 8 行，之后出现了两条新指令：
 
-```text
+```tpuasm
 { vst: vpush v2sf, v11 }      # 把 TC VREG 送进向量到标量的队列 v2sf
 { s0: spop s0, v2sf }         # 标量单元从 v2sf 取出一个数
 { va0: vmov.8x128 v15, s0 }   # 再广播回向量，写入输出

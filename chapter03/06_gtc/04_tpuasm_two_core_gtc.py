@@ -1,6 +1,6 @@
 """同一颗芯片的两个 TensorCore 各读 GTC：互发一次信号，用“先读、再发信号”和“收到信号、再读”的因果顺序，界定两个 TensorCore 的 GTC 偏移；同时读 LCC，对照两个 TensorCore 的 LCC 是否可比。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import numpy as np
 

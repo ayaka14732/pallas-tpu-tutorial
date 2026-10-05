@@ -6,7 +6,7 @@
 
 LCC 是 64 位的，标量寄存器是 32 位的，所以要分两半读：
 
-```text
+```tpuasm
 { s0: srdreg.lcclo s20 ; s1: srdreg.lcchi s25 }
 ```
 
@@ -45,7 +45,7 @@ def kernel(x_hbm, out_hbm, data, sem) -> None:
 
 主机把每对半字拼成 64 位，返回每次运行的 `(R1 − R0, R2 − R0)`。插入后的程序不再经过编译器，bundle 的内容和顺序就是设备实际执行的内容。`LccProbe.program(body)` 返回插入后的程序，可以用 `full_listing` 查看：
 
-```text
+```tpuasm
 { s0: sfence }
 { s0: srdreg.lcclo s20 ;
   s1: srdreg.lcchi s25 }
@@ -141,7 +141,7 @@ sadd s23 = s24 + 100，再 vmov，d = 1、2、3：[107, 107, 107]
 
 于是读数可以先留在 SMEM 中，等被测的程序运行结束，再用一个专门的读取程序取回。[`tpuasm_tools.KernelClock`](../../tpuasm_tools.py) 就是这样做的。每次读数是插入的 8 个 bundle（`clock_read`）：
 
-```text
+```tpuasm
 { s1: sst [smem:0x20100], s30 }                     # 借用 s30、s31，原值先存起来
 { s1: sst [smem:0x20101], s31 }
 { s0: sfence }                                      # 等此前的向量工作全部发射（第 4 节）
@@ -179,17 +179,17 @@ timed = clock.instrument(compiled, [module_start, start, start, end + 1, end + 1
 
 | | 程序开始 → kernel 开始 | 相邻两次读数 | kernel | kernel 结束 → 程序结束 |
 | --- | ---: | ---: | ---: | ---: |
-| `pl.delay(10000)`，TensorCore 0 | 57956、21670、30863 | 20 | 11402、11400、11398 | 94 |
-| `pl.delay(10000)`，TensorCore 1 | 103 | 20 | 11422、11420、11418 | 35 |
-| `pl.delay(1000000)`，TensorCore 0 | 38205、20392、30946 | 20 | 1050900、1051104、1050996 | 94 |
-| `pl.delay(1000000)`，TensorCore 1 | 103 | 20 | 1050920、1051124、1051016 | 35 |
+| `pl.delay(10000)`，TensorCore 0 | 48565、21395、19461 | 20 | 11401、11399、11396 | 94 |
+| `pl.delay(10000)`，TensorCore 1 | 103 | 20 | 11421、11419、11416 | 35 |
+| `pl.delay(1000000)`，TensorCore 0 | 50493、18912、17525 | 20 | 1050900、1050900、1050899 | 94 |
+| `pl.delay(1000000)`，TensorCore 1 | 103 | 20 | 1050920、1050920、1050919 | 35 |
 
 三次运行的读数：
 
 - **读数自身的开销恰好是 20 个周期。** 紧挨着的两次读数总是相差 20：前一次读数之后的两条 `sst`、两条 `sld`，加上后一次读数之前的两条 `sst` 和 `sfence`。任何区间的读数差减去 20，就是这段程序本身的周期数；`KernelClock.time_ops` 把这些步骤包在一起，直接返回程序和每条 HLO 指令扣除开销后的周期数。
-- **kernel 是 11380 和 1050880 个周期左右**（扣除 20 之后），比 `vdelay` 多约 880 个周期，是两次小 DMA 和计算；各次运行之间相差几个到两百个周期，来自 DMA。
+- **kernel 是 11380 和 1050880 个周期左右**（扣除 20 之后），比 `vdelay` 多约 880 个周期，是两次小 DMA 和计算；各次运行之间通常只差几个周期，偶尔相差一两百个，来自 DMA。
 - **TensorCore 1 的 kernel 比 TensorCore 0 多 20 个周期。** 它跳过了 kernel 主体，但要在出口等 TensorCore 0 汇合（第二章第 1 节），而 TensorCore 0 在到达出口之前还要做一次读数。
-- **TensorCore 0 在 kernel 之前有 2–6 万个周期的 runtime 代码**，每次运行都不一样；TensorCore 1 只有 103 个周期。比较两个程序时，用 TensorCore 1 的整个程序，或者只比较 kernel。
+- **TensorCore 0 在 kernel 之前有 2–5 万个周期的 runtime 代码**，每次运行都不一样；TensorCore 1 只有 103 个周期。比较两个程序时，用 TensorCore 1 的整个程序，或者只比较 kernel。
 
 读数用了 `sfence`，所以每个读数都是“此前的向量工作全部发射之后”的时刻；kernel 结束处，输出 DMA 已经被 `vwait` 等到。要测 kernel 中的一段，把 `find_bundles` 找到的 bundle 编号交给 `instrument` 即可；插入点在循环中时，SMEM 中留下的是最后一次迭代的读数。
 

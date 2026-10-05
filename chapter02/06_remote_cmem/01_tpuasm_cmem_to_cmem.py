@@ -1,6 +1,6 @@
 """跨芯片的 Megacore Shared CMEM → Megacore Shared CMEM：以两颗相邻芯片交换 TC VMEM 数据的 kernel 为载体，用 tpuasm 把 remote DMA 的两端改成 CMEM，并修改 ici_dest 中的 TensorCore 字段。"""
 import tpu_init
-tpu_init.initialise_local_chips()
+tpu_init.initialize_local_chips()
 
 import jax
 from jax import Ref

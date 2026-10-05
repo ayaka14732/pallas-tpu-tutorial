@@ -1,6 +1,6 @@
 """显式控制 MXU 的公开接口：push 一次 RHS 后用两块 LHS 复用它；以及 RHS 以 (N,K) 存放、push 时转置。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

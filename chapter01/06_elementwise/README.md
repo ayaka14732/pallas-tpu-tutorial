@@ -45,7 +45,7 @@ kernel 内可以直接用 `jnp` 和 `jax.lax` 的逐元素函数。它们由 Mos
 
 `exp(x)` 的清单：
 
-```text
+```tpuasm
 { va0: vmul.8x128.f32 v1, 1.4426950216293335, v0 }   # x × log2(e)
 { va0: vpow2.8x128.f32 erf, v1 }                     # 2 的幂，结果送入 erf
 { vr0: vpop.8x128 v2, erf }                          # 从 erf 取回结果
@@ -123,7 +123,7 @@ f32 的尾数是 24 位，而 EUP 只给出 12–18 位有效的结果。`vrcp` 
 
 `jnp.where(x > y, x, y)` 是两条指令：
 
-```text
+```tpuasm
 vgt.8x128.f32 vm0, v0, v1      # 比较结果写进掩码寄存器 vm0
 vsel.8x128    v2, vm0, v0, v1  # 按掩码逐元素选择
 ```
@@ -141,7 +141,7 @@ TPU v4 只有 8 个向量掩码寄存器。实验在函数中先算出 count 个
 
 掩码超过 8 个时，编译器把一部分掩码转存到 TC VREG 中：
 
-```text
+```tpuasm
 vimm.8x128.s32 v31, 0                  # 先把一个 TC VREG 清零
 vsel.8x128 v31, vm6, 0xffffffff, v31   # 掩码为 1 的位置写全 1，掩码转存为 32 bit 数据
 ...

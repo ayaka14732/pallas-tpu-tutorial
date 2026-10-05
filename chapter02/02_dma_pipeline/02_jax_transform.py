@@ -1,6 +1,6 @@
 """原生 XLA 的同一运算 y = 2x + 1，f32[32768,128]：统计 XLA 生成的 DMA 与每个 TensorCore 的工作量。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib
 

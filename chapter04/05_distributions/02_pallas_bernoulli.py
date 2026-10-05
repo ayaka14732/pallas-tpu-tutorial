@@ -1,6 +1,6 @@
 """随机比特 → 伯努利分布：stateful_bernoulli 与整数阈值两种写法，概率实际被量化成什么；以及把结果直接当作掩码使用时的指令。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from fractions import Fraction
 import math

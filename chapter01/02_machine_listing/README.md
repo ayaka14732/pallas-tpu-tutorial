@@ -105,7 +105,7 @@ bundle  650: 清单结束（共 650 个 bundle）
 
 kernel 段分为三个区间。第一个区间判断由谁执行：
 
-```text
+```tpuasm
 { misc: vtrace 0x80000000 }
 { s1: sld s6, [smem:0x1] }
 { s0: sne.s32 p0, s6, 0 }
@@ -118,7 +118,7 @@ kernel 段分为三个区间。第一个区间判断由谁执行：
 
 第二个区间是 kernel 主体，与源码一一对应：
 
-```text
+```tpuasm
 { s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
 { misc: vwait.ge [sflag:52], 8 }
 { vld: vld.8x128 v0, [vmem:0x0] ;
@@ -138,7 +138,7 @@ kernel 段分为三个区间。第一个区间判断由谁执行：
 
 第三个区间（`image bundles [518, 534)`）在 kernel 主体之后执行，两个 TensorCore 都会经过：
 
-```text
+```tpuasm
 { misc: vsyncadd.remote.s32 [sflag:s2], 1 }
 { misc: vwait.ge [sflag:45], 1 }
 { misc: vsyncadd.s32 [sflag:45], -1 }

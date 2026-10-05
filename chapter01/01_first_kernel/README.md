@@ -33,7 +33,7 @@
 
 ```python
 import tpu_init
-tpu_init.initialise_one_chip()  # 必须在 import jax 之前
+tpu_init.initialize_one_chip()  # 必须在 import jax 之前
 
 mesh = jax.make_mesh((1,), ('device',))
 tc_mesh = pltpu.TensorCoreMesh(axis_name='tc', num_cores=1)
@@ -72,7 +72,7 @@ y = jax.jit(scale)(x)
 
 ## 第一层：runtime 打开几颗芯片
 
-`tpu_init.initialise_one_chip()` 设置三个环境变量：
+`tpu_init.initialize_one_chip()` 设置三个环境变量：
 
 ```python
 os.environ['TPU_CHIPS_PER_PROCESS_BOUNDS'] = '1,1,1'
@@ -80,7 +80,7 @@ os.environ['TPU_PROCESS_BOUNDS'] = '1,1,1'
 os.environ['TPU_VISIBLE_CHIPS'] = '0'
 ```
 
-TPU runtime 在 JAX 第一次访问设备时读取这些变量，所以必须在 `import jax` 之前设置。设置后，`jax.devices()` 只返回一个 device，即本 host 的第 0 颗芯片。改用 `initialise_one_chip(1)` 就换成第 1 颗芯片；不同芯片的进程可以同时运行。第二章用 `initialise_local_chips()` 打开本 host 的全部四颗芯片。
+TPU runtime 在 JAX 第一次访问设备时读取这些变量，所以必须在 `import jax` 之前设置。设置后，`jax.devices()` 只返回一个 device，即本 host 的第 0 颗芯片。改用 `initialize_one_chip(1)` 就换成第 1 颗芯片；不同芯片的进程可以同时运行。第二章用 `initialize_local_chips()` 打开本 host 的全部四颗芯片。
 
 这一层只决定 runtime 打开哪些芯片，不决定程序用芯片上的几个 TensorCore。
 
@@ -94,7 +94,7 @@ TPU runtime 在 JAX 第一次访问设备时读取这些变量，所以必须在
 
 `check_vma=False` 关闭 `shard_map` 对“值在各 device 之间是否不同”的类型检查。打开这项检查（`check_vma=True`）时，Pallas 要求在 `out_type` 的 `jax.ShapeDtypeStruct` 上用 `manual_axis_type` 声明输出沿哪些 mesh 轴变化，否则报错。本教程不使用这项检查。
 
-原生 XLA 的 baseline 不需要这一层，但也要限定为一个 TensorCore，否则编译器会自己把工作分给两个 TensorCore，与本章的 Pallas kernel 不可比。做法是在 runtime 层再加一个参数，让一颗芯片的两个 TensorCore 各作为一个 device 出现（称为 split-chip）；XLA 的程序默认在第 0 个 device 上运行，也就只用 TensorCore 0。本章的 XLA 实验都调用 `tpu_init.initialise_one_core()`，它在 `initialise_one_chip()` 的基础上多设一个环境变量：
+原生 XLA 的 baseline 不需要这一层，但也要限定为一个 TensorCore，否则编译器会自己把工作分给两个 TensorCore，与本章的 Pallas kernel 不可比。做法是在 runtime 层再加一个参数，让一颗芯片的两个 TensorCore 各作为一个 device 出现（称为 split-chip）；XLA 的程序默认在第 0 个 device 上运行，也就只用 TensorCore 0。本章的 XLA 实验都调用 `tpu_init.initialize_one_core()`，它在 `initialize_one_chip()` 的基础上多设一个环境变量：
 
 ```python
 os.environ['LIBTPU_INIT_ARGS'] = '--deepsea_chip_config_name=legacy'

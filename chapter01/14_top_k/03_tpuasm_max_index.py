@@ -1,6 +1,6 @@
 """vmax.index.xlane 的语义与时序：并列时取哪个下标、NaN 怎样处理、从提交到取回多少周期；再用 LCC 实测 argmax、lax.top_k 与手写 top-8 的计算部分各要多少周期，并与发射模型比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from pathlib import Path
 import sys

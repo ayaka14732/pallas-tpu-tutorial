@@ -1,6 +1,6 @@
 """把 TC VMEM 中的 bf16[16,128] 按位重新解释为 u32[8,128]，确定两个 bf16 元素怎样共用一个 32 bit 位置。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

@@ -1,6 +1,6 @@
 """XProf 的逐指令事件从哪里来：打开 xla_xprof_enable_custom_call_tracing 后，编译器每隔若干个 bundle 放一条 0xa 类型的 vtrace，主机把相邻两个标记之间的指令事件按 bundle 编号均匀插值。列出标记的位置，以及一次执行中各 bundle 的事件起始时刻。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import importlib.util
 from pathlib import Path

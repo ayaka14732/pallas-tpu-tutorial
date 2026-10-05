@@ -1,6 +1,6 @@
 """不用 named_scope，直接用 tpuasm 在计算部分的前后各插入一条 vtrace：比较三种操作数在 XProf 中得到的事件。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from collections import defaultdict
 import importlib.util

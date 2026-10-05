@@ -1,6 +1,6 @@
 """公开接口的现状：在 scratch_types 中申请 pltpu.CMEM buffer，经 HBM → CMEM → TC VMEM → HBM 复制一个 f32[8,128]。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

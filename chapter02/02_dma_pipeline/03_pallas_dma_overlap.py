@@ -1,6 +1,6 @@
 """两条 DMA 同时进行时省下的是什么：一个 TensorCore 上，对 f32[R,128] 的 tile 分别做“只读入”“只写出”“先读入再写出”“读入与写出同时进行”“两条读入同时进行”，比较每个 tile 的时间。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

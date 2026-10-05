@@ -1,6 +1,6 @@
 """“提交—取回”通路的时序参数。延迟：在提交与取回之间插入 d − 1 个 vnop，看 R2 − R0 何时开始随 d 增加；发射间隔：连续发射 k 次，看 R2 − R0 每次增加多少。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle, read_lcc

@@ -1,6 +1,6 @@
 """Megacore Shared CMEM 有多大：把一个 tile 写到 CMEM 地址 0，把它的按位取反写到地址 A，再把两处读回。A 超出容量时会绕回到已有的地址，地址 0 的内容随之被改写。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import tpuasm_tools
 from tpuasm_tools import bundle

@@ -1,6 +1,6 @@
 """几种前缀扫描的计算部分各要多少周期：把编译器生成的计算 bundle 原样插进载体，用 LCC 实测，并与第三章第 5 节的发射模型比较。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 from pathlib import Path
 import sys

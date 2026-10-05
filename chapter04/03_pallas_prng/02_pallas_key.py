@@ -1,6 +1,6 @@
 """Pallas key：用 pltpu.to_pallas_key 把 JAX key 变成硬件生成器的 key，在 kernel 中用 jax.random 的接口采样。检查同一个 key 的两次采样、fold_in、split，以及 sample_block 对分块方式的不变性。"""
 import tpu_init
-tpu_init.initialise_one_chip()
+tpu_init.initialize_one_chip()
 
 import jax
 from jax import Ref

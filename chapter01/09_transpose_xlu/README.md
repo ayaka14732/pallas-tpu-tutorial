@@ -35,7 +35,7 @@ def kernel(*refs: Ref) -> None:
 
 `i32[128,128]` 有 16 个 TC VREG。清单中的计算部分（省略 DMA）：
 
-```text
+```tpuasm
 { vld: vld.8x128 v0, [vmem:0x0] ; ... }
 { vld: vld.8x128 v1, [vmem:0x8] ; vx0: vxpose.0.start.8x128 trf0, v0, 128 }
 { vld: vld.8x128 v2, [vmem:0x10] }
@@ -82,7 +82,7 @@ TPU v4 的 TensorCore 有两个 XLU，结果分别进入 `trf0` 和 `trf1`。两
 
 两个矩阵时提交指令的写法：
 
-```text
+```tpuasm
 7 × vx0: vxpose.0.8x128 trf0, vN, 128
 7 × vx0: vxpose.1.8x128 trf1, vN, 128
 7 × vx0: vxpose.2.8x128 trf0, vN, 128
@@ -101,7 +101,7 @@ TPU v4 的 TensorCore 有两个 XLU，结果分别进入 `trf0` 和 `trf1`。两
 
 `bf16[128,128]` 只有 8 个打包的 TC VREG（第 4 节），每个装 16 行。清单：
 
-```text
+```tpuasm
 { vld: vld.8x128 v1, [vmem:0x8] ; vx0: vxpose.0.packed.start.8x128 trf0, v0, 128 }
 ...
 { vx0: vxpose.0.packed.end.8x128 trf0, v7, 128 }
@@ -129,7 +129,7 @@ TPU v4 的 TensorCore 有两个 XLU，结果分别进入 `trf0` 和 `trf1`。两
 
 清单中提交的写法与上表对应：
 
-```text
+```tpuasm
 7 × vxpose.2.8x128 trf0, vN, 128 、 7 × vxpose.0.8x128 trf0, vN, 128 、 1 × vxpose.0.start、1 × vxpose.2.end（区域 A）
 7 × vxpose.3.8x128 trf1, vN, 8   、 7 × vxpose.1.8x128 trf1, vN, 8   、 1 × vxpose.1.start、1 × vxpose.3.end（区域 B）
 1 × vxpose.0.start.end.8x128 trf0, vN, 128（区域 C）
