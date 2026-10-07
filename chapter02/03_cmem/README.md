@@ -2,7 +2,7 @@
 
 TPU v4 的一颗芯片上，除了每个 TensorCore 私有的 TC VMEM，还有一块两个 TensorCore 共享的片上内存，本教程称为 Megacore Shared CMEM。本节回答三个问题：数据怎样进出它，向量单元怎样直接读它，两个 TensorCore 怎样通过它共享数据。
 
-公开的 Pallas 接口在 TPU v4 上没有提供可用的 CMEM buffer：在 `scratch_types` 中申请 `pltpu.CMEM(shape, dtype)`，编译失败，`Scratch memref allocation only supported for vmem, smem and semaphore_mem`（实验[源码](03_pallas_cmem_scratch.py)、[输出](03_pallas_cmem_scratch.txt)）。本节的实验因此都用 tpuasm 改写已编译的 kernel 来完成：先让 Mosaic 编译一个只用 HBM 和 TC VMEM 的载体，再在机器清单中加入访问 CMEM 的指令。这正是前言所说的：硬件具备的能力，即使公开接口没有覆盖，也要有办法用上。
+公开的 Pallas 接口在 TPU v4 上没有提供可用的 CMEM buffer：在 `scratch_types` 中申请 `pltpu.CMEM(shape, dtype)`，编译失败，`Scratch memref allocation only supported for vmem, smem and semaphore_mem`（实验[源码](03_pallas_cmem_scratch.py)、[输出](03_pallas_cmem_scratch.txt)）。这是 [JAX issue #39615](https://github.com/jax-ml/jax/issues/39615) 记录的问题。本节的实验因此都用 tpuasm 改写已编译的 kernel 来完成：先让 Mosaic 编译一个只用 HBM 和 TC VMEM 的载体，再在机器清单中加入访问 CMEM 的指令。这正是前言所说的：硬件具备的能力，即使公开接口没有覆盖，也要有办法用上。
 
 ## 两条读取通路
 

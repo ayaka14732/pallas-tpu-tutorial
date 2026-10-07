@@ -124,7 +124,7 @@ with jax.named_scope('store'):
 | `compute` | 89 | 127.1 ns | 区域内 133 个 bundle |
 | `store` | 633 | 904.3 ns | TC VMEM → HBM 512 KiB：`417.5 + 1.051 × 512` ≈ 956 个周期，910 ns |
 
-这种做法有代价：每条 `vtrace` 独占一个 bundle，区域的边界还限制了编译器跨边界重排指令（[研究报告 34](../../../pallas-tpu-readings-dev/research_reports/34_named_scope_changes_tpu_scheduling.md)）。带 region trace 测到的，是一个与正式运行不同的程序。
+这种做法有代价：每条 `vtrace` 独占一个 bundle，区域的边界还限制了编译器跨边界重排指令（[研究报告 34](../../../pallas-tpu-readings-dev/research_reports/34_named_scope_changes_tpu_scheduling.md)，[JAX issue #40720](https://github.com/jax-ml/jax/issues/40720)）。带 region trace 测到的，是一个与正式运行不同的程序。
 
 ## 手写 vtrace
 
