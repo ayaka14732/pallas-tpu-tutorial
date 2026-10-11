@@ -19,7 +19,7 @@ def kernel(x_hbm: Ref, y_hbm: Ref, o_hbm: Ref, x_vmem: Ref, sem: Ref) -> None:
 return kernel(pltpu.with_memory_space_constraint(x, pltpu.HBM), pltpu.with_memory_space_constraint(y, pltpu.HBM))
 ```
 
-`pltpu.with_memory_space_constraint(x, pltpu.HBM)` 要求 XLA 把这个输入放在 HBM；输出同样用 `pltpu.HBM` 固定（第一章第 11 节）。这样 XLA 不会占用 CMEM，本 kernel 可以独占 CMEM，从地址 0 开始使用。
+`pltpu.with_memory_space_constraint(x, pltpu.HBM)` 要求 XLA 把这个输入放在 HBM；输出同样用 `pltpu.HBM` 固定（第一章第 12 节）。这样 XLA 不会占用 CMEM，本 kernel 可以独占 CMEM，从地址 0 开始使用。
 
 两种改写都先在输入 DMA 之前插入 4 个 bundle，把 y（地址在 `s1`）从 HBM 搬进 CMEM 地址 0：
 
@@ -30,7 +30,7 @@ return kernel(pltpu.with_memory_space_constraint(x, pltpu.HBM), pltpu.with_memor
 { misc: vsyncadd.s32 [sflag:52], -8 }
 ```
 
-DMA 的端点写成 `[cmem:...]` 即可，长度和信号量的用法与第一章第 3 节完全相同。
+DMA 的端点写成 `[cmem:...]` 即可，长度和信号量的用法与第一章第 4 节完全相同。
 
 第一种是 staging：把原来的输入 DMA 的源从 `[hbm:s0]` 改成 `[cmem:s20]`，数据经 CMEM → TC VMEM 进入原来的 `vld`。
 
@@ -48,7 +48,7 @@ DMA 的端点写成 `[cmem:...]` 即可，长度和信号量的用法与第一�
 
 本小节实验[源码](04_tpuasm_cmem_capacity.py)、[输出](04_tpuasm_cmem_capacity.txt)。
 
-TC VMEM 的容量可以让编译器报出来（第一章第 3 节），CMEM 不能由 Pallas 分配，只能直接测。CMEM 的地址与 DMA 的长度一样以 512 B 的 granule 为单位。实验用第三章第 3 节的 `LccProbe` 执行手写片段：把一个 tile（记作 P）写到 CMEM 地址 0，把它的按位取反（记作 Q）写到地址 A，再把两处读回：
+TC VMEM 的容量可以让编译器报出来（第一章第 4 节），CMEM 不能由 Pallas 分配，只能直接测。CMEM 的地址与 DMA 的长度一样以 512 B 的 granule 为单位。实验用第一章第 3 节的 `LccProbe` 执行手写片段：把一个 tile（记作 P）写到 CMEM 地址 0，把它的按位取反（记作 Q）写到地址 A，再把两处读回：
 
 ```python
 + dma('[cmem:s20]', '[vmem:s22]')     # P → CMEM 地址 0
@@ -84,14 +84,14 @@ A = 0x80000（256.000 MiB 处）：地址 A 读回 Q True；地址 0 仍是 P Fa
 | CMEM → TC VMEM，DMA | `311 + 0.5K` |
 | HBM → TC VMEM，DMA | `483.6 + 1.105K` |
 
-前四行是精确的公式，不是拟合：串行地读，每多一个 TC VREG 恰好多 56 个周期，而连续 `vld` 每多一个恰好多 1 个周期；CMEM → TC VMEM 的 DMA 每 2 KiB 恰好多 1 个周期，实测与公式最多差 1 个周期。只有最后一行经过 HBM 的 DMA 是对实测做的线性拟合，单次测量在拟合值上下波动。`cld` 之后要过 53 个周期才能 `vpop`，`cld` 和 `vpop` 各自每 2 个周期最多发射一次（第三章第 5 节）。先发出 D 个 `cld` 再交替取回，就把等待重叠起来：每 D 个 TC VREG 多 54 个周期，D = 4 时平均每个 13.5 个周期。
+前四行是精确的公式，不是拟合：串行地读，每多一个 TC VREG 恰好多 56 个周期，而连续 `vld` 每多一个恰好多 1 个周期；CMEM → TC VMEM 的 DMA 每 2 KiB 恰好多 1 个周期，实测与公式最多差 1 个周期。只有最后一行经过 HBM 的 DMA 是对实测做的线性拟合，单次测量在拟合值上下波动。`cld` 之后要过 53 个周期才能 `vpop`，`cld` 和 `vpop` 各自每 2 个周期最多发射一次（第三章第 4 节）。先发出 D 个 `cld` 再交替取回，就把等待重叠起来：每 D 个 TC VREG 多 54 个周期，D = 4 时平均每个 13.5 个周期。
 
 所以 CMEM 的定位是：比 HBM 近（DMA 固定开销 311 对 484 个周期，带宽约为 HBM 的两倍），比 TC VMEM 远。
 
 - 只读一次的数据：用 `cld` 直接读，并尽量多发出几个 `cld` 再取回，省去一次 DMA 和 TC VMEM 空间。
 - 要反复读的数据：先用 DMA 搬进 TC VMEM，再用 `vld`。
 
-> 暂且可以理解为：“`cld` 之后 53 个周期才能 `vpop`、每 2 个周期最多发射一次”这类规则，来自在 kernel 中插入周期计数器的实测。第三章第 5 节把这些规则整理成发射模型，用于从清单估算执行时间。
+> 暂且可以理解为：“`cld` 之后 53 个周期才能 `vpop`、每 2 个周期最多发射一次”这类规则，来自在 kernel 中插入周期计数器的实测。第三章第 4 节把这些规则整理成发射模型，用于从清单估算执行时间。
 
 ## 两个 TensorCore 通过 CMEM 共享数据
 
@@ -122,8 +122,8 @@ CMEM 的另一个价值在于它是两个 TensorCore 共享的：一份数据只
 
 这个实验说明了共享内存的基本规则：一方写、另一方读，中间必须有同步来保证顺序。这里借用了编译器插入的入口汇合；第 4 节介绍怎样在 Pallas 中显式写出这种同步。
 
-> 暂且可以理解为：TensorCore 0 的 `vsyncadd.remote` 在它的 DMA 已经等到之后才发出，所以 TensorCore 1 看到信号时，CMEM 中的数据已经完整。DMA 完成、信号发出、对方读取三者之间的顺序保证，第三章第 4 节讨论 `sfence` 时会再次遇到。
+> 暂且可以理解为：TensorCore 0 的 `vsyncadd.remote` 在它的 DMA 已经等到之后才发出，所以 TensorCore 1 看到信号时，CMEM 中的数据已经完整。DMA 完成、信号发出、对方读取三者之间的顺序保证，第三章第 3 节讨论 `sfence` 时会再次遇到。
 
 ## 对照：原生 XLA 怎样使用 CMEM
 
-XLA 会自动使用 CMEM。第一章第 11 节的 XLA baseline 中，输入先经 `copy-start`/`copy-done` 预取进 CMEM，再用 `cld` 读入；第 2 节中，XLA 把循环中传递的数组放进了 CMEM。XLA 的选择对单个 kernel 未必最优，但它说明 CMEM 在实际程序中被大量使用。手写 kernel 时，用 tpuasm 可以把同样的通路握在自己手里。
+XLA 会自动使用 CMEM。第一章第 12 节的 XLA baseline 中，输入先经 `copy-start`/`copy-done` 预取进 CMEM，再用 `cld` 读入；第 2 节中，XLA 把循环中传递的数组放进了 CMEM。XLA 的选择对单个 kernel 未必最优，但它说明 CMEM 在实际程序中被大量使用。手写 kernel 时，用 tpuasm 可以把同样的通路握在自己手里。

@@ -1,0 +1,54 @@
+## x * 2，f32[8,128]
+  XLA：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 547)，共 26 个；其中的 HLO 指令：broadcast_multiply_fusion；DMA：无
+    区间内的向量指令：vld.8x128 1，vmul.8x128.f32 1，vst.8x128 1
+    8 份输入的周期数：[42, 42, 42, 42, 42, 42, 42, 42]
+  Pallas：unpin.2.refs_0_ 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 547)，共 26 个；其中的 HLO 指令：scale.1；DMA：无
+    区间内的向量指令：vld.8x128 1，vmul.8x128.f32 1，vst.8x128 1
+    8 份输入的周期数：[42, 42, 42, 42, 42, 42, 42, 42]
+## x * 2，f32[64,128]
+  XLA：unpin.2 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 555)，共 34 个；其中的 HLO 指令：broadcast_multiply_fusion；DMA：无
+    区间内的向量指令：vld.8x128 8，vmul.8x128.f32 8，vst.8x128 8
+    8 份输入的周期数：[50, 50, 50, 50, 50, 50, 50, 50]
+  Pallas：unpin.2.refs_0_ 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 555)，共 34 个；其中的 HLO 指令：scale.1；DMA：无
+    区间内的向量指令：vld.8x128 8，vmul.8x128.f32 8，vst.8x128 8
+    8 份输入的周期数：[50, 50, 50, 50, 50, 50, 50, 50]
+## x * 2，f32[1024,128]
+  XLA：unpin.2 是 f32[1024,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 675)，共 154 个；其中的 HLO 指令：broadcast_multiply_fusion；DMA：无
+    区间内的向量指令：vld.8x128 128，vmul.8x128.f32 128，vst.8x128 128
+    8 份输入的周期数：[170, 170, 170, 170, 170, 170, 170, 170]
+  Pallas：unpin.2.refs_0_ 是 f32[1024,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 675)，共 154 个；其中的 HLO 指令：scale.1；DMA：无
+    区间内的向量指令：vld.8x128 128，vmul.8x128.f32 128，vst.8x128 128
+    8 份输入的周期数：[170, 170, 170, 170, 170, 170, 170, 170]
+## Pallas，f32[8,128]：起点不动，终点逐个 bundle 向后移动
+  到 bundle 521 为止：  0    { s1: sld s1, [smem:0x3ffe6] }
+  到 bundle 522 为止：  3    { s0: sadd.s32 s14, s6, s1 ; s1: sld s13, [smem:s6 + s1] }
+  到 bundle 523 为止：  7    { s0: sadd.s32 s15, 1, s13 }
+  到 bundle 524 为止：  8    { s1: sst [smem:s14], s15 }
+  到 bundle 525 为止：  9    { misc: vtrace 0x80000003 }    # scale.1 开始
+  到 bundle 526 为止： 10    { s0: simm.s32 s0, 8 ; s1: simm.s32 s1, 0 }
+  到 bundle 527 为止： 11    {}
+  到 bundle 528 为止： 12    { vld: vld.8x128 v0, [vmem:s0] }
+  到 bundle 529 为止： 13    { va0: vmul.8x128.f32 v1, 2.0, v0 }
+  到 bundle 530 为止： 14    { vst: vst.8x128 [vmem:s1], v1 }
+  到 bundle 531 为止： 15    { misc: cfence }
+  到 bundle 532 为止： 16    { misc: vtrace 0x90000003 }
+  到 bundle 533 为止： 17    { s0: simm.s32 s17, 0 ; s1: sld s16, [smem:0x3ffe6] }
+  到 bundle 534 为止： 21    { s0: sadd.s32 s19, s17, s16 ; s1: sld s18, [smem:s17 + s16] }
+  到 bundle 535 为止： 25    { s0: sadd.s32 s20, 1, s18 }
+  到 bundle 536 为止： 26    { s1: sst [smem:s19], s20 }
+  到 bundle 537 为止： 27    { misc: vtrace 0x80000004 }    # pin.3 开始
+  到 bundle 538 为止： 28    { misc: cfence }
+  到 bundle 539 为止： 29    { misc: vtrace 0x90000004 }
+  到 bundle 540 为止： 30    { s1: sld s21, [smem:0x3ffe6] }
+  到 bundle 541 为止： 34    { s0: sadd.s32 s23, s17, s21 ; s1: sld s22, [smem:s17 + s21] }
+  到 bundle 542 为止： 38    { s0: sadd.s32 s24, 1, s22 }
+  到 bundle 543 为止： 39    { s1: sst [smem:s23], s24 }
+  到 bundle 544 为止： 40    { misc: vtrace 0x80000005 }    # unpin.3 开始
+  到 bundle 545 为止： 41    { misc: cfence }
+  到 bundle 546 为止： 42    { misc: vtrace 0x90000005 }

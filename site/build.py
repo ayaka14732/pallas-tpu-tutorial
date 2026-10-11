@@ -25,6 +25,7 @@ GITHUB_URL = "https://github.com/ayaka14732/pallas-tpu-tutorial"
 EXTERNAL_REPOSITORIES = {
     "pallas-tpu-readings-dev": "https://github.com/ayaka14732/pallas-tpu-readings-dev",
     "tpu-v4-latency-numbers": "https://github.com/ayaka14732/tpu-v4-latency-numbers",
+    "tpu-v4-top-k": "https://github.com/ayaka14732/tpu-v4-top-k",
     "tpuasm": "https://github.com/ayaka14732/tpuasm",
 }
 ASSET_SUFFIXES = {

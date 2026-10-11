@@ -1,0 +1,41 @@
+## y = 2x + 1，f32[1024,128]
+  XLA：unpin.2 是 f32[1024,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 677)，其中的 HLO 指令：multiply_add_fusion；DMA：无
+    区间内的向量指令：vadd.8x128.f32 128，vld.8x128 128，vmul.8x128.f32 128，vst.8x128 128
+    8 份输入的周期数：[172, 172, 172, 172, 172, 172, 172, 172]
+  Pallas：unpin.2.x_vmem 是 f32[1024,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    区间是 bundle [521, 677)，其中的 HLO 指令：affine.1；DMA：无
+    区间内的向量指令：vadd.8x128.f32 128，vld.8x128 128，vmul.8x128.f32 128，vst.8x128 128
+    8 份输入的周期数：[172, 172, 172, 172, 172, 172, 172, 172]
+## y = 2x + 1，f32[16,8]
+  XLA：unpin.2 是 f32[16,8]{1,0:T(8,128)S(1)}；unpin.3 是 f32[16,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [527, 557)，其中的 HLO 指令：multiply_add_fusion；DMA：无
+    8 份输入的周期数：[46, 46, 46, 46, 46, 46, 46, 46]
+  Pallas：unpin.2.x_vmem 是 f32[16,8]{1,0:T(8,128)S(1)}；unpin.3 是 f32[16,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [527, 557)，其中的 HLO 指令：affine.1；DMA：无
+    8 份输入的周期数：[46, 46, 46, 46, 46, 46, 46, 46]
+## y = 2x + 1，f32[16,8]，只去掉布局约束
+  XLA：unpin.2 是 f32[16,8]{0,1:T(8,128)S(1)}；unpin.3 是 f32[16,8]{0,1:T(8,128)S(1)}
+    区间是 bundle [521, 548)，其中的 HLO 指令：multiply_add_fusion；DMA：无
+    8 份输入的周期数：[43, 43, 43, 43, 43, 43, 43, 43]
+  Pallas：编译失败：INVALID_ARGUMENT: during context [post-layout]: Seen buffers while buffers aren't allowed in this context: %copy.1 = b(f32[16,8]{0,1:T(8,128)}) copy(%pin.3)
+## 两个结果：top-8，f32[8,128]
+  XLA（is_stable=True）：unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[8,8]{1,0:T(8,128)S(1)}；unpin.5 是 s32[8,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [529, 1068)，其中的 HLO 指令：iota、sort；DMA：cmem → vmem
+    8 份输入的周期数：[2725, 2721, 2723, 2722, 2722, 2723, 2721, 2721]
+  XLA（is_stable=False）：unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[8,8]{1,0:T(8,128)S(1)}；unpin.5 是 s32[8,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [529, 974)，其中的 HLO 指令：iota、sort；DMA：cmem → vmem
+    8 份输入的周期数：[2564, 2566, 2565, 2563, 2564, 2566, 2564, 2564]
+  Pallas：unpin.3.x_vmem 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[8,8]{1,0:T(8,128)S(1)}；unpin.5 是 s32[8,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [529, 621)，其中的 HLO 指令：top_k.1；DMA：无
+    8 份输入的周期数：[685, 685, 685, 685, 685, 685, 685, 685]
+## top-8，f32[8,128]，只去掉 optimization_barrier
+  XLA（is_stable=True）：unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[8,8]{1,0:T(8,128)S(1)}；unpin.5 是 s32[8,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [529, 1093)，其中的 HLO 指令：iota、sort、copy.4；DMA：cmem → vmem、vmem → hbm
+    8 份输入的周期数：[3136, 3140, 3139, 3138, 3139, 3136, 3137, 3137]
+  Pallas：unpin.3.x_vmem 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[8,8]{1,0:T(8,128)S(1)}；unpin.5 是 s32[8,8]{1,0:T(8,128)S(1)}
+    区间是 bundle [529, 646)，其中的 HLO 指令：top_k.1、copy.4；DMA：vmem → hbm
+    8 份输入的周期数：[1100, 1100, 1100, 1100, 1100, 1100, 1100, 1099]
+## top-8，f32[8,128]：改为给每条 HLO 指令各插一对读数
+  XLA（is_stable=True）：iota 43，sort 2634；合计 2677
+  Pallas：top_k.1 661；合计 661

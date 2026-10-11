@@ -1,0 +1,32 @@
+## 沿通道：cumsum(x, axis=1)；Pallas 用 Hillis–Steele
+  XLA：430 个周期；区间 230 个 bundle，HLO 指令：reduce_window_sum.1；DMA：无
+    端点：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 129，vld.8x128 145，vmov.8x128 1，vpop.8x128 17，vst.8x128 161，vxpose.0.8x128 7，vxpose.0.end.8x128 1，vxpose.0.start.end.8x128 1，vxpose.2.8x128 7，vxpose.2.start.8x128 1
+  Pallas：531 个周期；区间 56 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 7，vand.8x128.u32 1，vlaneseq.8x128.u32 1，vld.8x128 1，vlt.8x128.s32 7，vpop.8x128 7，vrot.0.8x128 2，vrot.1.8x128 2，vrot.2.8x128 2，vrot.3.8x128 1，vsel.8x128 7，vst.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## 沿通道：cumsum(x, axis=1)；Pallas 用 MXU
+  XLA：430 个周期；区间 230 个 bundle，HLO 指令：reduce_window_sum.1；DMA：无
+    端点：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 129，vld.8x128 145，vmov.8x128 1，vpop.8x128 17，vst.8x128 161，vxpose.0.8x128 7，vxpose.0.end.8x128 1，vxpose.0.start.end.8x128 1，vxpose.2.8x128 7，vxpose.2.start.8x128 1
+  Pallas：173 个周期；区间 65 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.s32 15，vand.8x128.u32 1，vdwg.128x128.f16 1，vimm.8x128.s32 2，vlaneseq.8x128.u32 1，vld.8x128 1，vle.8x128.s32 16，vmatmul.8x128.f32 1，vmatpush.packed.msk.8x128.f16 8，vpackc.8x128.f32.f16 8，vpop.8x128 1，vsel.8x128 16，vshrl.8x128.s32 1，vsmask 8，vst.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## 沿子通道：cumsum(x, axis=0)；Pallas 用 Hillis–Steele
+  XLA：59 个周期；区间 43 个 bundle，HLO 指令：reduce_window_sum.1；DMA：无
+    端点：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 9，vld.8x128 10，vmov.8x128 1，vst.8x128 11
+  Pallas：65 个周期；区间 49 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 3，vlaneseq.8x128.u32 1，vld.8x128 1，vlt.8x128.s32 3，vrot.slane.down.8x128.u32 17，vsel.8x128 3，vshrl.8x128.s32 1，vst.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## 沿子通道：cumsum(x, axis=0)；Pallas 逐行广播
+  XLA：59 个周期；区间 43 个 bundle，HLO 指令：reduce_window_sum.1；DMA：无
+    端点：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 9，vld.8x128 10，vmov.8x128 1，vst.8x128 11
+  Pallas：52 个周期；区间 36 个 bundle，HLO 指令：scan.1；DMA：无
+    端点：unpin.2.x_vmem 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[8,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 7，vld.8x128 8，vst.8x128 8
+  Pallas 与 XLA 的结果逐元素相同：True

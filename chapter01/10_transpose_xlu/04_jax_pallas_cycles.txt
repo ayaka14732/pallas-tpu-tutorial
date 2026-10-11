@@ -1,0 +1,48 @@
+## x.T，f32[128,128]
+  XLA：268 个周期；区间 86 个 bundle，HLO 指令：copy；DMA：无
+    端点：unpin.2 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 16，vpop.8x128 16，vst.8x128 16，vxpose.0.8x128 14，vxpose.0.end.8x128 1，vxpose.0.start.8x128 1
+  Pallas：267 个周期；区间 85 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 16，vpop.8x128 16，vst.8x128 16，vxpose.0.8x128 14，vxpose.0.end.8x128 1，vxpose.0.start.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## 两个 f32[128,128] 各自转置
+  XLA：527 个周期；区间 172 个 bundle，HLO 指令：copy、copy；DMA：无
+    端点：unpin.4 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.6 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.7 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 32，vpop.8x128 32，vst.8x128 32，vxpose.0.8x128 28，vxpose.0.end.8x128 2，vxpose.0.start.8x128 2
+  Pallas：285 个周期；区间 144 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.4.refs_0_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5.refs_1_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.6 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.7 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 32，vpop.8x128 32，vst.8x128 32，vxpose.0.8x128 7，vxpose.0.end.8x128 1，vxpose.1.8x128 7，vxpose.1.end.8x128 1，vxpose.2.8x128 7，vxpose.2.start.8x128 1，vxpose.3.8x128 7，vxpose.3.start.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## x.T，bf16[128,128]
+  XLA：288 个周期；区间 104 个 bundle，HLO 指令：copy；DMA：无
+    端点：unpin.2 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}
+    向量指令：vld.8x128 24，vpackc.8x128.f32.f16 8，vpop.8x128 16，vst.8x128 24，vunpackl.8x128.f16.f32 8，vunpacku.8x128.f16.f32 8，vxpose.0.8x128 14，vxpose.0.end.8x128 1，vxpose.0.start.8x128 1
+  Pallas：267 个周期；区间 54 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}
+    向量指令：vld.8x128 8，vpop.8x128 8，vst.8x128 8，vxpose.0.packed.8x128 6，vxpose.0.packed.end.8x128 1，vxpose.0.packed.start.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## x.T，f32[256,256]
+  XLA：397 个周期；区间 195 个 bundle，HLO 指令：copy；DMA：无
+    端点：unpin.2 是 f32[256,256]{1,0:T(8,128)S(1)}；unpin.3 是 f32[256,256]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 64，vpop.8x128 64，vst.8x128 64，vxpose.0.8x128 14，vxpose.0.end.8x128 2，vxpose.1.8x128 14，vxpose.1.end.8x128 2，vxpose.2.8x128 14，vxpose.2.start.8x128 2，vxpose.3.8x128 14，vxpose.3.start.8x128 2
+  Pallas：396 个周期；区间 194 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[256,256]{1,0:T(8,128)S(1)}；unpin.3 是 f32[256,256]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 64，vpop.8x128 64，vst.8x128 64，vxpose.0.8x128 14，vxpose.0.end.8x128 2，vxpose.1.8x128 14，vxpose.1.end.8x128 2，vxpose.2.8x128 14，vxpose.2.start.8x128 2，vxpose.3.8x128 14，vxpose.3.start.8x128 2
+  Pallas 与 XLA 的结果逐元素相同：True
+## x.T，f32[129,129]
+  XLA：277 个周期；区间 141 个 bundle，HLO 指令：copy；DMA：无
+    端点：unpin.2 是 f32[129,129]{1,0:T(8,128)S(1)}；unpin.3 是 f32[129,129]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 34，vpop.8x128 34，vst.8x128 34，vxpose.0.8x128 14，vxpose.0.end.8x128 2，vxpose.1.8x128 14，vxpose.1.end.8x128 2，vxpose.2.8x128 14，vxpose.2.start.8x128 2，vxpose.3.8x128 14，vxpose.3.start.8x128 2
+  Pallas：395 个周期；区间 147 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[129,129]{1,0:T(8,128)S(1)}；unpin.3 是 f32[129,129]{1,0:T(8,128)S(1)}
+    向量指令：vand.8x128.u32 1，veq.8x128.s32 2，vlaneseq.8x128.u32 1，vld.8x128 34，vmand.8x128.u1 1，vpop.8x128 34，vshrl.8x128.s32 1，vst.8x128 17，vst.msk.8x128 17，vxpose.0.8x128 7，vxpose.0.start.8x128 1，vxpose.0.start.end.8x128 1，vxpose.1.8x128 7，vxpose.1.start.8x128 1，vxpose.1.start.end.8x128 1，vxpose.2.8x128 7，vxpose.2.end.8x128 1，vxpose.3.8x128 7，vxpose.3.end.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## x.T，f32[8,128]
+  XLA：268 个周期；区间 58 个 bundle，HLO 指令：copy；DMA：无
+    端点：unpin.2 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[128,8]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 1，vpop.8x128 16，vst.8x128 16，vxpose.0.start.end.8x128 1
+  Pallas：267 个周期；区间 57 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[8,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[128,8]{1,0:T(8,128)S(1)}
+    向量指令：vand.8x128.u32 1，vlaneseq.8x128.u32 1，vld.8x128 1，vlt.8x128.s32 1，vpop.8x128 16，vst.msk.8x128 16，vxpose.0.start.end.8x128 1
+  Pallas 与 XLA 的结果逐元素相同：True

@@ -64,7 +64,7 @@ remote DMA 是一条 `dma.general`：
 { misc: vwait.ge [sflag:54], 8 }                  # wait_recv：等自己的接收信号量
 ```
 
-源和目的都是 `[vmem:...]`，目的地址指的是对方 TensorCore 的 TC VMEM。`src_flag` 是发送信号量（`sflag:53`），数据发出后它在本方加 8；`dst_flag` 是对方的接收信号量 `(2 + 对方编号) << 13 | 54`，数据到达后它在对方加 8。`ici_dest` 是 `0x80008000 | (2 + 对方编号) << 26`，低 12 位留给芯片编号，这里为 0。三处都用“2 + TensorCore 编号”表示目标 TensorCore，只是所在的位不同。双方执行同样的指令，所以每方的接收信号量 `sflag:54` 由对方的 DMA 填满。第一章第 3 节 HBM → HBM 复制时出现过的 `dma.general` 与 `ici_dest`，在这里有了用途：它们描述的是目的地在哪个 TensorCore、哪颗芯片。
+源和目的都是 `[vmem:...]`，目的地址指的是对方 TensorCore 的 TC VMEM。`src_flag` 是发送信号量（`sflag:53`），数据发出后它在本方加 8；`dst_flag` 是对方的接收信号量 `(2 + 对方编号) << 13 | 54`，数据到达后它在对方加 8。`ici_dest` 是 `0x80008000 | (2 + 对方编号) << 26`，低 12 位留给芯片编号，这里为 0。三处都用“2 + TensorCore 编号”表示目标 TensorCore，只是所在的位不同。双方执行同样的指令，所以每方的接收信号量 `sflag:54` 由对方的 DMA 填满。第一章第 4 节 HBM → HBM 复制时出现过的 `dma.general` 与 `ici_dest`，在这里有了用途：它们描述的是目的地在哪个 TensorCore、哪颗芯片。
 
 > 暂且可以理解为：`ici_dest` 编码了目的 TensorCore 所在的芯片与编号，同一颗芯片内与跨芯片使用同样的格式。第 5、6 节会看到跨芯片的情况，并用 tpuasm 改写其中的字段。
 

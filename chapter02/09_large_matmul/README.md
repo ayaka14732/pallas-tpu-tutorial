@@ -4,7 +4,7 @@
 
 ## 由硬件估算下限
 
-**计算。** 一个 TensorCore 有 4 个 MXU（`pltpu.get_tpu_info()` 的 `num_mxus=4`），第三章第 5 节测得一个 MXU 每 8 个周期接收一个 8 行的 LHS TC VREG，与已装入 MXU 的 `128×128` RHS 块相乘（第一章第 10 节；下文把装入 MXU 的 RHS 块称为权重），即每周期 128 × 128 = 16384 次乘加。两个 TensorCore 共 8 个 MXU，每周期 131072 次乘加。这个问题有 2048³ ≈ 8.6 × 10⁹ 次乘加，至少要 **65536 个周期**。
+**计算。** 一个 TensorCore 有 4 个 MXU（`pltpu.get_tpu_info()` 的 `num_mxus=4`），第一章第 11 节测得一个 MXU 每 8 个周期接收一个 8 行的 LHS TC VREG，与已装入 MXU 的 `128×128` RHS 块相乘（第一章第 11 节；下文把装入 MXU 的 RHS 块称为权重），即每周期 128 × 128 = 16384 次乘加。两个 TensorCore 共 8 个 MXU，每周期 131072 次乘加。这个问题有 2048³ ≈ 8.6 × 10⁹ 次乘加，至少要 **65536 个周期**。
 
 **数据。** LHS、RHS 各 8 MiB，输出 16 MiB。若两个 TensorCore 各算一半的行，每个都要读全部 RHS，HBM 上共读写约 40 MiB；按第 2 节每 KiB 约 1 个周期计，约 4 万个周期，比计算少。所以这是一个计算受限的问题：只要搬运与计算重叠，时间就由 MXU 决定。不能重叠的只有两段：第一块数据到达之前，和最后一块结果写回之时。
 
@@ -30,13 +30,13 @@ XLA 先把整个 LHS 预取进 Megacore Shared CMEM（`S(3)`，第 3 节），fu
 
 | | TensorCore 0 | TensorCore 1 |
 | --- | ---: | ---: |
-| `copy-done`（LHS 进入 CMEM） | 9138 | 9168 |
-| `fusion` | 74832 | 74775 |
-| 整个程序 | 105024 | 84122 |
+| `copy-done`（LHS 进入 CMEM） | 9210 | 9240 |
+| `fusion` | 74787 | 74737 |
+| 整个程序 | 115504 | 84208 |
 
-> 暂且可以理解为：TensorCore 有一个每周期加 1 的计数器，`tpuasm_tools.KernelClock` 在已编译程序的指定位置插入读数，程序运行之后取回。第三章第 3 节详细介绍它；TensorCore 0 的整个程序还包含一段 kernel 之前的 runtime 代码，所以比较整个程序时用 TensorCore 1。
+周期数用第一章第 3 节的 `tpuasm_tools.KernelClock` 读出；TensorCore 0 的整个程序还包含一段 kernel 之前的 runtime 代码，所以比较整个程序时用 TensorCore 1。
 
-XLA 用了 84122 个周期，比下限多约 18600 个周期，其中约 9100 个是 LHS 进入 CMEM 之前完全不能计算的时间。
+XLA 用了 84208 个周期，比下限多约 18700 个周期，其中约 9200 个是 LHS 进入 CMEM 之前完全不能计算的时间。
 
 ## Pallas：每个 TensorCore 一半的行
 
@@ -69,7 +69,7 @@ def _(block: jax.Array) -> None:
     store(block, slot).start()
 ```
 
-RHS 块是一个宽数组的列窗口，起点在运行时才知道，按第一章第 7 节用 `pl.multiple_of` 标明对齐：
+RHS 块是一个宽数组的列窗口，起点在运行时才知道，按第一章第 8 节用 `pl.multiple_of` 标明对齐：
 
 ```python
 rhs_hbm.at[:, pl.ds(pl.multiple_of(block * BLOCK, BLOCK), BLOCK)]
@@ -152,7 +152,7 @@ def _(row: jax.Array) -> None:
 
 ### 剩下的时间去了哪里
 
-版本 4 比 65536 个周期的下限多约 15000 个周期。开头和结尾不能重叠的部分约 2000 个周期；其余来自 MXU 没有满负荷。每次 `jnp.dot` 算 256 行时，每个 `128×128` 的权重只用于 256 / 16 = 16 条打包的 `vmatmul`，之后就要换下一块权重：8 次 `vmatpush` 加一次 `vdwg`（第一章第 10 节）。清单中 `vmatpush` 与 `vmatmul` 的条数之比约为 1 : 2，换权重占用了 MXU 的大量发射机会。版本 5 把每次 `jnp.dot` 的行数加倍，每块权重用于 32 条 `vmatmul`，降到 78305 个周期，比 XLA 快 7%。
+版本 4 比 65536 个周期的下限多约 15000 个周期。开头和结尾不能重叠的部分约 2000 个周期；其余来自 MXU 没有满负荷。每次 `jnp.dot` 算 256 行时，每个 `128×128` 的权重只用于 256 / 16 = 16 条打包的 `vmatmul`，之后就要换下一块权重：8 次 `vmatpush` 加一次 `vdwg`（第一章第 11 节）。清单中 `vmatpush` 与 `vmatmul` 的条数之比约为 1 : 2，换权重占用了 MXU 的大量发射机会。版本 5 把每次 `jnp.dot` 的行数加倍，每块权重用于 32 条 `vmatmul`，降到 78305 个周期，比 XLA 快 7%。
 
 版本 5 的代价是代码量：Mosaic 把每次 `jnp.dot` 完全展开成指令，kernel 段由版本 4 的 17764 个 bundle 增加到 19238 个。行数再加大，溢出区还会超过 TC VMEM 的容量（前一小节）。
 
@@ -166,4 +166,4 @@ def _(row: jax.Array) -> None:
 - 把 DMA 拆小之后，还要控制它们的先后：同时发出的 DMA 分享带宽，谁也不会先到。
 - `jnp.dot` 的大小同时受溢出区容量、程序大小和权重复用率的限制：太大放不下，太小 MXU 要频繁换权重。
 
-要进一步接近下限，需要直接控制 MXU 的权重装入与 `vmatmul` 的顺序（第一章第 10 节的 MXU FIFO 接口与 tpuasm 修正），让一块权重在更多行上复用。
+要进一步接近下限，需要直接控制 MXU 的权重装入与 `vmatmul` 的顺序（第一章第 11 节的 MXU FIFO 接口与 tpuasm 修正），让一块权重在更多行上复用。

@@ -78,7 +78,7 @@ TensorCore 没有自己发起这次 DMA。它把长度、主机地址和请求�
 INTERNAL: LLO_CHECK failure (.../llo_region_builder.cc:5132) multiplier_in_bytes % word_size == 0 (512 == 0) 512 4096
 ```
 
-用 `pl.multiple_of` 声明对齐也不能绕过。第一章第 7 节用它向编译器保证一个运行时的起点是 tile 的倍数；这里把输出写成 `f32[32,128]`，每页是 8 行的窗口，起始行声明为 8 的倍数：
+用 `pl.multiple_of` 声明对齐也不能绕过。第一章第 8 节用它向编译器保证一个运行时的起点是 tile 的倍数；这里把输出写成 `f32[32,128]`，每页是 8 行的窗口，起始行声明为 8 的倍数：
 
 ```python
 window = pages_host.at[pl.ds(pl.multiple_of(page_smem[0] * 8, 8), 8)]

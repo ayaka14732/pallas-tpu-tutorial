@@ -1,0 +1,48 @@
+## bf16[64,128] → f32
+  XLA：50 个周期；区间 34 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 bf16[64,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 4，vst.8x128 8，vunpackl.8x128.f16.f32 4，vunpacku.8x128.f16.f32 4
+  Pallas：50 个周期；区间 34 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 bf16[64,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vld.8x128 4，vst.8x128 8，vunpackl.8x128.f16.f32 4，vunpacku.8x128.f16.f32 4
+  Pallas 与 XLA 的结果逐元素相同：True
+## f32[64,128] → bf16
+  XLA：49 个周期；区间 33 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 bf16[64,128]{1,0:T(8,128)(2,1)S(1)}
+    向量指令：vld.8x128 8，vpackc.8x128.f32.f16 4，vst.8x128 4
+  Pallas：49 个周期；区间 33 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 bf16[64,128]{1,0:T(8,128)(2,1)S(1)}
+    向量指令：vld.8x128 8，vpackc.8x128.f32.f16 4，vst.8x128 4
+  Pallas 与 XLA 的结果逐元素相同：True
+## f32[64,128] → int32
+  XLA：50 个周期；区间 34 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 s32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vcvt.8x128.f32.s32 8，vld.8x128 8，vst.8x128 8
+  Pallas：50 个周期；区间 34 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 f32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 s32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vcvt.8x128.f32.s32 8，vld.8x128 8，vst.8x128 8
+  Pallas 与 XLA 的结果逐元素相同：True
+## int32[64,128] → f32
+  XLA：50 个周期；区间 34 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 s32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vcvt.8x128.s32.f32 8，vld.8x128 8，vst.8x128 8
+  Pallas：50 个周期；区间 34 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 s32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 f32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vcvt.8x128.s32.f32 8，vld.8x128 8，vst.8x128 8
+  Pallas 与 XLA 的结果逐元素相同：True
+## int8[64,128] → int32
+  XLA：59 个周期；区间 43 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 s8[64,128]{1,0:T(8,128)(4,1)S(1)}；unpin.3 是 s32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vand.8x128.u32 1，vlaneseq.8x128.u32 1，vld.sshfl.8x128 8，vshll.8x128.s32 8，vshra.8x128.s32 8，vshrl.8x128.s32 1，vst.8x128 8，vsub.8x128.s32 1
+  Pallas：114 个周期；区间 73 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 s8[64,128]{1,0:T(8,128)(4,1)S(1)}；unpin.3 是 s32[64,128]{1,0:T(8,128)S(1)}
+    向量指令：vand.8x128.u32 1，vlaneseq.8x128.u32 1，vld.8x128 8，vld.sshfl.8x128 8，vshll.8x128.s32 8，vshra.8x128.s32 8，vshrl.8x128.s32 1，vst.8x128 16，vsub.8x128.s32 1
+  Pallas 与 XLA 的结果逐元素相同：True
+## int32[64,128] → int8
+  XLA：71 个周期；区间 55 个 bundle，HLO 指令：convert_element_type.1；DMA：无
+    端点：unpin.2 是 s32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 s8[64,128]{1,0:T(8,128)(4,1)S(1)}
+    向量指令：vand.8x128.u32 16，vld.8x128 8，vor.8x128.u32 8，vpackc.8x128.f32.f16 16，vshll.8x128.s32 16，vst.8x128 8
+  Pallas：155 个周期；区间 97 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.2.refs_0_ 是 s32[64,128]{1,0:T(8,128)S(1)}；unpin.3 是 s8[64,128]{1,0:T(8,128)(4,1)S(1)}
+    向量指令：vand.8x128.u32 16，vld.8x128 16，vor.8x128.u32 8，vpackc.8x128.f32.f16 16，vshll.8x128.s32 16，vst.8x128 16
+  Pallas 与 XLA 的结果逐元素相同：True

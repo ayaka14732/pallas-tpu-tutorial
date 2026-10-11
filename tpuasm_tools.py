@@ -1,4 +1,4 @@
-"""教程脚本共用的 tpuasm 辅助函数：编译、读取机器清单、统计指令、改写并运行 executable。
+"""教程脚本共用的 tpuasm 辅助函数：编译、读取机器清单、统计指令、改写并运行 executable，以及用设备上的周期计数器 LCC 计时。
 
 所有编译产物证据都来自 executable 中实际的程序映像，经 tpuasm 反汇编得到带物理槽位和 Pallas 源码注释的清单。完整清单包含 runtime 的 prologue、例程和 epilogue；`kernel_listing` 只保留编译器归属到 HLO 指令（Pallas kernel 或 XLA fusion）的函数段。
 """
@@ -11,7 +11,10 @@ import re
 from typing import Any, cast
 
 import jax
+from jax import Ref
+from jax._src.state import primitives as state
 from jax.experimental import pallas as pl
+from jax.experimental.layout import Layout, with_layout_constraint
 from jax.experimental.pallas import tpu as pltpu
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
@@ -199,7 +202,7 @@ def reload_saved(address: int = 0x80) -> str:
     return ''.join(bundle(f'vld: vld.8x128 v{register}, [vmem:0x{address + 8 * index:x}]') for index, register in enumerate(SAVED)) + bundle('misc: vnop') * 16
 
 class LccProbe:
-    """在一个载体 kernel 中插入手写片段，用 LCC（或 GTC）读数计时（参照 tpu-v4-latency-numbers 第 0 节）。
+    """在一个载体 kernel 中插入手写片段，用 LCC（或 GTC）读数计时（第一章第 3 节；参照 tpu-v4-latency-numbers 第 0 节）。
 
     片段约定：第 i 次读数用 read_lcc(20 + i) 或 read_gtc(20 + i)，i 从 0 起，最多 4 次；片段不得改写存放读数的 s20–s23、s25–s28；v20–v30 保存着载体的标量寄存器，片段若要改写，须在 setup 中用 spill_saved() 存起来、在最后一次读数之后用 reload_saved() 读回。读数经载体的输出 DMA 返回。片段之前已把 TC VMEM 地址 0 起的输入读进 v10；输入是 u32[256,128] 的随机数，片段可以把它当作数据。setup 在第一次读数之前执行，之后由一条 sfence 排空，不计入区间。num_cores=2 时，两个 TensorCore 执行同一段片段，各自返回读数。进程打开多颗芯片时，device 选择载体在第几颗芯片上运行。
     """
@@ -289,9 +292,21 @@ class LccProbe:
         counters = self.run_raw(body, 3, repeats, setup)[:, 0].astype(np.int64)
         return counters[:, 1:] - counters[:, :1]
 
+LCC_END = read_lcc(21) + bundle('s0: sfence') + read_lcc(22)  # 片段的结尾：R1、sfence、R2
+
+def show_lcc(probe: LccProbe, label: str, body: str, setup: str = '') -> None:
+    """运行片段 8 次，打印出现过的 (R1 − R0, R2 − R0)。"""
+    print(f'  {label}：(R1 − R0, R2 − R0) = {sorted({tuple(row) for row in probe.run(body, setup=setup).tolist()})}')
+
+def show_latency(probe: LccProbe, name: str, issue: str, fetch: str, setup: str = '', after: str = '', distances: tuple[int, ...] = (1, 2, 4, 6, 7, 8, 12, 40)) -> None:
+    """测一条“提交—取回”通路的延迟：在提交指令 issue 与取回指令 fetch 之间插入 d − 1 个 vnop。取回要等结果时 R2 − R0 不随 d 变化，结果已经就绪后每次加 1。after 是读数之后还要执行的清单（例如取走队列中剩下的结果）。"""
+    print(f'## {name}')
+    for distance in distances:
+        show_lcc(probe, f'd = {distance:2d}', read_lcc(20) + bundle(issue) + bundle('misc: vnop') * (distance - 1) + bundle(fetch) + LCC_END + after, setup)
+
 CLOCK_BASE = 0x20000  # SMEM 中存放 KernelClock 读数的位置：第 i 个读数的低、高 32 位在 CLOCK_BASE + 2i 与 + 2i + 1
 CLOCK_SAVE = 0x20100  # 读数时借用 s30、s31，原值暂存在这里
-CLOCK_OVERHEAD = 20  # 相邻两次 clock_read 之间，读数自身占用的周期数（第三章第 3 节实测）
+CLOCK_OVERHEAD = 20  # 相邻两次 clock_read 之间，读数自身占用的周期数（第一章第 3 节实测）
 
 def clock_read(index: int, counter: str = 'lcc') -> str:
     """读一次 LCC 并存进 SMEM 的一段清单：先 sfence 等此前的向量工作全部发射，再在同一个 bundle 中读 LCC 的两半。借用的 s30、s31 读完后恢复。counter='gtc' 时改读 GTC。"""
@@ -318,12 +333,30 @@ def hlo_bounds(serialized: bytes) -> dict[int, tuple[int, int]]:
 
 MODULE = 0xFFFFFFF  # 整个程序（XProf 中的 module）的 vtrace 标记所用的序号
 
+NO_CODE = ('parameter', 'get-tuple-element', 'bitcast', 'tuple')  # 不生成代码、因而没有起止标记的 HLO 指令
+_HLO_INSTRUCTION = re.compile(r'^\s*(?:ROOT )?%([\w.\-]+) = .*?\s([\w\-]+)\((?:%|\d|\))', re.MULTILINE)  # 编译后的 HLO 中一条指令的名称与操作码
+
 def hlo_ops(compiled: Compiled) -> list[tuple[str, int, int]]:
-    """按执行顺序列出 (名称, 起始标记的 bundle, 结束标记的 bundle)：每条有 vtrace 标记的 HLO 指令一项，整个程序一项（名称为 module）。HLO 指令的序号就是它在编译后入口函数中的次序（参数不计），名称由此取得。"""
+    """按执行顺序列出 (名称, 起始标记的 bundle, 结束标记的 bundle)：每条有 vtrace 标记的 HLO 指令一项，整个程序一项（名称为 module）。
+
+    名称优先取自清单的注释：XLA 的指令在它的第一个 bundle 前有一行 `# entry bundle: %名称 = ...`，Pallas kernel 等 custom call 的函数段以 `# function ... [symbol N, 名称]` 开头。没有注释的指令（如 copy-start）按标记中的序号取名：序号是它在编译后入口函数的指令中的次序，但 get-tuple-element、bitcast 这类不生成代码的指令不占序号。
+    """
+    serialized = serialize(compiled)
+    notes, pc = [], 0
+    for line in full_listing(serialized).splitlines():
+        if line.startswith('{'):
+            pc += 1
+        elif line.startswith('# entry bundle: %'):
+            notes.append((pc, line.split('%')[1].split(' ')[0]))
+        elif line.startswith('# function '):
+            notes.append((pc, cast(re.Match[str], re.search(r'\[symbol \d+, ([^\]]+)\]', line)).group(1)))
     text = compiled.as_text()
     entry = text[text.index('\nENTRY'):].split('\n}')[0]
-    names = [name for name, opcode in re.findall(r'^\s*(?:ROOT )?%([\w.\-]+) = .*?\s([\w\-]+)\((?:%|\d|\))', entry, re.MULTILINE) if opcode != 'parameter']
-    result = [('module' if number == MODULE else names[number] if number < len(names) else f'op{number}', start, end) for number, (start, end) in hlo_bounds(serialize(compiled)).items()]
+    ordered = [name for name, opcode in _HLO_INSTRUCTION.findall(entry) if opcode not in NO_CODE]
+    result = []
+    for number, (start, end) in hlo_bounds(serialized).items():
+        noted = next((name for at, name in notes if start <= at <= end), None)
+        result.append(('module' if number == MODULE else noted or (ordered[number] if number < len(ordered) else f'op{number}'), start, end))
     return sorted(result, key=lambda item: item[1])
 
 class KernelClock:
@@ -343,6 +376,16 @@ class KernelClock:
             insertions[pc] = insertions.get(pc, '') + clock_read(index, counter)
         return load(insert_bundles(serialize(compiled), insertions), compiled)
 
+    def interval(self, compiled: Compiled, first: int, last: int, call: Callable[[Compiled], Any], samples: int = 1, core: int = 0) -> list[int]:
+        """区间 [first, last) 的周期数：在这两个 bundle 之前各读一次，call(executable) 运行一次程序，读数差减去读数自身的 20 个周期。返回 samples 次运行各自的值。"""
+        timed = self.instrument(compiled, [first, last])
+        cycles = []
+        for _ in range(samples):
+            call(timed)
+            readings = self.read(2)[core].astype(np.int64)
+            cycles.append(int(readings[1] - readings[0]) - CLOCK_OVERHEAD)
+        return cycles
+
     def time_ops(self, compiled: Compiled, call: Callable[[Compiled], Any], samples: int = 8) -> list[tuple[str, list[int]]]:
         """给整个程序和其中每条 HLO 指令计时：在各自 vtrace 起止标记的位置插入读数，call(executable) 运行一次程序，共运行 samples 次。返回 [(名称, 每个 TensorCore 的周期数)]，取各次运行的中位数，已扣除读数自身的开销（区间内每次读数 20 个周期）。"""
         ops = hlo_ops(compiled)
@@ -354,11 +397,13 @@ class KernelClock:
         for _ in range(samples):
             call(timed)
             runs.append(self.read(len(points)).astype(np.int64))
-        readings = np.median(np.array(runs), axis=0).astype(np.int64)
+        readings = np.array(runs)
         result = []
         for k, (name, _, _) in enumerate(ops):
             first, last = order[2 * k], order[2 * k + 1]
-            result.append((name, (readings[:, last] - readings[:, first] - CLOCK_OVERHEAD * (last - first)).tolist()))
+            # 先对每次运行求差，再取耗时的中位数。绝对 LCC 随运行单调递增，先取中位数只会挑到中间一两次运行。
+            durations = readings[:, :, last] - readings[:, :, first] - CLOCK_OVERHEAD * (last - first)
+            result.append((name, np.median(durations, axis=0).astype(np.int64).tolist()))
         return result
 
     def kernel_cycles(self, compiled: Compiled, call: Callable[[Compiled], Any], samples: int = 8, core: int = 0) -> int:
@@ -380,3 +425,129 @@ class KernelClock:
             words.append(tiles[:, :last - first, 0, 0].astype(np.uint64))
         halves = np.concatenate(words, axis=1).reshape(self.probe.num_cores, count, 2)
         return halves[:, :, 0] | (halves[:, :, 1] << np.uint64(32))
+
+# 以下是第一章第 3 节的 TC VMEM 计时边界：输入和每个结果都固定在 TC VMEM，只测中间的计算段。
+
+def row_layout(x: jax.Array) -> Layout:
+    """Pallas kernel 在 TC VMEM 中的二维数组所用的布局：行优先，按 8 个子通道乘 128 个通道切成 tile，HLO 中写作 {1,0:T(8,128)}；16 bit、8 bit 的元素再按 (2,1)、(4,1) 打包。"""
+    packing = 4 // x.dtype.itemsize
+    return Layout(major_to_minor=(0, 1), tiling=((8, 128), (packing, 1)) if packing > 1 else ((8, 128),))
+
+def pinned(x: jax.Array, constrain: bool = True) -> jax.Array:
+    """把一个值固定在 TC VMEM（HLO 的 layout 中出现 S(1)）；constrain 为 True 时再把二维数组的布局约束为 row_layout。布局约束必须加在 Unpin 之后。"""
+    y = state.unpin(state.pin(x, to='vmem'))
+    return with_layout_constraint(y, row_layout(x)) if constrain and x.ndim == 2 else y
+
+def vmem_kernel(f: Callable[..., Any], name: str = 'kernel') -> Callable[..., Any]:
+    """把函数 f 包成一个操作数和结果都在 TC VMEM 的 Pallas kernel：没有 DMA，也没有信号量。f 的每个参数、每个结果各对应一个 Ref。"""
+    def function(*arguments: jax.Array) -> Any:
+        shapes = jax.eval_shape(f, *arguments)
+        several = isinstance(shapes, (tuple, list))
+        outputs = tuple(shapes) if several else (shapes,)
+
+        @pl.kernel(
+            out_type=tuple(pltpu.VMEM(output.shape, output.dtype) for output in outputs),
+            mesh=pltpu.TensorCoreMesh(axis_name='tc', num_cores=1),
+            name=name,
+            compiler_params=pltpu.CompilerParams(
+                disable_bounds_checks=True,
+                disable_semaphore_checks=True,
+            ),
+        )
+        def kernel(*refs: Ref) -> None:
+            results = f(*(ref[...] for ref in refs[:len(arguments)]))
+            for ref, value in zip(refs[len(arguments):], results if several else (results,)):
+                ref[...] = value
+
+        results = kernel(*(pltpu.with_memory_space_constraint(argument, pltpu.VMEM) for argument in arguments))
+        return results if several else results[0]
+
+    return function
+
+def vmem_shell(function: Callable[..., Any], mesh: jax.sharding.Mesh, *, constrain: bool = True, barrier: bool = True) -> Callable[..., Any]:
+    """外壳：每个输入和每个结果都经过 pinned；多个输入、多个结果各自共同经过 optimization_barrier。"""
+    def program(*arguments: jax.Array) -> Any:
+        inputs = tuple(pinned(argument, constrain) for argument in arguments)
+        result = function(*(jax.lax.optimization_barrier(inputs) if barrier and len(inputs) > 1 else inputs))
+        if isinstance(result, jax.Array):
+            return pinned(result, constrain)
+        outputs = tuple(pinned(item, constrain) for item in result)
+        return jax.lax.optimization_barrier(outputs) if barrier else outputs
+
+    # out_specs 只有一个 P() 时，它对结果的每个叶子都适用。
+    return jax.shard_map(
+        program,
+        mesh=mesh,
+        in_specs=P(),
+        out_specs=P(),
+        check_vma=False,
+    )
+
+def vmem_interval(compiled: Compiled, inputs: int = 1) -> tuple[int, int, list[str], list[str], list[str], str]:
+    """计时区间 [first, last)：从最晚的一个输入的 Unpin 结束，到最晚的一个结果的 Unpin 结束。同时返回各个端点在 HLO 中的类型与 layout、区间内有代码的 HLO 指令、区间内的 DMA，以及区间内的清单。"""
+    text = compiled.as_text()
+    entry = text[text.index('\nENTRY'):].split('\n}')[0]
+    layouts = [f'{name} 是 {layout}' for name, layout in re.findall(r'%(unpin[\w.]*) = (\S+) custom-call', entry)]
+    ops = hlo_ops(compiled)
+    unpins = [end for name, _, end in ops if name.startswith('unpin')]
+    first, last = max(unpins[:inputs]) + 1, max(unpins[inputs:]) + 1
+    inside = [name for name, start, end in ops if first <= start and end < last and not name.startswith(('pin', 'unpin'))]
+    moves, lines, pc = [], [], -1
+    for line in full_listing(serialize(compiled)).splitlines():
+        pc += line.startswith('{')
+        if first <= pc < last:
+            lines.append(line)
+            moves += [f'{source} → {destination}' for destination, source in re.findall(r'dma\.\w+ \[(\w+):[^\]]*\], \[(\w+):', line.split('#')[0])]
+    return first, last, layouts, inside, moves, '\n'.join(lines)
+
+def vector_counts(listing: str) -> Counter[str]:
+    """清单中向量指令的条数（不计 vtrace 与 vnop）。"""
+    return Counter({mnemonic: count for mnemonic, count in count_mnemonics(listing).items() if mnemonic.startswith(('v', 'cld')) and not mnemonic.startswith(('vtrace', 'vnop'))})
+
+class VmemTiming:
+    """一段计算在 TC VMEM 边界内的计时结果：cycles 是每份输入的周期数（读数差减 20），bundles 是区间内的 bundle 数，listing 是区间内的清单，result 是最后一份输入的输出。"""
+
+    def __init__(self, cycles: list[int], first: int, last: int, layouts: list[str], inside: list[str], moves: list[str], listing: str, result: Any) -> None:
+        self.cycles, self.first, self.last, self.layouts, self.inside, self.moves, self.listing, self.result = cycles, first, last, layouts, inside, moves, listing, result
+        self.bundles = last - first
+
+    def summary(self) -> str:
+        """周期数的写法：每次相同时只写一个值，否则写中位数与范围。"""
+        low, high = min(self.cycles), max(self.cycles)
+        return str(low) if low == high else f'{int(np.median(self.cycles))}（{low}–{high}）'
+
+def time_in_vmem(clock: KernelClock, function: Callable[..., Any], runs: list[tuple[Any, ...]], check: Callable[..., None] | None = None, **options: bool) -> VmemTiming:
+    """把 function 放进 vmem_shell 编译，在区间两端各读一次 LCC。runs 的每一项是一份输入（参数的 tuple），各运行一次；check(result, *arguments) 核对每次的输出。"""
+    mesh = jax.make_mesh((1,), ('device',))
+    compiled = compile(vmem_shell(function, mesh, **options), *runs[0], mesh=mesh)
+    first, last, layouts, inside, moves, listing = vmem_interval(compiled, len(runs[0]))
+    timed = clock.instrument(compiled, [first, last])
+    cycles = []
+    for arguments in runs:
+        result = timed(*arguments)
+        jax.block_until_ready(result)
+        readings = clock.read(2)[0].astype(np.int64)
+        cycles.append(int(readings[1] - readings[0]) - CLOCK_OVERHEAD)
+        if check is not None:
+            check(result, *arguments)
+    return VmemTiming(cycles, first, last, layouts, inside, moves, listing, jax.tree.map(np.asarray, result))
+
+def compare_in_vmem(clock: KernelClock, name: str, f: Callable[..., Any], runs: list[tuple[Any, ...]], check: Callable[..., None] | None = None, pallas: Callable[..., Any] | None = None) -> dict[str, VmemTiming]:
+    """同一个运算分别由原生 XLA 和 Pallas kernel 实现，放进同一个 TC VMEM 边界计时，打印周期数与边界的证据。pallas 省略时用 vmem_kernel(f)；编译失败时打印报错的第一行。"""
+    print(f'## {name}')
+    timings = {}
+    for kind, function in (('XLA', f), ('Pallas', pallas or vmem_kernel(f))):
+        try:
+            timing = time_in_vmem(clock, function, runs, check)
+        except Exception as error:
+            print(f'  {kind}：编译失败：{str(error).split(", metadata=")[0].splitlines()[0][:200]}')
+            continue
+        counts = vector_counts(timing.listing)
+        print(f'  {kind}：{timing.summary()} 个周期；区间 {timing.bundles} 个 bundle，HLO 指令：{"、".join(timing.inside)}；DMA：{"、".join(sorted(set(timing.moves))) or "无"}')
+        print(f'    端点：{"；".join(timing.layouts)}')
+        print(f'    向量指令：{"，".join(f"{mnemonic} {counts[mnemonic]}" for mnemonic in sorted(counts))}')
+        timings[kind] = timing
+    if len(timings) == 2:
+        same = all(np.array_equal(a, b, equal_nan=True) for a, b in zip(jax.tree.leaves(timings['XLA'].result), jax.tree.leaves(timings['Pallas'].result)))
+        print(f'  Pallas 与 XLA 的结果逐元素相同：{same}')
+    return timings

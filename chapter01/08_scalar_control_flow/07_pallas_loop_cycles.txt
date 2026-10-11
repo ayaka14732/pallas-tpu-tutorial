@@ -1,0 +1,30 @@
+## Python for（展开）：106 个周期；区间 90 个 bundle
+## pl.loop(0, 64)：424 个周期；区间 30 个 bundle
+  L_0210:
+  { s0: sshll.u32 s7, s6, 0x3 ; s1: sadd.s32 s6, 1, s6 }
+  { s0: sadd.s32 s10, s7, s0 ; s1: sadd.s32 s13, s7, s1 }
+  { s0: sge.s32 p0, s6, 64 ; vld: vld.8x128 v0, [vmem:s10] }
+  { va0: vmul.8x128.f32 v1, 2.0, v0 }
+  { s0: @!p0 sbr.rel L_0210 }
+  { vst: vst.8x128 [vmem:s13], v1 }
+## pl.loop(0, 64, unroll=2)：264 个周期；区间 31 个 bundle
+  L_0210:
+  { s0: sshll.u32 s7, s6, 0x3 ; s1: sadd.s32 s6, 2, s6 }
+  { s0: sadd.s32 s10, s7, s0 ; s1: sadd.s32 s13, s7, s1 }
+  { s0: sge.s32 p0, s6, 64 ; vld: vld.8x128 v0, [vmem:s10] }
+  { va0: vmul.8x128.f32 v1, 2.0, v0 ; vld: vld.8x128 v2, [vmem:s10 + 0x8] }
+  { va0: vmul.8x128.f32 v3, 2.0, v2 }
+  { s0: @!p0 sbr.rel L_0210 ; vst: vst.8x128 [vmem:s13], v1 }
+  { vst: vst.8x128 [vmem:s13 + 0x8], v3 }
+## pl.loop(0, 64, unroll=4)：184 个周期；区间 33 个 bundle
+  L_0210:
+  { s0: sshll.u32 s7, s6, 0x3 ; s1: sadd.s32 s6, 4, s6 }
+  { s0: sadd.s32 s10, s7, s0 ; s1: sadd.s32 s13, s7, s1 }
+  { s0: sge.s32 p0, s6, 64 ; vld: vld.8x128 v0, [vmem:s10] }
+  { va0: vmul.8x128.f32 v1, 2.0, v0 ; vld: vld.8x128 v2, [vmem:s10 + 0x8] }
+  { va0: vmul.8x128.f32 v3, 2.0, v2 ; vld: vld.8x128 v4, [vmem:s10 + 0x10] }
+  { va0: vmul.8x128.f32 v5, 2.0, v4 ; vst: vst.8x128 [vmem:s13], v1 ; vld: vld.8x128 v6, [vmem:s10 + 0x18] }
+  { va0: vmul.8x128.f32 v7, 2.0, v6 ; vst: vst.8x128 [vmem:s13 + 0x8], v3 }
+  { s0: @!p0 sbr.rel L_0210 ; vst: vst.8x128 [vmem:s13 + 0x10], v5 }
+  { vst: vst.8x128 [vmem:s13 + 0x18], v7 }
+## pl.loop(0, 64, unroll=8)：144 个周期；区间 37 个 bundle

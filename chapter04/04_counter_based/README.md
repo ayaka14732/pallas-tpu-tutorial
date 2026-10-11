@@ -62,7 +62,7 @@ TensorCore 没有循环移位指令，`rotate_left(v, r)` 要拆成三条：`vsh
 “计算指令”是向量运算，不含访存与同步。从 64 行到 128 行，每多一个 TC VREG：
 
 - **threefry2x32 增加 135.5 条**，与上面约 120 条的估计相符。`rows = 8` 时的 267 条中，约 130 条是固定开销：`key` 与 `fold_in` 本身也是一次 threefry hash，作用在两个标量上；清单中这部分还用到了 XLU 的 `vrot` 与 `spop`，把 key 的两个字从 lane 中取出。
-- **Philox 4x32 增加 268.6 条**，是 threefry 的两倍。Philox 每轮要做两次 32 × 32 → 64 位乘法；第一章第 6 节说过，TPU v4 的向量单元没有整数乘法器，这里乘数是常数，编译器把乘法展开成移位与加减。小尺寸时（8–32 行）Philox 的指令数几乎不变：实验每次 hash 产生 4 个字，`rows` 很小时只用到一个 TC VREG 的一部分，却仍要算满整个 TC VREG。实验用的是 JAX 中 `jax.experimental.pallas.ops.tpu.random.philox` 的 `philox_4x32`，只统计指令，没有与其他实现比较数值。
+- **Philox 4x32 增加 268.6 条**，是 threefry 的两倍。Philox 每轮要做两次 32 × 32 → 64 位乘法；第一章第 7 节说过，TPU v4 的向量单元没有整数乘法器，这里乘数是常数，编译器把乘法展开成移位与加减。小尺寸时（8–32 行）Philox 的指令数几乎不变：实验每次 hash 产生 4 个字，`rows` 很小时只用到一个 TC VREG 的一部分，却仍要算满整个 TC VREG。实验用的是 JAX 中 `jax.experimental.pallas.ops.tpu.random.philox` 的 `philox_4x32`，只统计指令，没有与其他实现比较数值。
 - **硬件 `vrng` 增加 1 条**，就是 `vrng` 本身；约 120 条的种子混合只付一次（第 3 节）。
 
 `vld` + `vst` 一列说明了另一个问题。threefry 对整个数组逐元素计算，Mosaic 把所有行同时展开：`rows = 128` 时 16 个输出 TC VREG 各自需要 `x0`、`x1` 和中间值，远超 TC VREG 的数量，溢出到 TC VMEM，读写多达 1441 条。所以计数器式生成器应当分块调用，每次只生成几十行；第 6 节的计时就是每次 64 行。

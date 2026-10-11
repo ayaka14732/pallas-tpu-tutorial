@@ -1,0 +1,30 @@
+## 16 轮相互依赖的链
+  vadd.8x128.f32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vsub.8x128.f32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vmul.8x128.f32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vmax.8x128.f32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vmin.8x128.f32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vadd.8x128.s32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vsub.8x128.s32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vand.8x128.u32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vor.8x128.u32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vxor.8x128.u32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vshll.8x128.s32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vshrl.8x128.s32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vshra.8x128.s32：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vpcnt：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vclz：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vmov.8x128：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vsel.8x128（掩码不变）：16 个 bundle，R2 − R0 = 29（互不等待时是 29）
+  vcvt.8x128.f32.s32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vcvt.8x128.s32.f32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vunpackl.8x128.f16.f32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vpackc.8x128.f32.f16：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vrot.slane.down.8x128.u32：16 个 bundle，R2 − R0 = 43（互不等待时是 29）
+  vgt.8x128.f32 → vsel（两条一轮）：32 个 bundle，R2 − R0 = 45（互不等待时是 45）
+  vgt.8x128.s32 → vsel（两条一轮）：32 个 bundle，R2 − R0 = 45（互不等待时是 45）
+  vld → vadd.s32（两条一轮，读别的 tile）：32 个 bundle，R2 − R0 = 45（互不等待时是 45）
+  vadd.f32 → vmax.f32（两条一轮）：32 个 bundle，R2 − R0 = 60（互不等待时是 45）
+## 指令相同、先后不同：8 条互不依赖的 vadd.f32 和写出各自结果的 8 条 vst
+  每条 vadd 后面紧跟它的 vst：(R1 − R0, R2 − R0) = [(17, 36)]
+  先 8 条 vadd，再 8 条 vst：(R1 − R0, R2 − R0) = [(17, 29)]

@@ -1,0 +1,14 @@
+## kernel 主体
+  509: { s0: dma.simple [vmem:s7], [hbm:s0], length=8, dst_flag=[sflag:52] }
+  510: { misc: vwait.ge [sflag:52], 8 }
+  511: { vld: vld.8x128 v0, [vmem:0x0] ; misc: vsyncadd.s32 [sflag:52], -8 }
+  512: { va0: vmul.8x128.f32 v1, 2.0, v0 }
+  513: { vst: vst.8x128 [vmem:0x0], v1 }
+  514: { s0: dma.simple [hbm:s1], [vmem:s7], length=8, dst_flag=[sflag:52] }
+  515: { misc: vwait.ge [sflag:52], 8 }
+  516: { misc: vsyncadd.s32 [sflag:52], -8 }
+## 周期数（区间 [first, last)，8 次运行）
+  整个 kernel（两个 vtrace 标记之间），bundle [503, 534)：[874, 874, 918, 992, 901, 875, 876, 876]，中位数 876
+  输入 DMA：发起到等待结束，bundle [509, 511)：[445, 445, 617, 446, 445, 445, 446, 446]，中位数 445
+  计算：vld、vmul、vst，bundle [511, 514)：[1, 1, 1, 1, 1, 1, 1, 1]，中位数 1
+  输出 DMA：发起到等待结束，bundle [514, 517)：[407, 407, 407, 406, 407, 408, 408, 407]，中位数 407

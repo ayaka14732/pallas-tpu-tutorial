@@ -1,0 +1,56 @@
+## bf16[16,128] @ bf16[128,128]
+  XLA：176 个周期；区间 45 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.4 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 bf16[16,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[16,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 1，vld.8x128 9，vmatmul.packed.8x128.f16 1，vmatpush.packed.8x128.f16 8，vpop.8x128 2，vst.8x128 2
+  Pallas：176 个周期；区间 45 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.4.refs_1_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3.refs_0_ 是 bf16[16,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[16,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 1，vld.8x128 9，vmatmul.packed.8x128.f16 1，vmatpush.packed.8x128.f16 8，vpop.8x128 2，vst.8x128 2
+  Pallas 与 XLA 的结果逐元素相同：True
+## bf16[128,128] @ bf16[128,128]
+  XLA：211 个周期；区间 78 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.3 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.4 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 16，vmatmul.packed.8x128.f16 8，vmatpush.packed.8x128.f16 32，vpop.8x128 16，vst.8x128 16
+  Pallas：211 个周期；区间 78 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.3.refs_0_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.4.refs_1_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 16，vmatmul.packed.8x128.f16 8，vmatpush.packed.8x128.f16 32，vpop.8x128 16，vst.8x128 16
+  Pallas 与 XLA 的结果逐元素相同：True
+## bf16[1024,128] @ bf16[128,128]
+  XLA：435 个周期；区间 252 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.4 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3 是 bf16[1024,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 72，vmatmul.packed.8x128.f16 64，vmatpush.packed.8x128.f16 32，vpop.8x128 128，vst.8x128 128
+  Pallas：435 个周期；区间 252 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.4.refs_1_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.3.refs_0_ 是 bf16[1024,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[1024,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 72，vmatmul.packed.8x128.f16 64，vmatpush.packed.8x128.f16 32，vpop.8x128 128，vst.8x128 128
+  Pallas 与 XLA 的结果逐元素相同：True
+## f32[128,128] @ f32[128,128]，默认精度
+  XLA：214 个周期；区间 91 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.3 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 32，vmatmul.packed.8x128.f16 8，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 16，vpop.8x128 16，vst.8x128 16
+  Pallas：214 个周期；区间 94 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.3.refs_0_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.4.refs_1_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 32，vmatmul.8x128.f32 16，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 8，vpop.8x128 16，vst.8x128 16
+  Pallas 与 XLA 的结果逐元素相同：True
+## f32[128,128] @ f32[128,128]，precision=HIGHEST
+  XLA：451 个周期；区间 357 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.3 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.4 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 80，vand.8x128.u32 64，vdwg.128x128.f16 4，vld.8x128 46，vmatmul.hi.8x128.f32 77，vmatmul.hi.dwg.8x128.f32 3，vmatmul.low.8x128.f32 15，vmatmul.low.dwg.8x128.f32 1，vmatpush.hi.8x128.f32 112，vmatpush.low.8x128.f32 16，vpop.8x128 96，vsel.8x128 16，vst.8x128 30，vsub.8x128.f32 64，vweird.8x128.f32 16
+  Pallas：446 个周期；区间 351 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.3.refs_0_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.4.refs_1_ 是 f32[128,128]{1,0:T(8,128)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 80，vand.8x128.u32 64，vdwg.128x128.f16 4，vld.8x128 47，vmatmul.hi.8x128.f32 77，vmatmul.hi.dwg.8x128.f32 3，vmatmul.low.8x128.f32 15，vmatmul.low.dwg.8x128.f32 1，vmatpush.hi.8x128.f32 112，vmatpush.low.8x128.f32 16，vpop.8x128 96，vst.8x128 31，vsub.8x128.f32 64
+  Pallas 与 XLA 的结果逐元素相同：True
+## bf16[128,256] @ bf16[256,128]
+  XLA：247 个周期；区间 126 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.3 是 bf16[128,256]{1,0:T(8,128)(2,1)S(1)}；unpin.4 是 bf16[256,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 16，vdwg.128x128.f16 4，vld.8x128 32，vmatmul.packed.8x128.f16 16，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 16，vpop.8x128 32，vst.8x128 16，vunpackl.8x128.f16.f32 16，vunpacku.8x128.f16.f32 16
+  Pallas：247 个周期；区间 127 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.3.refs_0_ 是 bf16[128,256]{1,0:T(8,128)(2,1)S(1)}；unpin.4.refs_1_ 是 bf16[256,128]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,128]{1,0:T(8,128)S(1)}
+    向量指令：vadd.8x128.f32 16，vdwg.128x128.f16 4，vld.8x128 32，vmatmul.packed.8x128.f16 16，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 16，vpop.8x128 32，vst.8x128 16，vunpackl.8x128.f16.f32 16，vunpacku.8x128.f16.f32 16
+  Pallas 与 XLA 的结果逐元素相同：True
+## bf16[128,128] @ bf16[128,256]
+  XLA：248 个周期；区间 109 个 bundle，HLO 指令：fusion；DMA：无
+    端点：unpin.3 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.4 是 bf16[128,256]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,256]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 24，vmatmul.packed.8x128.f16 16，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 16，vpop.8x128 32，vst.8x128 32，vunpackl.8x128.f16.f32 16，vunpacku.8x128.f16.f32 16
+  Pallas：248 个周期；区间 109 个 bundle，HLO 指令：kernel.1；DMA：无
+    端点：unpin.3.refs_0_ 是 bf16[128,128]{1,0:T(8,128)(2,1)S(1)}；unpin.4.refs_1_ 是 bf16[128,256]{1,0:T(8,128)(2,1)S(1)}；unpin.5 是 f32[128,256]{1,0:T(8,128)S(1)}
+    向量指令：vdwg.128x128.f16 4，vld.8x128 24，vmatmul.packed.8x128.f16 16，vmatpush.packed.8x128.f16 32，vpackc.8x128.f32.f16 16，vpop.8x128 32，vst.8x128 32，vunpackl.8x128.f16.f32 16，vunpacku.8x128.f16.f32 16
+  Pallas 与 XLA 的结果逐元素相同：True

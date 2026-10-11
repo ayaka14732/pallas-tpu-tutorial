@@ -12,7 +12,7 @@
 - 让 kernel 读写主机内存，并知道这条通路的开销；
 - 读懂 XLA 对大矩阵乘法的安排，并写出不慢于它的 Pallas kernel。
 
-本章引用的时延来自 [tpu-v4-latency-numbers](../../tpu-v4-latency-numbers/README.md)；它们是怎样测出来的，第三章详细介绍。
+本章的周期数用第一章第 3 节的办法在设备上读出；引用的 DMA 开销模型来自 [tpu-v4-latency-numbers](../../tpu-v4-latency-numbers/README.md)，测法相同。跨 TensorCore、跨芯片的时间怎样比较，第三章第 5 节介绍。
 
 ## 本章目录
 

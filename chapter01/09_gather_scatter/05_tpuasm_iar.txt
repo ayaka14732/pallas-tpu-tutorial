@@ -1,0 +1,18 @@
+## vld.iar0 读的是表的哪一行（表从 0x80 起，第 r 行第 l 列的值是 128r + l）
+  vsetiar.raw：通道号不变：True；行号等于 s + i[s,l]：True
+  vsetiar.lane：通道号不变：True；行号等于 s + i[0,l]：True
+  vsetiar.sublane：通道号不变：True；行号等于 s + 16 × i[s,l]：True
+## sublane gather：y[s,l] = x[i[s,l], l]
+  与 np.take_along_axis(x, i, axis=0) 相同：True
+  7 条指令（2 条 vst、vsub、vand、vsetiar、vld.iar，加一条使用结果的 vadd）：R2 − R0 = 24
+## sublane scatter：y[i[s,l], l] = x[s,l]，每列的 i 是 0–7 的一个排列
+  与 np.put_along_axis(y, i, x, axis=0) 相同：True
+## 计时：R2 − R0（其中 13 个周期是读数与排空的固定开销）
+  vld，紧接着使用：15
+  vld.iar0，紧接着使用：15
+  vsetiar.raw、vld.iar0，紧接着使用：19
+  vst 之后从同一个 tile vld.iar0，紧接着使用：20
+  16 条 vld：29
+  16 条 vld.iar0：29
+  16 条 vst：29
+  16 条 vst.iar：29

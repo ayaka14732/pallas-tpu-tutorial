@@ -116,5 +116,5 @@ def device_ns(event: dict) -> float:
     return event['stats']['device_duration_ps'] / 1000
 
 def device_cycles(event: dict) -> float:
-    """把事件在设备上的持续时间折算成 TensorCore 的周期数：GTC 高 60 位每走 2 个计数对应 3 个周期，即按 1.05 GHz 换算。这是折算而不是计数：分辨率是 1.5 个周期，而且只在本芯片的时钟与 GTC 的时间源同步时才准确（第三章第 6、7 节）。"""
+    """把事件在设备上的持续时间折算成 TensorCore 的周期数：GTC 高 60 位每走 2 个计数对应 3 个周期，即按 1.05 GHz 换算。这是折算而不是计数：分辨率是 1.5 个周期，而且只在本芯片的时钟与 GTC 的时间源同步时才准确（第三章第 5、6 节）。"""
     return event['stats'].get('device_duration_ps', event['duration_ps']) * 1.05e-3

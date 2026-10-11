@@ -23,7 +23,7 @@
 
 - **向量单元不能直接访问 HBM。** 它只能把 TC VMEM 中的数据读进 TC VREG（load），在 TC VREG 上运算，再写回 TC VMEM（store）。
 - **HBM 与 TC VMEM 之间的数据由 DMA 搬运。** DMA（direct memory access）是一个独立于向量单元的搬运机构：标量单元发出“把这一段从这里搬到那里”的请求之后，搬运在后台进行，TensorCore 可以继续执行别的指令。
-- **数据以 tile 为单位处理。** 一个 TC VREG 是 8 行 × 128 列，所以数组被切成 `8×128` 的块，每块称为一个 tile。本节的例子 `f32[8,128]` 恰好是一个 tile。行与列在硬件上分别叫 sublane 和 lane（本章第 4 节）。
+- **数据以 tile 为单位处理。** 一个 TC VREG 是 8 行 × 128 列，所以数组被切成 `8×128` 的块，每块称为一个 tile。本节的例子 `f32[8,128]` 恰好是一个 tile。行与列在硬件上分别叫 sublane 和 lane（本章第 5 节）。
 
 所以一个 kernel 最基本的形态就是三步：用 DMA 把输入从 HBM 搬到 TC VMEM，在 TC VMEM 与 TC VREG 之间读、算、写，再用 DMA 把结果搬回 HBM。下面的最小 kernel 正是这三步。
 
@@ -139,7 +139,7 @@ kernel 主体只有三行。
 pltpu.async_copy(x_hbm, x_vmem, sem).wait()
 ```
 
-TensorCore 的向量单元只能读写 TC VMEM，不能直接访问 HBM，所以 HBM 中的数据必须先用 DMA 搬进来。`pltpu.async_copy(源, 目的, 信号量)` 发起一次 DMA 并立即返回一个描述符，DMA 在后台进行；`.wait()` 等到这次 DMA 完成。如果不等待就去读 `x_vmem`，读到的可能是还没有搬完的旧数据，所以每次 DMA 都要在使用它的结果之前等待。发起和等待可以分开写，中间插入不依赖这次 DMA 的其他工作，本章第 3 节会用到这一点。
+TensorCore 的向量单元只能读写 TC VMEM，不能直接访问 HBM，所以 HBM 中的数据必须先用 DMA 搬进来。`pltpu.async_copy(源, 目的, 信号量)` 发起一次 DMA 并立即返回一个描述符，DMA 在后台进行；`.wait()` 等到这次 DMA 完成。如果不等待就去读 `x_vmem`，读到的可能是还没有搬完的旧数据，所以每次 DMA 都要在使用它的结果之前等待。发起和等待可以分开写，中间插入不依赖这次 DMA 的其他工作，本章第 4 节会用到这一点。
 
 第二行是计算：
 
@@ -164,7 +164,7 @@ ENTRY %main.1 (x_hbm.1: f32[8,128]) -> f32[8,128] {
 ROOT %scale.1 = f32[8,128]{1,0:T(8,128)} custom-call(%x_hbm.1), custom_call_target="tpu_custom_call", ...
 ```
 
-输出的 layout 写作 `{1,0:T(8,128)}`：数组在 HBM 中也是按 `8×128` 的 tile 存放的，与 TC VREG 的形状一致，所以 DMA 搬进 TC VMEM 的数据可以直接一个 tile 一个 tile 地读进 TC VREG。本章第 3、4 节会反复用到这一点。
+输出的 layout 写作 `{1,0:T(8,128)}`：数组在 HBM 中也是按 `8×128` 的 tile 存放的，与 TC VREG 的形状一致，所以 DMA 搬进 TC VMEM 的数据可以直接一个 tile 一个 tile 地读进 TC VREG。本章第 4、5 节会反复用到这一点。
 
 实验脚本不直接调用 `jax.jit`，而是用 [`tpuasm_tools.compile`](../../tpuasm_tools.py)。两者的编译结果相同，后者在编译时保留源码位置，以便下一节读机器清单。
 
@@ -214,7 +214,7 @@ compiler_params=pltpu.CompilerParams(
 )
 ```
 
-实验把输入 DMA 改为只搬 `x_hbm.at[pl.ds(8, 8)]`（第 8–15 行，`.at[]` 的写法见本章第 3 节），在四种参数下编译同一个 kernel：
+实验把输入 DMA 改为只搬 `x_hbm.at[pl.ds(8, 8)]`（第 8–15 行，`.at[]` 的写法见本章第 4 节），在四种参数下编译同一个 kernel：
 
 | 参数 | kernel 段 bundle 数 | `shalt` 条数 |
 | --- | ---: | ---: |

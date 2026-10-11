@@ -1,0 +1,44 @@
+## f32[8,128]，k = 1
+  XLA，is_stable=False：1992 个周期；区间 951 个 bundle，XLU 提交 214 次；HLO 指令：custom-call；DMA：无
+  XLA，is_stable=True：1992 个周期；区间 951 个 bundle，XLU 提交 214 次；HLO 指令：custom-call；DMA：无
+  Pallas，lax.top_k：117 个周期；区间 47 个 bundle，XLU 提交 2 次；HLO 指令：top_k.1；DMA：无
+  Pallas，掩码排除已选位置：193 个周期；区间 49 个 bundle，XLU 提交 2 次；HLO 指令：top_k.1；DMA：无
+  Pallas，抬高：120 个周期；区间 52 个 bundle，XLU 提交 3 次；HLO 指令：top_k.1；DMA：无
+  Pallas，秩计数：772 个周期；区间 469 个 bundle，XLU 提交 129 次；HLO 指令：top_k.1；DMA：无
+## f32[8,128]，k = 8
+  XLA，is_stable=False：2565（2563–2567） 个周期；区间 445 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  XLA，is_stable=True：2722（2721–2724） 个周期；区间 539 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  Pallas，lax.top_k：685 个周期；区间 92 个 bundle，XLU 提交 16 次；HLO 指令：top_k.1；DMA：无
+  Pallas，掩码排除已选位置：1355 个周期；区间 127 个 bundle，XLU 提交 16 次；HLO 指令：top_k.1；DMA：无
+  Pallas，抬高：695 个周期；区间 111 个 bundle，XLU 提交 17 次；HLO 指令：top_k.1；DMA：无
+  Pallas，秩计数：798 个周期；区间 490 个 bundle，XLU 提交 136 次；HLO 指令：top_k.1；DMA：无
+## f32[8,128]，k = 16
+  XLA，is_stable=False：2564（2563–2565） 个周期；区间 445 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  XLA，is_stable=True：2723（2721–2724） 个周期；区间 539 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  Pallas，lax.top_k：1341 个周期；区间 148 个 bundle，XLU 提交 32 次；HLO 指令：top_k.1；DMA：无
+  Pallas，掩码排除已选位置：2683 个周期；区间 229 个 bundle，XLU 提交 32 次；HLO 指令：top_k.1；DMA：无
+  Pallas，抬高：1351 个周期；区间 180 个 bundle，XLU 提交 33 次；HLO 指令：top_k.1；DMA：无
+  Pallas，秩计数：830 个周期；区间 508 个 bundle，XLU 提交 144 次；HLO 指令：top_k.1；DMA：无
+## f32[8,128]，k = 32
+  XLA，is_stable=False：2565（2563–2566） 个周期；区间 445 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  XLA，is_stable=True：2722（2722–2724） 个周期；区间 539 个 bundle，XLU 提交 56 次；HLO 指令：iota、sort；DMA：cmem → vmem
+  Pallas，lax.top_k：2653 个周期；区间 274 个 bundle，XLU 提交 64 次；HLO 指令：top_k.1；DMA：无
+  Pallas，掩码排除已选位置：5339 个周期；区间 429 个 bundle，XLU 提交 64 次；HLO 指令：top_k.1；DMA：无
+  Pallas，抬高：2663 个周期；区间 316 个 bundle，XLU 提交 65 次；HLO 指令：top_k.1；DMA：无
+  Pallas，秩计数：894 个周期；区间 546 个 bundle，XLU 提交 160 次；HLO 指令：top_k.1；DMA：无
+## 汇总：f32[8,128]，k = 1、8、16、32
+  XLA，is_stable=False：1992、2565（2563–2567）、2564（2563–2565）、2565（2563–2566）
+  XLA，is_stable=True：1992、2722（2721–2724）、2723（2721–2724）、2722（2722–2724）
+  Pallas，lax.top_k：117、685、1341、2653
+  Pallas，掩码排除已选位置：193、1355、2683、5339
+  Pallas，抬高：120、695、1351、2663
+  Pallas，秩计数：772、798、830、894
+## 只改形状，k = 8
+  f32[8,256]，XLA，is_stable=False：编译失败：INTERNAL: during context [post-optimization]: Fused computation shape ((f32[8,8]{1,0:T(8,128)}, s32[8,8]{1,0:T(8,128)})) is not equal to the fusion shape ((f32[
+  f32[8,256]，Pallas，lax.top_k：1325 个周期；区间 142 个 bundle；DMA：无
+  f32[8,1024]，XLA，is_stable=False：6101 个周期；区间 4084 个 bundle；DMA：无
+  f32[8,1024]，Pallas，lax.top_k：1445 个周期；区间 317 个 bundle；DMA：无
+  f32[64,128]，XLA，is_stable=False：2680（2679–2681） 个周期；区间 2000 个 bundle；DMA：cmem → vmem
+  f32[64,128]，Pallas，lax.top_k：766 个周期；区间 365 个 bundle；DMA：无
+  f32[128,128]，XLA，is_stable=False：5260（5258–5263） 个周期；区间 2912 个 bundle；DMA：cmem → vmem、vmem → cmem
+  f32[128,128]，Pallas，lax.top_k：1235 个周期；区间 666 个 bundle；DMA：无
